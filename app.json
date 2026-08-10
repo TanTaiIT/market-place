@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Ghim",
+    "slug": "ghim",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "ghim",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#B98851"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.ghim.app"
+    },
+    "android": {
+      "package": "com.ghim.app",
+      "edgeToEdgeEnabled": true,
+      "adaptiveIcon": {
+        "backgroundColor": "#B98851"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

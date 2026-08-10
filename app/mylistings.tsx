@@ -1,0 +1,105 @@
+import React from 'react';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeInDown, SlideOutRight } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
+import { useToast } from '@/components/Toast';
+import { useDeleteListing, useMyListings } from '@/queries/listings';
+import { C, F, shadow } from '@/theme';
+
+export default function MyListings() {
+  const router = useRouter();
+  const toast = useToast();
+  const { data, isLoading } = useMyListings();
+  const del = useDeleteListing();
+
+  return (
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <ScreenHeader title="Tin đã đăng" />
+      <FlatList
+        data={data ?? []}
+        keyExtractor={(l) => String(l.id)}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, gap: 10 }}
+        renderItem={({ item, index }) => (
+          <Animated.View
+            entering={FadeInDown.delay(index * 80).duration(340)}
+            exiting={SlideOutRight.duration(280)}
+            style={styles.row}
+          >
+            <LinearGradient
+              colors={item.photo}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.photo}
+            />
+            <View style={{ flex: 1 }}>
+              <Text numberOfLines={2} style={styles.title}>
+                {item.title}
+              </Text>
+              <Text style={styles.price}>{item.price}</Text>
+              <View
+                style={[
+                  styles.badge,
+                  { backgroundColor: item.status === 'live' ? C.mossLight : '#FDEFD9' },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.badgeText,
+                    { color: item.status === 'live' ? C.moss : C.corkDark },
+                  ]}
+                >
+                  {item.status === 'live' ? 'Đang hiển thị' : 'Chờ duyệt'}
+                </Text>
+              </View>
+            </View>
+            <View style={{ gap: 6, justifyContent: 'center' }}>
+              <Pressable style={styles.iconBtn} onPress={() => router.push('/post')}>
+                <Text style={{ fontSize: 12 }}>✎</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.iconBtn, { backgroundColor: '#FCE4E1' }]}
+                onPress={() => {
+                  del.mutate(item.id);
+                  toast('🗑 Đã xoá tin đăng');
+                }}
+              >
+                <Text style={{ fontSize: 12 }}>🗑</Text>
+              </Pressable>
+            </View>
+          </Animated.View>
+        )}
+        ListEmptyComponent={
+          isLoading ? <Loading /> : <EmptyState icon="📌" text="Bạn chưa ghim tin nào lên bảng" />
+        }
+      />
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: C.paper },
+  row: {
+    flexDirection: 'row',
+    gap: 12,
+    backgroundColor: C.paperWarm,
+    borderRadius: 8,
+    padding: 10,
+    ...shadow,
+  },
+  photo: { width: 60, height: 60, borderRadius: 6 },
+  title: { fontFamily: F.uiBold, fontSize: 13, color: C.ink, marginBottom: 3 },
+  price: { fontFamily: F.monoBold, fontSize: 12, color: C.moss, marginBottom: 4 },
+  badge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
+  badgeText: { fontFamily: F.uiBold, fontSize: 9.5 },
+  iconBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: C.sand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

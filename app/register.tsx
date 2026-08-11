@@ -17,15 +17,25 @@ export default function Register() {
   const register = useRegister();
   const signIn = useSignIn();
 
-  const [form, setForm] = useState({ name: '', phone: '', org: '', password: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', org: '', password: '' });
   const set = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const submit = () =>
-    register.mutate(form, {
-      // Xem ghi chú ở login.tsx: bật phiên xong để Stack.Protected tự đổi route
-      onSuccess: (profile) => signIn({ phone: profile.phone }),
-      onError: (e: Error) => toast(e.message),
-    });
+    register.mutate(
+      {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        // BE tạo Organization mới từ tên này; slug do BE sinh ra.
+        organizationName: form.org.trim(),
+        phone: form.phone.trim() || undefined,
+      },
+      {
+        // Xem ghi chú ở login.tsx: bật phiên xong để Stack.Protected tự đổi route
+        onSuccess: (session) => signIn(session),
+        onError: (e: Error) => toast(e.message),
+      },
+    );
 
   return (
     <LinearGradient colors={[C.cork, C.corkDark]} style={{ flex: 1 }}>
@@ -39,6 +49,13 @@ export default function Register() {
             <Text style={styles.tagline}>Tham gia bảng tin trường bạn</Text>
 
             <Field label="Họ và tên" value={form.name} onChangeText={set('name')} placeholder="Nguyễn Văn A" />
+            <Field
+              label="Email"
+              value={form.email}
+              onChangeText={set('email')}
+              keyboardType="email-address"
+              placeholder="ban@truong.edu.vn"
+            />
             <Field
               label="Số điện thoại"
               value={form.phone}

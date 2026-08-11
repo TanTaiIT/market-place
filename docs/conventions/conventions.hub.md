@@ -45,4 +45,6 @@ Index **duy nhất** cho convention của repo này. Quy tắc dùng: tra ở đ
 - Lỗi hiện ra bằng `useToast()` từ `@/components/Toast`.
 - **Không secret nào được nằm trong repo này** — upload ảnh chỉ qua Cloudinary unsigned preset.
 - Comment tiếng Việt, WHY-only.
-- Verify: `npm run lint` + `npm run typecheck` (cwd = `docs/VueRoute`).
+- Dữ liệu đến từ BE thật qua SDK generated; `src/api/generated/**` không sửa tay, regen bằng `npm run api:sync`.
+- Base URL của BE: `EXPO_PUBLIC_API_URL` trong `.env` (xem `.env.example`) — thiết bị thật phải dùng IP LAN.
+- Verify: `npm run lint` + `npm run typecheck` (cwd = `docs/market-place`).

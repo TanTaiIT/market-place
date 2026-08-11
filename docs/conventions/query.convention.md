@@ -7,15 +7,34 @@ SoT cho: `src/api/**` + `src/queries/**` — key factory, read/write split, opti
 
 ## 1. Phân vai ba file
 
-| File                    | Chịu trách nhiệm                                                            | Cấm                                  |
-| ----------------------- | --------------------------------------------------------------------------- | ------------------------------------ |
-| `src/api/db.ts`         | Domain type + fixture in-memory + hằng dữ liệu (`CATEGORIES`, `CHAT_COLORS`) | Gọi hook, biết tới React             |
-| `src/api/client.ts`     | Mọi hàm truy cập dữ liệu, `async`, ném `Error` khi hỏng                      | Import React / TanStack / component  |
-| `src/api/cloudinary.ts` | Upload ảnh lên Cloudinary — dịch vụ ngoài **thật**, không phải API giả       | Chứa bất kỳ khoá bí mật nào (§9)     |
-| `src/queries/*.ts`      | Hook `useQuery`/`useMutation`, quản lý cache                                 | Chứa business rule của màn hình      |
+| File                     | Chịu trách nhiệm                                                              | Cấm                                 |
+| ------------------------ | ----------------------------------------------------------------------------- | ----------------------------------- |
+| `src/api/db.ts`          | Domain type + hằng dữ liệu (`CATEGORIES`, `CHAT_COLORS`) + state local còn lại | Gọi hook, biết tới React            |
+| `src/api/client.ts`      | Mọi hàm truy cập dữ liệu + mapper DTO → domain, ném `Error` khi hỏng           | Import React / TanStack / component |
+| `src/api/http.ts`        | Base URL + Bearer token cho SDK (`runtimeConfigPath`)                          | Import `stores/**` (§6 folder)      |
+| `src/api/generated/**`   | Output của `npm run api:sync` — **không sửa tay**, oxlint đã ignore            | Bị import ngoài `client.ts`         |
+| `src/api/cloudinary.ts`  | Upload ảnh lên Cloudinary — dịch vụ ngoài **thật**                             | Chứa bất kỳ khoá bí mật nào (§9)    |
+| `src/queries/*.ts`       | Hook `useQuery`/`useMutation`, quản lý cache                                   | Chứa business rule của màn hình     |
 
-`client.ts` hiện là **API giả** có `delay()` để loading/refetch/optimistic chạy thật. Khi lên backend:
-thay ruột từng hàm bằng `fetch()`, **giữ nguyên chữ ký và kiểu trả về** — toàn bộ hook và màn hình không đổi.
+`client.ts` gọi **BE thật** qua SDK generated từ OpenAPI của repo `market`. Chữ ký hàm giữ nguyên để
+hook và màn hình không đổi; ngoại lệ duy nhất là `id` đã thành `string` (ObjectId 24 hex), không còn là số.
+
+Ba nhóm **vẫn là local** vì BE chưa có endpoint — đừng "sửa" chúng thành fetch khi chưa có route:
+
+| Nhóm                          | Lý do                                                              |
+| ----------------------------- | ------------------------------------------------------------------ |
+| Tin đã lưu (`toggleSaved`…)    | Chưa có route favorite nào                                         |
+| Chat (`sendMessage`…)          | `POST /chats` trả 501; realtime thì đi socket, không qua OpenAPI    |
+| `createListing`               | `POST /listings` cần `categoryId` (24 hex) mà `GET /categories` = 501 |
+
+SDK **không throw**, nó trả `{ data, error }`. `unwrap()` trong `client.ts` là chỗ duy nhất đổi cả hai
+nhánh thành `Error` tiếng Việt — mọi hàm mới phải đi qua nó, đừng đọc `res.error` ở call-site.
+
+Regenerate: `npm run api:sync` (đọc `../market/openapi.json`, đổi chỗ thì set `OPENAPI_INPUT`).
+Bên `market` phải chạy `npm run openapi:export` trước để file spec mới nhất.
+
+**Listing/notification bắt buộc có token**: BE lấy tenant từ JWT, gọi ẩn danh trả
+`400 Missing tenant context`. Mọi màn dùng chúng đều nằm sau auth guard nên đúng luồng thật.
 
 Hàm trong `client.ts` phải `throw new Error('<thông điệp tiếng Việt>')` khi thất bại, không trả `null` im lặng:
 

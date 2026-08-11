@@ -1,12 +1,127 @@
+import {
+  authLogin,
+  authRegister,
+  listingGetById,
+  listingList,
+  listingRemove,
+  notificationList,
+  userGetMe,
+  userUpdateMe,
+} from './generated';
+import type { Listing as ListingDto, MeProfile, Notification as NotifDto } from './generated';
 import { CHAT_COLORS, db, NEW_PHOTOS } from './db';
-import type { Conversation, Listing, Message, Notif, Profile } from './db';
+import type { AuthSession, Conversation, Listing, Message, Notif, Profile } from './db';
+import { getCurrentUserId } from './http';
 
 /**
- * Lớp "API giả". Mọi hàm đều async + có độ trễ để React Query
- * thể hiện đúng loading / refetch / optimistic update.
- * Khi có backend thật, chỉ cần thay ruột từng hàm bằng fetch().
+ * Lớp truy cập dữ liệu. Tin đăng / hồ sơ / thông báo đi qua SDK generated (BE `market` thật);
+ * tin đã lưu và chat vẫn local vì BE chưa có endpoint (`/chats` trả 501, favorite chưa có route).
+ *
+ * Mọi hàm ném `Error` với thông điệp tiếng Việt khi thất bại — call-site hiện nó bằng một
+ * `toast` duy nhất (query.convention §5), không hàm nào trả `null` im lặng.
  */
-const delay = (ms = 450) => new Promise<void>((r) => setTimeout(r, ms));
+
+// ── SDK UNWRAP ──────────────────────────────────────────────────────
+
+type SdkResult<T> = { data?: { data: T }; error?: unknown };
+
+/** SDK không throw: nó trả `{ data, error }`. Dồn cả hai nhánh về Error tiếng Việt. */
+function unwrap<T>(res: SdkResult<T>, fallback: string): T {
+  if (res.error) {
+    const message = (res.error as { message?: unknown }).message;
+    throw new Error(typeof message === 'string' && message ? message : fallback);
+  }
+  if (!res.data) throw new Error(fallback);
+  return res.data.data;
+}
+
+// ── MAPPER: DTO → domain ────────────────────────────────────────────
+
+/** Hermes không có Intl đầy đủ nên `toLocaleString` không tin được — chấm nghìn bằng tay. */
+function formatPrice(price: number): string {
+  if (price <= 0) return 'Free';
+  return `${String(Math.round(price)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}đ`;
+}
+
+function initialsOf(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(-2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('');
+}
+
+/** Gradient chọn theo id để một tin luôn có cùng màu giữa các lần render. */
+function gradOf(id: string) {
+  let sum = 0;
+  for (let i = 0; i < id.length; i += 1) sum += id.charCodeAt(i);
+  return NEW_PHOTOS[sum % NEW_PHOTOS.length];
+}
+
+function relativeTime(iso: string): string {
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
+  if (minutes < 1) return 'vừa xong';
+  if (minutes < 60) return `${minutes} phút`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} giờ`;
+  return `${Math.round(hours / 24)} ngày`;
+}
+
+function toListing(dto: ListingDto): Listing {
+  return {
+    id: dto._id,
+    title: dto.title,
+    price: formatPrice(dto.price),
+    // BE trả `category` dạng ObjectId; đổi id -> tên hiển thị cần GET /categories (BE trả 501).
+    cat: '',
+    // BE không trả tên organization trong Listing, nên meta chỉ còn mốc thời gian.
+    meta: relativeTime(dto.createdAt),
+    photo: gradOf(dto._id),
+    photoUrls: dto.images,
+    seller: dto.posterName,
+    avatar: initialsOf(dto.posterName),
+    contact: dto.posterContact,
+    desc: dto.description,
+    // UI chỉ có hai trạng thái; 5 trạng thái còn lại của BE đều là "chưa hiển thị".
+    status: dto.status === 'active' ? 'live' : 'pending',
+    mine: dto.seller === getCurrentUserId(),
+  };
+}
+
+function toProfile(dto: MeProfile): Profile {
+  return {
+    name: dto.name,
+    // `org`, `posted`, `sold` chưa có trong MeProfile của BE — hiện chỗ trống thay vì số bịa.
+    org: '',
+    phone: dto.phone ?? '',
+    avatar: dto.avatar || initialsOf(dto.name),
+    posted: 0,
+    sold: 0,
+    rating: dto.ratingCount > 0 ? dto.ratingAvg.toFixed(1) : '—',
+  };
+}
+
+const NOTIF_ICON: Record<string, string> = { organization: '🏫', chain: '🔗' };
+const NOTIF_BADGE: Record<string, string> = { organization: 'Từ trường', chain: 'Từ hệ thống' };
+
+function toNotif(dto: NotifDto): Notif {
+  const me = getCurrentUserId();
+  return {
+    id: dto._id,
+    icon: NOTIF_ICON[dto.sourceType] ?? '📌',
+    kind: dto.sourceType === 'chain' ? 'chain' : 'org',
+    badge: NOTIF_BADGE[dto.sourceType],
+    title: dto.title,
+    body: dto.body,
+    time: `${relativeTime(dto.createdAt)} trước`,
+    unread: me ? !dto.readBy.includes(me) : true,
+  };
+}
+
+// ── LOCAL HELPERS (phần chưa có BE) ─────────────────────────────────
+
+const delay = (ms = 300) => new Promise<void>((r) => setTimeout(r, ms));
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
 
 const nowTime = () => {
@@ -23,135 +138,132 @@ const AUTO_REPLIES = [
 
 export const api = {
   /* ---------------- auth ---------------- */
-  async login(phone: string, _password: string) {
-    await delay(700);
-    if (!phone.trim()) throw new Error('Nhập số điện thoại để đăng nhập');
-    return clone(db.profile);
+  async login(email: string, password: string, orgSlug?: string): Promise<AuthSession> {
+    const res = await authLogin({ body: { email, password, orgSlug } });
+    const auth = unwrap(res, 'Đăng nhập không thành công, kiểm tra lại email và mật khẩu');
+    return {
+      userId: auth.user.id,
+      email: auth.user.email,
+      orgSlug,
+      accessToken: auth.tokens.accessToken,
+      refreshToken: auth.tokens.refreshToken,
+    };
   },
 
-  async register(input: { name: string; phone: string; org: string }) {
-    await delay(800);
-    if (!input.name.trim()) throw new Error('Nhập họ tên để tạo tài khoản');
-    db.profile.name = input.name;
-    db.profile.org = input.org || db.profile.org;
-    db.profile.phone = input.phone || db.profile.phone;
-    db.profile.avatar = input.name
-      .trim()
-      .split(/\s+/)
-      .slice(-2)
-      .map((w) => w[0]?.toUpperCase() ?? '')
-      .join('');
-    return clone(db.profile);
+  /**
+   * BE `POST /auth/register` tạo **Organization mới + owner đầu tiên**, không phải thêm người
+   * vào tổ chức có sẵn. Muốn tham gia tổ chức đã tồn tại thì phải chờ endpoint invite của BE.
+   */
+  async register(input: {
+    name: string;
+    email: string;
+    password: string;
+    organizationName: string;
+    phone?: string;
+  }): Promise<AuthSession> {
+    const res = await authRegister({ body: input });
+    const auth = unwrap(res, 'Tạo tài khoản không thành công');
+    return {
+      userId: auth.user.id,
+      email: auth.user.email,
+      accessToken: auth.tokens.accessToken,
+      refreshToken: auth.tokens.refreshToken,
+    };
   },
 
   /* ---------------- listings ---------------- */
-  async getListings(cat = 'Tất cả'): Promise<Listing[]> {
-    await delay();
-    const items = cat === 'Tất cả' ? db.listings : db.listings.filter((l) => l.cat === cat);
-    return clone(items);
+  /**
+   * `cat` chưa lọc được: BE nhận `category` là ObjectId còn app chỉ có tên hiển thị, và
+   * `GET /categories` (chỗ đổi tên -> id) đang trả 501. Nhận tham số để giữ chữ ký cho hook.
+   */
+  async getListings(_cat = 'Tất cả'): Promise<Listing[]> {
+    const res = await listingList({ query: { limit: 50 } });
+    return unwrap(res, 'Không tải được bảng tin').map(toListing);
   },
 
-  async getListing(id: number): Promise<Listing> {
-    await delay(250);
-    const found = db.listings.find((l) => l.id === id);
-    if (!found) throw new Error('Không tìm thấy tin này');
-    return clone(found);
+  async getListing(id: string): Promise<Listing> {
+    const res = await listingGetById({ path: { id } });
+    return toListing(unwrap(res, 'Không tìm thấy tin này'));
   },
 
   async searchListings(q: string): Promise<Listing[]> {
-    await delay(300);
-    const t = q.trim().toLowerCase();
-    if (!t) return [];
-    return clone(
-      db.listings.filter(
-        (l) => l.title.toLowerCase().includes(t) || l.cat.toLowerCase().includes(t),
-      ),
-    );
+    const term = q.trim();
+    if (!term) return [];
+    const res = await listingList({ query: { q: term, limit: 50 } });
+    return unwrap(res, 'Không tìm được tin nào').map(toListing);
   },
 
   async getMyListings(): Promise<Listing[]> {
-    await delay(350);
-    return clone(db.listings.filter((l) => l.mine));
+    const seller = getCurrentUserId();
+    if (!seller) throw new Error('Phiên đăng nhập đã hết, đăng nhập lại nhé');
+    const res = await listingList({ query: { seller, limit: 50 } });
+    return unwrap(res, 'Không tải được tin của bạn').map(toListing);
   },
 
-  async createListing(input: {
+  /**
+   * Chưa gọi được BE: `POST /listings` bắt buộc `categoryId` (24 hex) và `location.coordinates`.
+   * Danh mục lấy từ `GET /categories` — đang 501, nên không có id hợp lệ nào để gửi.
+   * Mở lại khi BE có `/categories` và app thu thập được toạ độ.
+   */
+  async createListing(_input: {
     title: string;
     price: string;
     desc: string;
     cat: string;
-    /** URL Cloudinary do FE upload trước đó; BE chỉ lưu mảng chuỗi này */
     photoUrls?: string[];
   }): Promise<Listing> {
-    await delay(900);
-    if (!input.title.trim()) throw new Error('Đặt tên cho món đồ trước khi ghim');
-    const id = Math.max(0, ...db.listings.map((l) => l.id)) + 1;
-    const item: Listing = {
-      id,
-      title: input.title.trim(),
-      price: input.price.trim() ? `${input.price.trim()}đ` : 'Free',
-      cat: input.cat,
-      meta: `${db.profile.org} · vừa xong`,
-      photo: NEW_PHOTOS[id % NEW_PHOTOS.length],
-      photoUrls: input.photoUrls,
-      seller: db.profile.name,
-      avatar: db.profile.avatar,
-      contact: `${db.profile.phone} · ${db.profile.org}`,
-      desc: input.desc.trim() || 'Chưa có mô tả.',
-      status: 'pending',
-      mine: true,
-    };
-    db.listings.unshift(item);
-    db.profile.posted += 1;
-    return clone(item);
+    await delay(150);
+    throw new Error('Đăng tin cần API danh mục của server, tính năng này chưa mở');
   },
 
-  async deleteListing(id: number) {
-    await delay(400);
-    const i = db.listings.findIndex((l) => l.id === id);
-    if (i >= 0) db.listings.splice(i, 1);
+  async deleteListing(id: string) {
+    const res = await listingRemove({ path: { id } });
+    unwrap(res, 'Không xoá được tin này');
     db.savedIds = db.savedIds.filter((s) => s !== id);
     return { id };
   },
 
-  /* ---------------- saved ---------------- */
-  async getSavedIds(): Promise<number[]> {
-    await delay(200);
+  /* ---------------- saved (local, chưa có endpoint) ---------------- */
+  async getSavedIds(): Promise<string[]> {
+    await delay(120);
     return [...db.savedIds];
   },
 
   async getSavedListings(): Promise<Listing[]> {
-    await delay(350);
-    return clone(db.listings.filter((l) => db.savedIds.includes(l.id)));
+    // Chưa có `GET /listings?ids=` nên phải lấy từng tin; danh sách lưu vốn ngắn.
+    const found = await Promise.all(
+      db.savedIds.map((id) => api.getListing(id).catch(() => null)),
+    );
+    return found.filter((l): l is Listing => l !== null);
   },
 
-  async toggleSaved(id: number): Promise<number[]> {
-    await delay(300);
+  async toggleSaved(id: string): Promise<string[]> {
+    await delay(150);
     db.savedIds = db.savedIds.includes(id)
       ? db.savedIds.filter((s) => s !== id)
       : [...db.savedIds, id];
     return [...db.savedIds];
   },
 
-  /* ---------------- chat ---------------- */
+  /* ---------------- chat (local, BE trả 501) ---------------- */
   async getConversations(): Promise<Conversation[]> {
-    await delay(400);
+    await delay(200);
     return clone(db.conversations);
   },
 
   async getConversation(id: number): Promise<Conversation> {
-    await delay(250);
+    await delay(150);
     const c = db.conversations.find((x) => x.id === id);
     if (!c) throw new Error('Cuộc trò chuyện không tồn tại');
     c.unread = false;
     return clone(c);
   },
 
-  /** Mở (hoặc tạo mới) cuộc trò chuyện gắn với một tin đăng */
-  async openConversationFor(listingId: number): Promise<Conversation> {
-    await delay(300);
-    const listing = db.listings.find((l) => l.id === listingId);
-    if (!listing) throw new Error('Không tìm thấy tin này');
+  /** Mở (hoặc tạo mới) hội thoại cho một tin thật — thông tin người bán lấy từ BE. */
+  async openConversationFor(listingId: string): Promise<Conversation> {
+    const listing = await api.getListing(listingId);
     if (listing.mine) throw new Error('Đây là tin của bạn');
+
     let c = db.conversations.find((x) => x.listingId === listingId);
     if (!c) {
       c = {
@@ -197,19 +309,21 @@ export const api = {
 
   /* ---------------- misc ---------------- */
   async getNotifications(): Promise<Notif[]> {
-    await delay(400);
-    return clone(db.notifications);
+    const res = await notificationList({ query: { limit: 50 } });
+    return unwrap(res, 'Không tải được thông báo').map(toNotif);
   },
 
   async getProfile(): Promise<Profile> {
-    await delay(200);
-    return clone(db.profile);
+    const res = await userGetMe();
+    return toProfile(unwrap(res, 'Không tải được hồ sơ'));
   },
 
   async updateProfile(input: Partial<Profile>): Promise<Profile> {
-    await delay(600);
-    Object.assign(db.profile, input);
-    return clone(db.profile);
+    const res = await userUpdateMe({
+      // BE chỉ nhận ba field này; `org`/`posted`/`sold` không thuộc hồ sơ user.
+      body: { name: input.name, phone: input.phone },
+    });
+    return toProfile(unwrap(res, 'Không lưu được hồ sơ'));
   },
 };
 

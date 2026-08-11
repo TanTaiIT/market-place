@@ -45,6 +45,8 @@
     "eqeqeq": ["error", "always", { "null": "ignore" }],
     "no-console": ["warn", { "allow": ["warn", "error"] }],
     "import/no-duplicates": "error",
+    // `_id` là tên field của Mongo, mapper trong `api/client.ts` phải đọc đúng tên BE trả về.
+    "no-underscore-dangle": ["warn", { "allow": ["_id"] }],
     // ── ALIAS ENFORCEMENT ─────────────────────────────────────────
     // tsconfig paths already map `@/*` -> `./src/*`; every existing import
     // follows it. Sibling './x' stays legal, only parent traversal is banned.
@@ -60,5 +62,14 @@
       },
     ],
   },
-  "ignorePatterns": ["node_modules/**", ".expo/**", "android/**", "ios/**", "dist/**"],
+  // `src/api/generated/**` là output của `npm run api:sync`, không sửa tay: nó dùng
+  // `../core/*.gen` giữa các file của chính nó nên vi phạm no-restricted-imports ở trên.
+  "ignorePatterns": [
+    "node_modules/**",
+    ".expo/**",
+    "android/**",
+    "ios/**",
+    "dist/**",
+    "src/api/generated/**",
+  ],
 }

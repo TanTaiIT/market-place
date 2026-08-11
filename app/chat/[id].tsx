@@ -52,7 +52,8 @@ export default function Chat() {
   const [text, setText] = useState('');
 
   const { data: conversation, isLoading } = useConversation(conversationId);
-  const { data: listing } = useListing(conversation?.listingId ?? NaN);
+  // Chuỗi rỗng = chưa có hội thoại -> `useListing` tự tắt qua `enabled`.
+  const { data: listing } = useListing(conversation?.listingId ?? '');
   const send = useSendMessage(conversationId);
 
   const scrollToEnd = () =>

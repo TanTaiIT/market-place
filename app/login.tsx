@@ -14,8 +14,10 @@ export default function Login() {
   const router = useRouter();
   const toast = useToast();
   const insets = useSafeAreaInsets();
-  const [phone, setPhone] = useState('090 123 4567');
-  const [password, setPassword] = useState('123456');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  // BE scope đăng nhập theo Organization: lấy từ subdomain ở web, còn app phải gửi `orgSlug`.
+  const [orgSlug, setOrgSlug] = useState('');
   const login = useLogin();
   const signIn = useSignIn();
 
@@ -32,11 +34,11 @@ export default function Login() {
 
   const submit = () => {
     login.mutate(
-      { phone, password },
+      { email: email.trim(), password, orgSlug: orgSlug.trim() || undefined },
       {
         // Chỉ bật phiên, không tự điều hướng — `Stack.Protected` đổi tập route khả dụng,
         // gọi router.replace ngay đây sẽ chạy trước khi route đích được đăng ký.
-        onSuccess: () => signIn({ phone }),
+        onSuccess: (session) => signIn(session),
         onError: (e: Error) => toast(e.message),
       },
     );
@@ -58,11 +60,11 @@ export default function Login() {
             <Text style={styles.tagline}>Ghim tin lên bảng, bán liền trong ngày</Text>
 
             <Field
-              label="Số điện thoại"
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-              placeholder="09xx xxx xxx"
+              label="Email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              placeholder="ban@truong.edu.vn"
             />
             <Field
               label="Mật khẩu"
@@ -70,6 +72,12 @@ export default function Login() {
               onChangeText={setPassword}
               secureTextEntry
               placeholder="••••••••"
+            />
+            <Field
+              label="Mã trường / tổ chức"
+              value={orgSlug}
+              onChangeText={setOrgSlug}
+              placeholder="hung-vuong"
             />
 
             <PinButton

@@ -19,7 +19,8 @@ import { C, F, shadow } from '@/theme';
 
 export default function ListingDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const listingId = Number(id);
+  // ObjectId của BE là chuỗi 24 hex — `Number()` ở đây sẽ ra NaN.
+  const listingId = id ?? '';
   const router = useRouter();
   const toast = useToast();
   const insets = useSafeAreaInsets();

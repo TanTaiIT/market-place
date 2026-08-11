@@ -16,11 +16,12 @@ export function useListings(cat: string) {
   });
 }
 
-export function useListing(id: number) {
+export function useListing(id: string) {
   return useQuery({
     queryKey: qk.listing(id),
     queryFn: () => api.getListing(id),
-    enabled: Number.isFinite(id),
+    // Route param có thể rỗng lúc màn hình mới mount, và ObjectId của BE là 24 hex.
+    enabled: id.length > 0,
   });
 }
 
@@ -70,11 +71,11 @@ export function useCreateListing() {
 export function useToggleSaved() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => api.toggleSaved(id),
+    mutationFn: (id: string) => api.toggleSaved(id),
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: qk.savedIds() });
-      const prev = qc.getQueryData<number[]>(qk.savedIds()) ?? [];
-      qc.setQueryData<number[]>(
+      const prev = qc.getQueryData<string[]>(qk.savedIds()) ?? [];
+      qc.setQueryData<string[]>(
         qk.savedIds(),
         prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
       );
@@ -93,7 +94,7 @@ export function useToggleSaved() {
 export function useDeleteListing() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => api.deleteListing(id),
+    mutationFn: (id: string) => api.deleteListing(id),
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: qk.myListings() });
       const prev = qc.getQueryData<Listing[]>(qk.myListings());
@@ -120,7 +121,8 @@ export function useUpdateProfile() {
 
 export function useLogin() {
   return useMutation({
-    mutationFn: (v: { phone: string; password: string }) => api.login(v.phone, v.password),
+    mutationFn: (v: { email: string; password: string; orgSlug?: string }) =>
+      api.login(v.email, v.password, v.orgSlug),
   });
 }
 
@@ -128,6 +130,8 @@ export function useRegister() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: api.register,
-    onSuccess: (data) => qc.setQueryData(qk.profile(), data),
+    // Đăng ký trả về session (token + userId), không phải hồ sơ — nên invalidate để
+    // `useProfile()` gọi lại `GET /users/me` bằng token mới thay vì ghi cache bằng session.
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.profile() }),
   });
 }

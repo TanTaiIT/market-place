@@ -6,9 +6,20 @@ import { createJSONStorage, persist } from 'zustand/middleware';
  * Danh tính của phiên đăng nhập — thứ duy nhất cần sống lâu hơn một màn hình.
  * Hồ sơ đầy đủ (tên, số tin, đánh giá) vẫn thuộc về `useProfile()`; đừng nhân bản vào đây,
  * nếu không sẽ có hai nguồn sự thật lệch nhau sau mỗi lần `useUpdateProfile`.
- * Khi có backend thật: thêm `token` vào đây và đổi storage sang `expo-secure-store`.
+ *
+ * Khai lại type thay vì import `AuthSession` từ `@/api/db`: store là lá, không được import
+ * layer khác (folder.convention §6). Hai bên khớp nhau theo cấu trúc.
+ *
+ * TODO(bảo mật): token đang nằm trong AsyncStorage — đọc được trên máy đã root/jailbreak.
+ * Chuyển sang `expo-secure-store` khi thêm được native module (cần rebuild dev client).
  */
-type Session = { phone: string };
+type Session = {
+  userId: string;
+  email: string;
+  orgSlug?: string;
+  accessToken: string;
+  refreshToken: string;
+};
 
 type AuthState = {
   session: Session | null;

@@ -18,7 +18,7 @@ export function useConversation(id: number) {
 export function useOpenConversation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (listingId: number) => api.openConversationFor(listingId),
+    mutationFn: (listingId: string) => api.openConversationFor(listingId),
     onSuccess: (c) => {
       qc.setQueryData(qk.conversation(c.id), c);
       qc.invalidateQueries({ queryKey: qk.conversations() });

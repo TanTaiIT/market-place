@@ -20,6 +20,7 @@ import {
   JetBrainsMono_600SemiBold,
 } from '@expo-google-fonts/jetbrains-mono';
 import { ToastProvider } from '@/components/Toast';
+import { useSyncAccessToken } from '@/queries/auth';
 import { useAuthHydrated, useIsAuthenticated } from '@/stores/auth';
 import { C } from '@/theme';
 
@@ -50,6 +51,8 @@ export default function RootLayout() {
 
   const isAuthenticated = useIsAuthenticated();
   const authHydrated = useAuthHydrated();
+  // Đẩy token của phiên xuống tầng HTTP trước khi bất kỳ màn con nào mount và gọi query.
+  useSyncAccessToken();
   // Font lỗi vẫn cho chạy tiếp, chỉ rơi về font hệ thống. Nhưng phiên đăng nhập thì phải
   // đọc xong mới render: guard chạy sớm sẽ nháy qua màn login rồi mới nhảy vào feed.
   const ready = (loaded || error) && authHydrated;

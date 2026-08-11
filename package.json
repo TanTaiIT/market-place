@@ -8,7 +8,8 @@
     "ios": "expo start --ios",
     "fix": "expo install --fix",
     "lint": "oxlint -c .oxlintrc.jsonc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "api:sync": "openapi-ts"
   },
   "dependencies": {
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",
@@ -37,6 +38,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@hey-api/openapi-ts": "^0.97.3",
     "@types/react": "~19.1.0",
     "babel-preset-expo": "~54.0.12",
     "typescript": "~5.9.2"

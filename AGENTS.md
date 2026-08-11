@@ -60,8 +60,10 @@ src/api/**  ─────────┘
 - `src/components/**` được phép đọc query (vd `TabBar.tsx` dùng `useConversations`), nhưng **mutation chỉ
   được gọi từ `app/**`** — đó là ranh giới đang đúng trên toàn bộ codebase, giữ nguyên nó.
 - `src/queries/**` được đọc/ghi store (`queries/auth.ts`); chiều ngược lại thì cấm.
-- `src/api/db.ts` là fixture in-memory + là nơi khai báo domain type. Khi có backend thật: thay ruột từng hàm
-  trong `client.ts` bằng `fetch()`, hook và màn hình giữ nguyên.
+- `src/api/db.ts` khai báo domain type + giữ phần state còn local (tin đã lưu, hội thoại). Tin đăng, hồ sơ
+  và thông báo đã đi qua BE thật: `client.ts` gọi SDK trong `src/api/generated/**` (generate từ OpenAPI của
+  repo `market` bằng `npm run api:sync`, **không sửa tay**), `http.ts` giữ base URL + Bearer token.
+  Chi tiết phần nào thật / phần nào còn local: `query.convention.md` §1.
 
 ---
 

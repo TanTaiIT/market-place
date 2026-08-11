@@ -1,8 +1,8 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { Listing } from '@/api/db';
+import { ListingPhoto } from './ListingPhoto';
 import { C, F, shadow } from '@/theme';
 
 /** Góc nghiêng lặp lại giống .note-card:nth-child(n) trong prototype */
@@ -35,16 +35,16 @@ export function NoteCard({
         ]}
       >
         <View style={styles.pinhead} />
-        <LinearGradient
-          colors={item.photo}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+        <ListingPhoto
+          photo={item.photo}
+          photoUrl={item.photoUrls?.[0]}
           style={styles.photo}
+          imageStyle={styles.photoRadius}
         >
           <View style={styles.priceTag}>
             <Text style={styles.priceText}>{item.price}</Text>
           </View>
-        </LinearGradient>
+        </ListingPhoto>
         <View style={styles.body}>
           <Text numberOfLines={2} style={styles.title}>
             {item.title}
@@ -83,6 +83,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 6,
     borderTopRightRadius: 6,
   },
+  photoRadius: { borderTopLeftRadius: 6, borderTopRightRadius: 6 },
   priceTag: {
     position: 'absolute',
     bottom: -2,

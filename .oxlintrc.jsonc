@@ -1,0 +1,64 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
+  // Standalone config for the Expo/React-Native app (own git repo, own npm lock).
+  // NOT extending the app-root config on purpose: that one enables the `vue`
+  // plugin, scopes 13 overrides to `src/**` paths absent here, and ignores
+  // `docs/**` — extending it would silently lint nothing.
+  "plugins": ["typescript", "unicorn", "import", "promise", "react"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "perf": "warn",
+    "style": "off",
+    "pedantic": "off",
+    "restriction": "off",
+    "nursery": "off",
+  },
+  "rules": {
+    // ── REACT HOOKS ───────────────────────────────────────────────
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn",
+    // ── REACT RULES THAT ASSUME REACT-DOM (OFF FOR EXPO/RN) ───────
+    // babel-preset-expo ships the automatic JSX runtime — importing React is
+    // not required, so the rule fires on every runtime-correct route file.
+    "react/react-in-jsx-scope": "off",
+    // expo-status-bar types `style` as 'auto'|'light'|'dark'|'inverted'; the
+    // rule assumes the react-dom/RN `style={object}` contract.
+    "react/style-prop-object": "off",
+    // `tabBar={(props) => <TabBar {...props} />}` is React Navigation's
+    // documented render-prop API, which is exactly what allowAsProps permits.
+    "react/no-unstable-nested-components": ["warn", { "allowAsProps": true }],
+    // ── TYPESCRIPT ────────────────────────────────────────────────
+    "typescript/no-explicit-any": "error",
+    "typescript/consistent-type-imports": "error",
+    "typescript/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_",
+      },
+    ],
+    // ── CORRECTNESS ───────────────────────────────────────────────
+    "no-var": "error",
+    "prefer-const": "error",
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "import/no-duplicates": "error",
+    // ── ALIAS ENFORCEMENT ─────────────────────────────────────────
+    // tsconfig paths already map `@/*` -> `./src/*`; every existing import
+    // follows it. Sibling './x' stays legal, only parent traversal is banned.
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["../*"],
+            "message": "Use the '@/' alias (tsconfig paths: '@/*' -> './src/*'). Sibling './x' is fine.",
+          },
+        ],
+      },
+    ],
+  },
+  "ignorePatterns": ["node_modules/**", ".expo/**", "android/**", "ios/**", "dist/**"],
+}

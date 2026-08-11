@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Field, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useRegister } from '@/queries/listings';
+import { useSignIn } from '@/stores/auth';
 import { C, F, shadow } from '@/theme';
 
 export default function Register() {
@@ -14,13 +15,15 @@ export default function Register() {
   const toast = useToast();
   const insets = useSafeAreaInsets();
   const register = useRegister();
+  const signIn = useSignIn();
 
   const [form, setForm] = useState({ name: '', phone: '', org: '', password: '' });
   const set = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const submit = () =>
     register.mutate(form, {
-      onSuccess: () => router.replace('/(tabs)/feed'),
+      // Xem ghi chú ở login.tsx: bật phiên xong để Stack.Protected tự đổi route
+      onSuccess: (profile) => signIn({ phone: profile.phone }),
       onError: (e: Error) => toast(e.message),
     });
 

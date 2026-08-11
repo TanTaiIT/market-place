@@ -48,8 +48,8 @@ plugins: ['react-native-worklets/plugin']
 
 ```
 app/                        # expo-router: mỗi file là một route
-├── _layout.tsx             # font, QueryClientProvider, ToastProvider, Stack
-├── index.tsx               # redirect → /login
+├── _layout.tsx             # font, QueryClientProvider, ToastProvider, Stack + guard
+├── index.tsx               # redirect theo phiên → /login hoặc /(tabs)/feed
 ├── login.tsx  register.tsx
 ├── (tabs)/
 │   ├── _layout.tsx         # Tabs + tab bar tự vẽ
@@ -68,8 +68,41 @@ src/
 ├── queries/keys.ts         # query key tập trung
 ├── queries/listings.ts     # hook cho tin đăng, saved, profile
 ├── queries/chat.ts         # hook cho chat
-└── components/             # Corkboard, NoteCard, TabBar, Toast, ui.tsx
+├── queries/auth.ts         # useSignOut — xoá phiên + dọn cache
+├── queries/upload.ts       # useListingPhotos — upload ngay khi chọn + trạng thái per-ảnh
+├── api/cloudinary.ts       # upload unsigned, trả secure_url
+├── stores/auth.ts          # Zustand: phiên đăng nhập, persist qua AsyncStorage
+└── components/             # Corkboard, NoteCard, ListingPhoto, ListingGallery,
+                            # PhotoPicker, TabBar, Toast, ui.tsx
 ```
+
+Quy ước code nằm ở `AGENTS.md` + `docs/conventions/` (dispatch qua `conventions.hub.md`).
+
+---
+
+## 3b. Ảnh tin đăng — Cloudinary
+
+FE upload thẳng lên Cloudinary rồi chỉ gửi mảng `secure_url` xuống BE; không có file nào đi qua BE.
+Một tin tối đa **6 ảnh**, `photoUrls[0]` là ảnh bìa. Màn chi tiết vuốt ngang qua cả bộ ảnh; thẻ tin và
+kết quả tìm kiếm chỉ hiện ảnh bìa.
+
+Ảnh bay lên Cloudinary **ngay khi chọn**, song song với lúc người dùng điền form, nên bấm "Ghim" gần như
+không phải chờ. Mỗi thumbnail tự hiện trạng thái (đang tải · ảnh bìa · lỗi — chạm để thử lại), và nút
+"Ghim" bị khoá tới khi mọi ảnh xong. Đổi lại, bỏ ngang form sẽ để lại ảnh mồ côi trên Cloudinary.
+
+**Cần làm một lần trước khi chạy:** vào Cloudinary Console → *Settings → Upload → Upload presets* →
+**Add upload preset**, đặt tên `ghim_unsigned`, **Signing Mode = Unsigned**, rồi Save.
+Tên preset và cloud name khai ở đầu `src/api/cloudinary.ts`.
+
+Nên đặt luôn cho preset đó:
+
+- *Folder* = `ghim/listings`
+- *Incoming transformation* = `c_limit,w_1600,q_auto,f_auto` — chặn ảnh quá khổ ngay từ đầu vào
+- *Max file size* — Cloudinary từ chối sớm thay vì để người dùng chờ hết upload
+
+**Không có `apiKey`/`apiSecret` nào trong repo này và sẽ không bao giờ có.** Bundle React Native giải nén
+được, nên mọi khoá nhét vào đây coi như đã công khai — unsigned preset chính là cơ chế Cloudinary thiết kế
+cho đúng tình huống này. Nếu về sau cần upload có ký, signature phải do BE cấp.
 
 ---
 
@@ -101,7 +134,7 @@ Query key nằm gọn trong `src/queries/keys.ts` để invalidate không bị l
 | `box-shadow: 0 6px 0 var(--pin-dark)` | lớp nền tối + mặt nút trượt xuống khi nhấn |
 | `@keyframes saveBounce` | `withSequence(withSpring(1.3), withSpring(1))` + xoay |
 | `@keyframes pinPress` | `withSequence` lún 6px → nảy -3px → về 0 |
-| `.photo-drop.filled` + kẹp giấy xoay | `withTiming` opacity/scale + `withSpring` góc kẹp |
+| `.photo-drop.filled` + kẹp giấy xoay | bỏ khi chuyển sang nhiều ảnh — kẹp giấy giờ tĩnh, thumbnail vào bằng `FadeInDown` so le |
 | `.toast.show` | `withSpring` translateY, ToastProvider dùng chung |
 | `@keyframes typingDot` | `withRepeat` + `withDelay` cho từng chấm |
 | `:active { transform: scale(...) }` | `Pressable` với style theo `pressed` |
@@ -127,6 +160,11 @@ trong `src/components/TabBar.tsx`.
 
 - Thay `src/api/client.ts` bằng HTTP thật; cân nhắc thêm `AsyncStorage`
   persister cho React Query để dùng offline.
-- Đăng nhập hiện chưa lưu phiên — thêm token vào SecureStore và chặn route.
-- `expo-image-picker` cho ô chọn ảnh (hiện chỉ là animation demo).
+- Phiên đăng nhập đã lưu qua `src/stores/auth.ts` và route đã chặn bằng
+  `Stack.Protected`. Còn lại: khi backend cấp token thật thì thêm `token` vào
+  `Session` và đổi storage sang `expo-secure-store` (AsyncStorage không dành cho
+  dữ liệu nhạy cảm).
+- Ô chọn ảnh đã dùng `expo-image-picker` thật và upload lên Cloudinary (xem §3b).
+  Còn lại: xoá ảnh mồ côi trên Cloudinary khi người dùng xoá tin — thao tác này cần
+  chữ ký nên phải làm ở BE, không làm được từ FE.
 - Icon và splash: thêm file vào `assets/` rồi khai báo trong `app.json`.

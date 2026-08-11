@@ -79,7 +79,8 @@ export const api = {
     price: string;
     desc: string;
     cat: string;
-    hasPhoto: boolean;
+    /** URL Cloudinary do FE upload trước đó; BE chỉ lưu mảng chuỗi này */
+    photoUrls?: string[];
   }): Promise<Listing> {
     await delay(900);
     if (!input.title.trim()) throw new Error('Đặt tên cho món đồ trước khi ghim');
@@ -91,6 +92,7 @@ export const api = {
       cat: input.cat,
       meta: `${db.profile.org} · vừa xong`,
       photo: NEW_PHOTOS[id % NEW_PHOTOS.length],
+      photoUrls: input.photoUrls,
       seller: db.profile.name,
       avatar: db.profile.avatar,
       contact: `${db.profile.phone} · ${db.profile.org}`,

@@ -10,7 +10,6 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -20,44 +19,32 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Corkboard } from '@/components/Corkboard';
+import { PhotoPicker } from '@/components/PhotoPicker';
 import { CatTape, Field, ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { POST_CATEGORIES } from '@/api/db';
 import { useCreateListing } from '@/queries/listings';
+import { useListingPhotos } from '@/queries/upload';
 import { C, F, shadow } from '@/theme';
 
 export default function Post() {
   const router = useRouter();
   const toast = useToast();
   const create = useCreateListing();
+  const { photos, addPhotos, removePhoto, retryPhoto, photoUrls, uploadingCount, hasFailed } =
+    useListingPhotos();
 
-  const [hasPhoto, setHasPhoto] = useState(false);
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
   const [desc, setDesc] = useState('');
   const [cat, setCat] = useState(POST_CATEGORIES[0]);
 
-  /* Ảnh "rơi" vào khung + kẹp giấy xoay — .photo-drop.filled */
-  const fill = useSharedValue(0);
-  const clipRot = useSharedValue(-8);
-  const fillStyle = useAnimatedStyle(() => ({
-    opacity: fill.value,
-    transform: [{ scale: 0.6 + fill.value * 0.4 }, { rotate: `${-6 + fill.value * 6}deg` }],
-  }));
-  const clipStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${clipRot.value}deg` }],
-  }));
-
-  const togglePhoto = () => {
-    const next = !hasPhoto;
-    setHasPhoto(next);
-    fill.value = withTiming(next ? 1 : 0, { duration: 350 });
-    clipRot.value = withSpring(next ? 10 : -8, { damping: 10 });
-  };
-
   /* @keyframes pinPress — nút lún xuống rồi bật nhẹ lên */
   const press = useSharedValue(0);
   const pressStyle = useAnimatedStyle(() => ({ transform: [{ translateY: press.value }] }));
+
+  // Khoá nút khi còn ảnh đang bay: ảnh chưa xong thì tin sẽ thiếu URL của nó
+  const blocked = create.isPending || uploadingCount > 0;
 
   const submit = () => {
     press.value = withSequence(
@@ -65,8 +52,15 @@ export default function Post() {
       withSpring(-3, { damping: 6 }),
       withSpring(0),
     );
+
+    // Ảnh đã bay lên Cloudinary từ lúc chọn, ở đây chỉ còn chốt lại là chúng xong hết chưa
+    if (hasFailed) {
+      toast('⚠️ Có ảnh tải lỗi — chạm vào ảnh đó để thử lại');
+      return;
+    }
+
     create.mutate(
-      { title, price, desc, cat, hasPhoto },
+      { title, price, desc, cat, photoUrls },
       {
         onSuccess: () => {
           toast('✓ Đã ghim tin lên bảng thành công!');
@@ -90,24 +84,12 @@ export default function Post() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <Pressable
-              onPress={togglePhoto}
-              style={[styles.photoDrop, hasPhoto && { borderStyle: 'solid' }]}
-            >
-              <Animated.View style={[StyleSheet.absoluteFill, fillStyle]}>
-                <LinearGradient
-                  colors={['#EFCB9C', '#D9A566']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-              </Animated.View>
-              <Animated.View style={[styles.clip, clipStyle]} />
-              <Text style={{ fontSize: 26 }}>📎</Text>
-              <Text style={styles.photoText}>
-                {hasPhoto ? 'Đã thêm ảnh · chạm để bỏ' : 'Chạm để thêm ảnh'}
-              </Text>
-            </Pressable>
+            <PhotoPicker
+              photos={photos}
+              onAdd={addPhotos}
+              onRemove={removePhoto}
+              onRetry={retryPhoto}
+            />
 
             <Field
               label="Tên món đồ"
@@ -151,11 +133,15 @@ export default function Post() {
               <View style={styles.submitShadow} />
               <Pressable
                 onPress={submit}
-                disabled={create.isPending}
-                style={[styles.submit, create.isPending && { opacity: 0.7 }]}
+                disabled={blocked}
+                style={[styles.submit, blocked && { opacity: 0.7 }]}
               >
                 <Text style={styles.submitText}>
-                  {create.isPending ? 'Đang ghim...' : '📌 Ghim lên bảng'}
+                  {create.isPending
+                    ? 'Đang ghim...'
+                    : uploadingCount > 0
+                      ? `Đang tải ảnh (${photos.length - uploadingCount}/${photos.length})...`
+                      : '📌 Ghim lên bảng'}
                 </Text>
               </Pressable>
             </Animated.View>
@@ -167,31 +153,6 @@ export default function Post() {
 }
 
 const styles = StyleSheet.create({
-  photoDrop: {
-    borderWidth: 2.5,
-    borderStyle: 'dashed',
-    borderColor: C.cork,
-    borderRadius: 10,
-    height: 140,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 8,
-    marginBottom: 20,
-    backgroundColor: C.paperWarm,
-    overflow: 'hidden',
-  },
-  clip: {
-    position: 'absolute',
-    top: -8,
-    alignSelf: 'center',
-    width: 22,
-    height: 34,
-    borderWidth: 4,
-    borderColor: C.corkDark,
-    borderRadius: 8,
-  },
-  photoText: { fontFamily: F.uiSemi, fontSize: 12.5, color: C.inkSoft },
   label: {
     fontFamily: F.uiBold,
     fontSize: 11.5,

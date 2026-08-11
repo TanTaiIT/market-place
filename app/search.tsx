@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ListingPhoto } from '@/components/ListingPhoto';
 import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
 import { useSearch } from '@/queries/listings';
 import { C, F, shadow } from '@/theme';
@@ -64,11 +64,11 @@ export default function Search() {
                 onPress={() => router.push(`/listing/${item.id}`)}
                 style={({ pressed }) => [styles.row, pressed && { transform: [{ scale: 0.98 }] }]}
               >
-                <LinearGradient
-                  colors={item.photo}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
+                <ListingPhoto
+                  photo={item.photo}
+                  photoUrl={item.photoUrls?.[0]}
                   style={styles.rowPhoto}
+                  imageStyle={styles.rowPhotoRadius}
                 />
                 <View style={{ flex: 1 }}>
                   <Text numberOfLines={2} style={styles.rowTitle}>
@@ -131,6 +131,7 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   rowPhoto: { width: 64, height: 64, borderRadius: 6 },
+  rowPhotoRadius: { borderRadius: 6 },
   rowTitle: { fontFamily: F.uiBold, fontSize: 13, color: C.ink, marginBottom: 3 },
   rowPrice: { fontFamily: F.monoBold, fontSize: 12, color: C.moss, marginBottom: 3 },
   rowMeta: { fontFamily: F.ui, fontSize: 10.5, color: C.inkSoft },

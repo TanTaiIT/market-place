@@ -1,7 +1,6 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -11,6 +10,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ListingGallery } from '@/components/ListingGallery';
 import { Avatar, Loading, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useListing, useSavedIds, useToggleSaved } from '@/queries/listings';
@@ -56,12 +56,7 @@ export default function ListingDetail() {
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-        <LinearGradient
-          colors={listing.photo}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}
-        >
+        <ListingGallery photo={listing.photo} photoUrls={listing.photoUrls} style={styles.hero}>
           <Pressable
             onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/feed'))}
             style={[styles.circleBtn, { top: insets.top + 8, left: 16 }]}
@@ -78,7 +73,7 @@ export default function ListingDetail() {
           <Animated.View entering={FadeIn.delay(120)} style={styles.priceFloat}>
             <Text style={styles.priceFloatText}>{listing.price}</Text>
           </Animated.View>
-        </LinearGradient>
+        </ListingGallery>
 
         <Animated.View entering={FadeInDown.duration(380)} style={styles.body}>
           <View style={styles.catBadge}>

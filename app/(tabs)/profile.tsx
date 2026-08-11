@@ -6,6 +6,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Loading } from '@/components/ui';
 import { useToast } from '@/components/Toast';
+import { useSignOut } from '@/queries/auth';
 import { useProfile } from '@/queries/listings';
 import { C, F, shadow } from '@/theme';
 
@@ -14,6 +15,7 @@ export default function Profile() {
   const toast = useToast();
   const insets = useSafeAreaInsets();
   const { data: profile, isLoading } = useProfile();
+  const signOut = useSignOut();
 
   if (isLoading || !profile) return <Loading />;
 
@@ -22,7 +24,7 @@ export default function Profile() {
     { icon: '🤍', text: 'Tin đã lưu', go: () => router.push('/saved') },
     { icon: '⚙️', text: 'Cài đặt tài khoản', go: () => router.push('/settings') },
     { icon: '❓', text: 'Trợ giúp & hỗ trợ', go: () => toast('Liên hệ: hotro@ghim.vn') },
-    { icon: '🚪', text: 'Đăng xuất', danger: true, go: () => router.replace('/login') },
+    { icon: '🚪', text: 'Đăng xuất', danger: true, go: signOut },
   ];
 
   return (

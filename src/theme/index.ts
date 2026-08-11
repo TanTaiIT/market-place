@@ -22,6 +22,10 @@ export const C = {
   sand: '#F0EAD8',
   tapeInk: '#5C4A0A',
   amberInk: '#4A2E0B',
+  /** Lớp phủ mờ trên ảnh thật để chữ đè lên vẫn đọc được */
+  scrim: 'rgba(24,36,18,0.32)',
+  /** Lớp phủ báo lỗi trên ảnh — `pinDark` pha alpha */
+  scrimError: 'rgba(185,46,29,0.72)',
 } as const;
 
 /** Tên font sau khi load bằng @expo-google-fonts */

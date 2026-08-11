@@ -20,6 +20,7 @@ import {
   JetBrainsMono_600SemiBold,
 } from '@expo-google-fonts/jetbrains-mono';
 import { ToastProvider } from '@/components/Toast';
+import { useAuthHydrated, useIsAuthenticated } from '@/stores/auth';
 import { C } from '@/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -47,12 +48,17 @@ export default function RootLayout() {
     JetBrainsMono_600SemiBold,
   });
 
-  useEffect(() => {
-    if (loaded || error) SplashScreen.hideAsync().catch(() => {});
-  }, [loaded, error]);
+  const isAuthenticated = useIsAuthenticated();
+  const authHydrated = useAuthHydrated();
+  // Font lỗi vẫn cho chạy tiếp, chỉ rơi về font hệ thống. Nhưng phiên đăng nhập thì phải
+  // đọc xong mới render: guard chạy sớm sẽ nháy qua màn login rồi mới nhảy vào feed.
+  const ready = (loaded || error) && authHydrated;
 
-  // Font lỗi vẫn cho chạy tiếp, chỉ rơi về font hệ thống
-  if (!loaded && !error) return <View style={styles.boot} />;
+  useEffect(() => {
+    if (ready) SplashScreen.hideAsync().catch(() => {});
+  }, [ready]);
+
+  if (!ready) return <View style={styles.boot} />;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -67,10 +73,23 @@ export default function RootLayout() {
                 animation: 'slide_from_right',
               }}
             >
-              <Stack.Screen name="login" options={{ animation: 'fade' }} />
-              <Stack.Screen name="register" options={{ animation: 'fade' }} />
-              <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
-              <Stack.Screen name="post" options={{ animation: 'slide_from_bottom' }} />
+              <Stack.Protected guard={!isAuthenticated}>
+                <Stack.Screen name="login" options={{ animation: 'fade' }} />
+                <Stack.Screen name="register" options={{ animation: 'fade' }} />
+              </Stack.Protected>
+
+              {/* Mọi route cần đăng nhập phải khai ở đây, kể cả route không cần option
+                  riêng — screen không nằm trong khối này vẫn mở được bằng deep link. */}
+              <Stack.Protected guard={isAuthenticated}>
+                <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+                <Stack.Screen name="post" options={{ animation: 'slide_from_bottom' }} />
+                <Stack.Screen name="search" />
+                <Stack.Screen name="mylistings" />
+                <Stack.Screen name="saved" />
+                <Stack.Screen name="settings" />
+                <Stack.Screen name="listing/[id]" />
+                <Stack.Screen name="chat/[id]" />
+              </Stack.Protected>
             </Stack>
           </ToastProvider>
         </SafeAreaProvider>

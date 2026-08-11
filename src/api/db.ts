@@ -6,7 +6,10 @@ export type Listing = {
   price: string;
   cat: string;
   meta: string;
+  /** Cặp màu dựng ảnh giả — dùng khi tin chưa có ảnh thật */
   photo: Grad;
+  /** URL Cloudinary theo thứ tự người đăng chọn; phần tử **đầu tiên là ảnh bìa** */
+  photoUrls?: string[];
   seller: string;
   avatar: string;
   contact: string;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withDelay, withSpring } from 'react-native-reanimated';
@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Field, GhostButton, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useLogin } from '@/queries/listings';
+import { useSignIn } from '@/stores/auth';
 import { C, F, shadow } from '@/theme';
 
 export default function Login() {
@@ -16,6 +17,7 @@ export default function Login() {
   const [phone, setPhone] = useState('090 123 4567');
   const [password, setPassword] = useState('123456');
   const login = useLogin();
+  const signIn = useSignIn();
 
   // Ghim rơi từ trên xuống rồi nảy nhẹ — @keyframes pinFall
   const drop = useSharedValue(-140);
@@ -32,7 +34,9 @@ export default function Login() {
     login.mutate(
       { phone, password },
       {
-        onSuccess: () => router.replace('/(tabs)/feed'),
+        // Chỉ bật phiên, không tự điều hướng — `Stack.Protected` đổi tập route khả dụng,
+        // gọi router.replace ngay đây sẽ chạy trước khi route đích được đăng ký.
+        onSuccess: () => signIn({ phone }),
         onError: (e: Error) => toast(e.message),
       },
     );

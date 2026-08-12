@@ -10,6 +10,12 @@ export type ListingPhoto = {
   uri: string;
   url?: string;
   status: 'uploading' | 'done' | 'error';
+  /**
+   * Lý do upload hỏng, giữ nguyên thông điệp từ Cloudinary. Chỉ có cờ `status: 'error'` là không
+   * đủ: lỗi cấu hình vĩnh viễn ("Upload preset not found") trông y hệt lỗi mạng tạm thời, nên
+   * người dùng bấm "thử lại" mãi mà không biết là vô ích.
+   */
+  error?: string;
 };
 
 /**
@@ -28,13 +34,14 @@ export function useListingPhotos() {
     setPhotos((list) => list.map((p) => (p.uri === uri ? { ...p, ...next } : p)));
 
   const start = async (uri: string) => {
-    patch(uri, { status: 'uploading', url: undefined });
+    patch(uri, { status: 'uploading', url: undefined, error: undefined });
     try {
       patch(uri, { status: 'done', url: await upload.mutateAsync(uri) });
-    } catch {
+    } catch (e) {
       // Báo lỗi ngay trên thumbnail (chạm để thử lại) thay vì toast: 6 ảnh hỏng
       // sẽ đẩy ra 6 toast chồng nhau, và người dùng không biết ảnh nào hỏng.
-      patch(uri, { status: 'error' });
+      console.log('error', (e as Error).message);
+      patch(uri, { status: 'error', error: (e as Error).message });
     }
     // `patch` là map theo uri nên ảnh bị xoá giữa chừng sẽ tự no-op, không cần huỷ tay
   };

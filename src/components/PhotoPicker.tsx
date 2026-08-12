@@ -27,6 +27,9 @@ export function PhotoPicker({
 }) {
   const toast = useToast();
   const remaining = MAX_PHOTOS - photos.length;
+  // Gộp về một dòng thay vì hiện trên từng thumbnail: 96px không đủ chỗ cho câu lỗi, và 6 ảnh
+  // hỏng cùng lý do thì lặp 6 lần là nhiễu. Vẫn inline nên bề mặt lỗi vẫn là một (§9).
+  const failedReason = photos.find((p) => p.status === 'error')?.error;
 
   const pick = async () => {
     if (remaining <= 0) {
@@ -114,6 +117,7 @@ export function PhotoPicker({
       <Text style={styles.counter}>
         {photos.length}/{MAX_PHOTOS} ảnh · ảnh đầu tiên dùng làm ảnh bìa
       </Text>
+      {failedReason && <Text style={styles.failReason}>⚠️ {failedReason}</Text>}
     </View>
   );
 }
@@ -202,4 +206,5 @@ const styles = StyleSheet.create({
   },
   addText: { fontFamily: F.uiSemi, fontSize: 11.5, color: C.inkSoft },
   counter: { fontFamily: F.ui, fontSize: 11.5, color: C.inkSoft, marginTop: 4 },
+  failReason: { fontFamily: F.uiSemi, fontSize: 11.5, color: C.pinDark, marginTop: 4 },
 });

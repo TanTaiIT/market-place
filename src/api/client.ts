@@ -1,23 +1,17 @@
 import {
-  deleteListingsById,
-  getListings,
-  getListingsById,
-  getUsersMe,
-  patchUsersMe,
-  postAuthLogin,
-  postAuthRegister,
+  authLogin,
+  authRefresh,
+  authRegister,
+  listingGetById,
+  listingList,
+  listingRemove,
+  userGetMe,
+  userUpdateMe,
 } from './generated';
-import type {
-  AuthResponse,
-  GetListingsResponse,
-  GetListingsByIdResponse,
-  GetUsersMeResponse,
-  Listing as ListingDto,
-  UserProfile,
-} from './generated';
+import type { AuthResponse, Listing as ListingDto, MeProfile } from './generated';
 import { CHAT_COLORS, db, NEW_PHOTOS } from './db';
 import type { AuthSession, Conversation, Listing, Message, Notif, Profile } from './db';
-import { getCurrentUserId } from './http';
+import { getCurrentUserId, withAuthRetry } from './http';
 
 /**
  * Lớp truy cập dữ liệu. Tin đăng / hồ sơ / thông báo đi qua SDK generated (BE `market` thật);
@@ -29,30 +23,23 @@ import { getCurrentUserId } from './http';
 
 // ── SDK UNWRAP ──────────────────────────────────────────────────────
 
-type ApiEnvelope<T> = { success: true; message: string; data: T };
-type SdkResult<T> = { data?: ApiEnvelope<T>; error?: unknown };
-type PopulatedRef = string | { _id?: string; name?: string; slug?: string; avatar?: string; phone?: string };
+type ApiEnvelope<TPayload> = { success: true; message: string; data: TPayload };
+type SdkResult<TPayload> = { data?: ApiEnvelope<TPayload>; error?: unknown };
 
-/** SDK không throw: nó trả `{ data, error }`. Dồn cả hai nhánh về Error tiếng Việt. */
-function unwrap<T>(res: SdkResult<T>, fallback: string): T {
+/**
+ * SDK không throw: nó trả `{ data, error }`. Dồn cả hai nhánh về Error tiếng Việt.
+ *
+ * `TPayload` là payload **trong cùng** và luôn để TS tự suy từ kiểu SDK — đừng truyền type
+ * argument bằng tay. Truyền `GetXxxResponse` (vốn là cả envelope) lệch đúng một tầng: TS vẫn
+ * pass vì `.data` tồn tại trên kiểu, còn runtime đọc `.data` của mảng nên nổ `undefined`.
+ */
+function unwrap<TPayload>(res: SdkResult<TPayload>, fallback: string): TPayload {
   if (res.error) {
     const message = (res.error as { message?: unknown }).message;
     throw new Error(typeof message === 'string' && message ? message : fallback);
   }
   if (!res.data) throw new Error(fallback);
   return res.data.data;
-}
-
-function sellerIdOf(seller: ListingDto['seller']): string {
-  return typeof seller === 'string' ? seller : seller._id;
-}
-
-function populatedNameOf(value: PopulatedRef): string {
-  return typeof value === 'string' ? '' : value.name ?? '';
-}
-
-function populatedAvatarOf(value: PopulatedRef): string {
-  return typeof value === 'string' ? '' : value.avatar ?? '';
 }
 
 // ── MAPPER: DTO → domain ────────────────────────────────────────────
@@ -88,26 +75,30 @@ function relativeTime(iso: string): string {
   return `${Math.round(hours / 24)} ngày`;
 }
 
+/**
+ * `seller` và `category` chỉ là ObjectId dạng chuỗi: BE cố tình **không** populate chúng —
+ * populate `seller` sẽ đọc xuyên org và lách mất cách ly tenant, còn model `Category` thì chưa
+ * tồn tại. Tên/liên hệ người đăng vì thế lấy từ snapshot `posterName`/`posterContact` mà BE chốt
+ * lúc tạo tin, đúng như `listing.repository.ts` ghi.
+ */
 function toListing(dto: ListingDto): Listing {
-  const seller = dto.seller as PopulatedRef;
-  const category = dto.category as PopulatedRef;
-  const sellerId = sellerIdOf(dto.seller);
-  const isMine = sellerId === getCurrentUserId();
-  const sellerName = isMine ? 'Bạn' : populatedNameOf(seller) || 'Người bán';
-  const avatarText = populatedAvatarOf(seller) || initialsOf(sellerName);
+  const isMine = dto.seller === getCurrentUserId();
+  const sellerName = isMine ? 'Bạn' : dto.posterName || 'Người bán';
 
   return {
     id: dto._id,
     title: dto.title,
     price: formatPrice(dto.price),
-    cat: populatedNameOf(category),
+    // Chỉ có id danh mục, chưa có tên -> để rỗng cho tới khi BE mở `GET /categories`. Hệ quả:
+    // lọc theo chip danh mục ở bảng tin vẫn ra rỗng, đó là việc còn treo của BE.
+    cat: '',
     // BE không trả tên organization trong Listing, nên meta chỉ còn mốc thời gian.
     meta: relativeTime(dto.createdAt),
     photo: gradOf(dto._id),
     photoUrls: dto.images,
     seller: sellerName,
-    avatar: avatarText,
-    contact: '',
+    avatar: initialsOf(sellerName),
+    contact: dto.posterContact,
     desc: dto.description,
     // UI chỉ có hai trạng thái; 5 trạng thái còn lại của BE đều là "chưa hiển thị".
     status: dto.status === 'active' ? 'live' : 'pending',
@@ -115,7 +106,24 @@ function toListing(dto: ListingDto): Listing {
   };
 }
 
-function toProfile(dto: UserProfile): Profile {
+/**
+ * Cả ba endpoint auth (`login`/`register`/`refresh`) trả cùng `AuthResponse`, nên phiên chỉ được
+ * dựng ở đây — ba bản copy là ba chỗ có thể quên `refreshToken` mới sau khi BE rotate.
+ *
+ * `orgSlug` không có trong response: BE không trả slug, chỉ trả `organizationId`. Nó là thứ người
+ * dùng tự nhập ở màn đăng nhập nên caller truyền lại vào để phiên còn nhớ cho lần sau.
+ */
+function toSession(auth: AuthResponse, orgSlug?: string): AuthSession {
+  return {
+    userId: auth.user.id,
+    email: auth.user.email,
+    orgSlug,
+    accessToken: auth.tokens.accessToken,
+    refreshToken: auth.tokens.refreshToken,
+  };
+}
+
+function toProfile(dto: MeProfile): Profile {
   return {
     name: dto.name,
     // `org`, `posted`, `sold` chưa có trong MeProfile của BE — hiện chỗ trống thay vì số bịa.
@@ -172,19 +180,16 @@ const AUTO_REPLIES = [
 
 export const api = {
   /* ---------------- auth ---------------- */
+  /**
+   * `orgSlug` **phải** đi trong body: BE chỉ unique email theo `(organizationId, email)` nên
+   * `authService.login` gọi `requireOrganizationId()`. Org lấy từ subdomain (web) hoặc `orgSlug`
+   * (app) — thiếu cả hai thì `resolveTenant` không mở scope và login chết ở tầng tenant, không
+   * phải vì sai mật khẩu. Đây là lý do tham số này không được nuốt như trước.
+   */
   async login(email: string, password: string, orgSlug?: string): Promise<AuthSession> {
-    const res = await postAuthLogin({ body: { email, password } });
-    const auth = unwrap<AuthResponse>(
-      res as SdkResult<AuthResponse>,
-      'Đăng nhập không thành công, kiểm tra lại email và mật khẩu',
-    );
-    return {
-      userId: auth.user.id,
-      email: auth.user.email,
-      orgSlug,
-      accessToken: auth.tokens.accessToken,
-      refreshToken: auth.tokens.refreshToken,
-    };
+    const res = await authLogin({ body: { email, password, orgSlug } });
+    const auth = unwrap(res, 'Đăng nhập không thành công, kiểm tra lại email và mật khẩu');
+    return toSession(auth, orgSlug);
   },
 
   /**
@@ -196,26 +201,38 @@ export const api = {
     email: string;
     password: string;
     organizationName: string;
+    organizationSlug?: string;
     phone?: string;
   }): Promise<AuthSession> {
-    const res = await postAuthRegister({
+    const res = await authRegister({
+      // `registerSchema` của BE là `.strict()` và **bắt buộc** `organizationName`; bỏ nó đi thì
+      // nhận 400 "Validation failed" chứ không phải lỗi nghiệp vụ nào.
       body: {
+        organizationName: input.organizationName,
+        organizationSlug: input.organizationSlug,
         name: input.name,
         email: input.email,
         password: input.password,
         phone: input.phone,
       },
     });
-    const auth = unwrap<AuthResponse>(
-      res as SdkResult<AuthResponse>,
-      'Tạo tài khoản không thành công',
-    );
-    return {
-      userId: auth.user.id,
-      email: auth.user.email,
-      accessToken: auth.tokens.accessToken,
-      refreshToken: auth.tokens.refreshToken,
-    };
+    const auth = unwrap(res, 'Tạo tài khoản không thành công');
+    // Slug do BE sinh khi không truyền, và phiên sau đăng ký chưa biết nó là gì. Giữ slug người
+    // dùng tự nhập (nếu có) để lần đăng nhập lại trên thiết bị khác còn điền đúng org.
+    return toSession(auth, input.organizationSlug);
+  },
+
+  /**
+   * Đổi refresh token lấy cặp token mới. BE **rotate cả hai** và trả kèm user, nên phải ghi lại
+   * trọn phiên chứ không chỉ `accessToken` — giữ refresh token cũ là lần refresh sau sẽ 401.
+   *
+   * Không đi qua `getCurrentUserId()`/session ở module scope: hàm này chạy đúng lúc access token
+   * đã hết hạn, nên refresh token phải do caller truyền vào.
+   */
+  async refreshSession(refreshToken: string, orgSlug?: string): Promise<AuthSession> {
+    const res = await authRefresh({ body: { refreshToken } });
+    const auth = unwrap(res, 'Phiên đăng nhập đã hết, đăng nhập lại nhé');
+    return toSession(auth, orgSlug);
   },
 
   /* ---------------- listings ---------------- */
@@ -224,35 +241,32 @@ export const api = {
    * `GET /categories` (chỗ đổi tên -> id) đang trả 501. Nhận tham số để giữ chữ ký cho hook.
    */
   async getListings(cat = 'Tất cả'): Promise<Listing[]> {
-    const res = await getListings({ query: { limit: 50, status: 'active' } });
-    const items = unwrap<GetListingsResponse>(
-      res as SdkResult<GetListingsResponse>,
-      'Không tải được bảng tin',
-    ).data.map(toListing);
+    // Không gửi `status`: `listingQuerySchema` của BE không khai field đó (chỉ caller nội bộ mới
+    // được ép status), và `buildFilter` đã mặc định ACTIVE. Gửi thêm chỉ bị zod strip im lặng.
+    const res = await withAuthRetry(() => listingList({ query: { limit: 50 } }));
+    const items = unwrap(res, 'Không tải được bảng tin').map(toListing);
 
     if (cat === 'Tất cả') return items;
     return items.filter((item) => item.cat === cat);
   },
 
   async getListing(id: string): Promise<Listing> {
-    const res = await getListingsById({ path: { id } });
-    return toListing(
-      unwrap<GetListingsByIdResponse>(res as SdkResult<GetListingsByIdResponse>, 'Không tìm thấy tin này').data,
-    );
+    const res = await withAuthRetry(() => listingGetById({ path: { id } }));
+    return toListing(unwrap(res, 'Không tìm thấy tin này'));
   },
 
   async searchListings(q: string): Promise<Listing[]> {
     const term = q.trim();
     if (!term) return [];
-    const res = await getListings({ query: { q: term, limit: 50, status: 'active' } });
-    return unwrap<GetListingsResponse>(res as SdkResult<GetListingsResponse>, 'Không tìm được tin nào').data.map(toListing);
+    const res = await withAuthRetry(() => listingList({ query: { q: term, limit: 50 } }));
+    return unwrap(res, 'Không tìm được tin nào').map(toListing);
   },
 
   async getMyListings(): Promise<Listing[]> {
     const seller = getCurrentUserId();
     if (!seller) throw new Error('Phiên đăng nhập đã hết, đăng nhập lại nhé');
-    const res = await getListings({ query: { seller, limit: 50 } });
-    return unwrap<GetListingsResponse>(res as SdkResult<GetListingsResponse>, 'Không tải được tin của bạn').data.map(toListing);
+    const res = await withAuthRetry(() => listingList({ query: { seller, limit: 50 } }));
+    return unwrap(res, 'Không tải được tin của bạn').map(toListing);
   },
 
   /**
@@ -272,7 +286,7 @@ export const api = {
   },
 
   async deleteListing(id: string) {
-    const res = await deleteListingsById({ path: { id } });
+    const res = await withAuthRetry(() => listingRemove({ path: { id } }));
     unwrap(res, 'Không xoá được tin này');
     db.savedIds = db.savedIds.filter((s) => s !== id);
     return { id };
@@ -369,20 +383,18 @@ export const api = {
   },
 
   async getProfile(): Promise<Profile> {
-    const res = await getUsersMe();
-    return toProfile(
-      unwrap<GetUsersMeResponse>(res as SdkResult<GetUsersMeResponse>, 'Không tải được hồ sơ').data,
-    );
+    const res = await withAuthRetry(() => userGetMe());
+    return toProfile(unwrap(res, 'Không tải được hồ sơ'));
   },
 
   async updateProfile(input: Partial<Profile>): Promise<Profile> {
-    const res = await patchUsersMe({
-      // BE chỉ nhận ba field này; `org`/`posted`/`sold` không thuộc hồ sơ user.
-      body: { name: input.name, phone: input.phone },
-    });
-    return toProfile(
-      unwrap<GetUsersMeResponse>(res as SdkResult<GetUsersMeResponse>, 'Không lưu được hồ sơ').data,
+    const res = await withAuthRetry(() =>
+      userUpdateMe({
+        // BE chỉ nhận ba field này; `org`/`posted`/`sold` không thuộc hồ sơ user.
+        body: { name: input.name, phone: input.phone },
+      }),
     );
+    return toProfile(unwrap(res, 'Không lưu được hồ sơ'));
   },
 };
 

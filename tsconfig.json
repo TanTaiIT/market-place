@@ -6,8 +6,24 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      // expo-router 6.0.24 ship `build/*.d.ts` import bare `expo-router/src/*`, nhưng `files`
+      // của nó có `"!src"` nên tarball không hề chứa src -> `export *` giải ra rỗng và mọi
+      // `useRouter`/`Redirect`/`useLocalSearchParams` thành TS2305. `build/` mirror đúng cây
+      // `src/` nên map thẳng sang đó. Bỏ dòng này = 14 lỗi quay lại.
+      "expo-router/src/*": [
+        "./node_modules/expo-router/build/*"
       ]
-    }
+    },
+    // `react-native-strict-api` trỏ react-native sang `types_generated/` (Strict TypeScript API
+    // của RN 0.80+). Bắt buộc phải có: bộ type cũ trong `Libraries/**/*.d.ts` import bare
+    // `react-native/types/private/Utilities`, mà `exports` map của RN lại map `"./types/*"` -> null,
+    // nên `Constructor` thành any, `class View extends any` mất hết member của Component và mọi
+    // thẻ JSX báo TS2786/TS2607. Giữ kèm `react-native` để không đổi ý định của expo/tsconfig.base.
+    "customConditions": [
+      "react-native-strict-api",
+      "react-native"
+    ]
   },
   "include": [
     "**/*.ts",

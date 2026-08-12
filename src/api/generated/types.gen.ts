@@ -4,7 +4,26 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}/api/v1` | (string & {});
 };
 
+export type ErrorResponse = {
+    success: false;
+    message: string;
+    details?: Array<{
+        path: string;
+        message: string;
+    }>;
+};
+
+export type Organization = {
+    id: string;
+    name: string;
+    slug: string;
+    chainId: string | null;
+    status: string;
+};
+
 export type RegisterInput = {
+    organizationName: string;
+    organizationSlug?: string;
     name: string;
     email: string;
     phone?: string;
@@ -12,6 +31,7 @@ export type RegisterInput = {
 };
 
 export type LoginInput = {
+    orgSlug?: string;
     email: string;
     password: string;
 };
@@ -20,24 +40,21 @@ export type RefreshInput = {
     refreshToken: string;
 };
 
-export type AuthTokens = {
-    accessToken: string;
-    refreshToken: string;
-};
-
-export type AuthUser = {
-    id: string;
-    name: string;
-    email: string;
-    phone?: string;
-    avatar: string;
-    role: 'user' | 'admin' | 'moderator';
-    isEmailVerified: boolean;
-};
-
 export type AuthResponse = {
-    user: AuthUser;
-    tokens: AuthTokens;
+    user: {
+        id: string;
+        organizationId: string;
+        name: string;
+        email: string;
+        phone?: string;
+        avatar: string;
+        role: string;
+        isEmailVerified: boolean;
+    };
+    tokens: {
+        accessToken: string;
+        refreshToken: string;
+    };
 };
 
 export type UpdateProfile = {
@@ -46,21 +63,21 @@ export type UpdateProfile = {
     avatar?: string;
 };
 
-export type UserProfile = {
-    _id: string;
+export type PublicProfile = {
+    id: string;
     name: string;
-    email: string;
-    phone?: string;
     avatar: string;
-    role: 'user' | 'admin' | 'moderator';
-    isEmailVerified: boolean;
-    isActive: boolean;
     ratingAvg: number;
     ratingCount: number;
-    lastLoginAt?: string;
-    deletedAt: string | null;
     createdAt: string;
-    updatedAt: string;
+};
+
+export type MeProfile = PublicProfile & {
+    email: string;
+    phone?: string;
+    role: string;
+    isEmailVerified: boolean;
+    isActive: boolean;
 };
 
 export type CreateListing = {
@@ -113,90 +130,145 @@ export type UpdateListing = {
     };
 };
 
-export type ListingLocation = {
-    type: 'Point';
-    coordinates: [
-        number | number,
-        number | number
-    ];
-    address?: string;
-    province?: string;
-    district?: string;
-};
-
 export type Listing = {
     _id: string;
+    organizationId: string;
     title: string;
-    slug?: string;
+    slug: string;
     description: string;
     price: number;
     isNegotiable: boolean;
     condition: 'new' | 'like_new' | 'used';
     images: Array<string>;
     category: string;
-    seller: string | {
-        _id: string;
+    seller: string;
+    /**
+     * Snapshot tên người đăng lúc tạo tin
+     */
+    posterName: string;
+    /**
+     * Snapshot liên hệ công khai lúc tạo tin
+     */
+    posterContact: string;
+    location: {
+        /**
+         * [longitude, latitude]
+         */
+        coordinates: [
+            number | number,
+            number | number
+        ];
+        address?: string;
+        province?: string;
+        district?: string;
+        type: 'Point';
     };
-    location: ListingLocation;
     status: 'draft' | 'pending' | 'active' | 'sold' | 'expired' | 'rejected' | 'hidden';
     viewCount: number;
     favoriteCount: number;
-    attributes: {
-        [key: string]: string;
-    };
     expiresAt?: string;
-    deletedAt: string | null;
     createdAt: string;
     updatedAt: string;
 };
 
-export type ErrorDetail = {
-    path: string;
-    message: string;
-};
-
-export type ErrorResponse = {
-    success: false;
-    message: string;
-    details?: Array<ErrorDetail>;
-    stack?: string;
-};
-
-export type PaginationMeta = {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-    hasNextPage: boolean;
-    hasPrevPage: boolean;
-};
-
-export type PostAuthRegisterData = {
+export type CreateChain = {
+    name: string;
+    slug?: string;
     /**
-     * New user payload
+     * User được chỉ định làm chain owner
      */
+    ownerId: string;
+};
+
+export type Chain = {
+    _id: string;
+    name: string;
+    slug: string;
+    ownerId: string;
+    status: string;
+    createdAt: string;
+};
+
+export type ChainStats = {
+    chainId: string;
+    totals: {
+        organizations: number;
+        listings: number;
+        users: number;
+    };
+    breakdown: Array<{
+        organization: Organization;
+        listings: number;
+        users: number;
+    }>;
+};
+
+export type CreateNotification = {
+    title: string;
+    body: string;
+};
+
+export type Notification = {
+    _id: string;
+    organizationId: string;
+    sourceType: 'organization' | 'chain';
+    sourceChainId: string | null;
+    title: string;
+    body: string;
+    readBy: Array<string>;
+    createdAt: string;
+};
+
+export type PlatformAdminLogin = {
+    email: string;
+    password: string;
+};
+
+export type PlatformAdminAuth = {
+    admin: {
+        id: string;
+        email: string;
+        name: string;
+        role: string;
+    };
+    accessToken: string;
+};
+
+export type AssignChain = {
+    chainId: string | null;
+};
+
+export type SetOrganizationStatus = {
+    status: 'active' | 'suspended';
+};
+
+export type AuthRegisterData = {
     body?: RegisterInput;
     path?: never;
     query?: never;
     url: '/auth/register';
 };
 
-export type PostAuthRegisterErrors = {
+export type AuthRegisterErrors = {
     /**
-     * Validation error
+     * Dữ liệu không hợp lệ
      */
     400: ErrorResponse;
     /**
-     * Email already exists
+     * Organization slug đã tồn tại
      */
     409: ErrorResponse;
+    /**
+     * Quá nhiều request
+     */
+    429: ErrorResponse;
 };
 
-export type PostAuthRegisterError = PostAuthRegisterErrors[keyof PostAuthRegisterErrors];
+export type AuthRegisterError = AuthRegisterErrors[keyof AuthRegisterErrors];
 
-export type PostAuthRegisterResponses = {
+export type AuthRegisterResponses = {
     /**
-     * Account created successfully
+     * Đăng ký thành công
      */
     201: {
         success: true;
@@ -205,31 +277,35 @@ export type PostAuthRegisterResponses = {
     };
 };
 
-export type PostAuthRegisterResponse = PostAuthRegisterResponses[keyof PostAuthRegisterResponses];
+export type AuthRegisterResponse = AuthRegisterResponses[keyof AuthRegisterResponses];
 
-export type PostAuthLoginData = {
+export type AuthLoginData = {
     body?: LoginInput;
     path?: never;
     query?: never;
     url: '/auth/login';
 };
 
-export type PostAuthLoginErrors = {
+export type AuthLoginErrors = {
     /**
-     * Validation error
-     */
-    400: ErrorResponse;
-    /**
-     * Invalid credentials
+     * Sai thông tin đăng nhập, tài khoản bị khoá, hoặc thiếu organization
      */
     401: ErrorResponse;
+    /**
+     * Organization không tồn tại hoặc đã bị khoá
+     */
+    403: ErrorResponse;
+    /**
+     * Quá nhiều request
+     */
+    429: ErrorResponse;
 };
 
-export type PostAuthLoginError = PostAuthLoginErrors[keyof PostAuthLoginErrors];
+export type AuthLoginError = AuthLoginErrors[keyof AuthLoginErrors];
 
-export type PostAuthLoginResponses = {
+export type AuthLoginResponses = {
     /**
-     * Logged in successfully
+     * Đăng nhập thành công
      */
     200: {
         success: true;
@@ -238,31 +314,27 @@ export type PostAuthLoginResponses = {
     };
 };
 
-export type PostAuthLoginResponse = PostAuthLoginResponses[keyof PostAuthLoginResponses];
+export type AuthLoginResponse = AuthLoginResponses[keyof AuthLoginResponses];
 
-export type PostAuthRefreshData = {
+export type AuthRefreshData = {
     body?: RefreshInput;
     path?: never;
     query?: never;
     url: '/auth/refresh';
 };
 
-export type PostAuthRefreshErrors = {
+export type AuthRefreshErrors = {
     /**
-     * Validation error
-     */
-    400: ErrorResponse;
-    /**
-     * Invalid refresh token
+     * Refresh token hết hạn hoặc không hợp lệ
      */
     401: ErrorResponse;
 };
 
-export type PostAuthRefreshError = PostAuthRefreshErrors[keyof PostAuthRefreshErrors];
+export type AuthRefreshError = AuthRefreshErrors[keyof AuthRefreshErrors];
 
-export type PostAuthRefreshResponses = {
+export type AuthRefreshResponses = {
     /**
-     * Token refreshed
+     * Token đã được làm mới
      */
     200: {
         success: true;
@@ -271,27 +343,27 @@ export type PostAuthRefreshResponses = {
     };
 };
 
-export type PostAuthRefreshResponse = PostAuthRefreshResponses[keyof PostAuthRefreshResponses];
+export type AuthRefreshResponse = AuthRefreshResponses[keyof AuthRefreshResponses];
 
-export type DeleteUsersMeData = {
+export type UserDeleteMeData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/users/me';
 };
 
-export type DeleteUsersMeErrors = {
+export type UserDeleteMeErrors = {
     /**
-     * Missing or invalid access token
+     * Thiếu hoặc sai access token
      */
     401: ErrorResponse;
 };
 
-export type DeleteUsersMeError = DeleteUsersMeErrors[keyof DeleteUsersMeErrors];
+export type UserDeleteMeError = UserDeleteMeErrors[keyof UserDeleteMeErrors];
 
-export type DeleteUsersMeResponses = {
+export type UserDeleteMeResponses = {
     /**
-     * Account deleted
+     * Đã xoá tài khoản
      */
     200: {
         success: true;
@@ -300,71 +372,71 @@ export type DeleteUsersMeResponses = {
     };
 };
 
-export type DeleteUsersMeResponse = DeleteUsersMeResponses[keyof DeleteUsersMeResponses];
+export type UserDeleteMeResponse = UserDeleteMeResponses[keyof UserDeleteMeResponses];
 
-export type GetUsersMeData = {
+export type UserGetMeData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/users/me';
 };
 
-export type GetUsersMeErrors = {
+export type UserGetMeErrors = {
     /**
-     * Missing or invalid access token
+     * Thiếu hoặc sai access token
      */
     401: ErrorResponse;
 };
 
-export type GetUsersMeError = GetUsersMeErrors[keyof GetUsersMeErrors];
+export type UserGetMeError = UserGetMeErrors[keyof UserGetMeErrors];
 
-export type GetUsersMeResponses = {
+export type UserGetMeResponses = {
     /**
-     * Current user profile
+     * Thông tin user hiện tại
      */
     200: {
         success: true;
         message: string;
-        data: UserProfile;
+        data: MeProfile;
     };
 };
 
-export type GetUsersMeResponse = GetUsersMeResponses[keyof GetUsersMeResponses];
+export type UserGetMeResponse = UserGetMeResponses[keyof UserGetMeResponses];
 
-export type PatchUsersMeData = {
+export type UserUpdateMeData = {
     body?: UpdateProfile;
     path?: never;
     query?: never;
     url: '/users/me';
 };
 
-export type PatchUsersMeErrors = {
+export type UserUpdateMeErrors = {
     /**
-     * Validation error
+     * Dữ liệu không hợp lệ
      */
     400: ErrorResponse;
     /**
-     * Missing or invalid access token
+     * Thiếu hoặc sai access token
      */
     401: ErrorResponse;
 };
 
-export type PatchUsersMeError = PatchUsersMeErrors[keyof PatchUsersMeErrors];
+export type UserUpdateMeError = UserUpdateMeErrors[keyof UserUpdateMeErrors];
 
-export type PatchUsersMeResponses = {
+export type UserUpdateMeResponses = {
     /**
-     * Updated user profile
+     * Đã cập nhật
      */
     200: {
         success: true;
         message: string;
-        data: UserProfile;
+        data: MeProfile;
     };
 };
 
-export type PatchUsersMeResponse = PatchUsersMeResponses[keyof PatchUsersMeResponses];
+export type UserUpdateMeResponse = UserUpdateMeResponses[keyof UserUpdateMeResponses];
 
-export type GetUsersByIdData = {
+export type UserGetByIdData = {
     body?: never;
     path: {
         id: string;
@@ -373,33 +445,29 @@ export type GetUsersByIdData = {
     url: '/users/{id}';
 };
 
-export type GetUsersByIdErrors = {
+export type UserGetByIdErrors = {
     /**
-     * Invalid user id
-     */
-    400: ErrorResponse;
-    /**
-     * User not found
+     * Không tìm thấy user
      */
     404: ErrorResponse;
 };
 
-export type GetUsersByIdError = GetUsersByIdErrors[keyof GetUsersByIdErrors];
+export type UserGetByIdError = UserGetByIdErrors[keyof UserGetByIdErrors];
 
-export type GetUsersByIdResponses = {
+export type UserGetByIdResponses = {
     /**
-     * User profile
+     * Hồ sơ công khai
      */
     200: {
         success: true;
         message: string;
-        data: UserProfile;
+        data: PublicProfile;
     };
 };
 
-export type GetUsersByIdResponse = GetUsersByIdResponses[keyof GetUsersByIdResponses];
+export type UserGetByIdResponse = UserGetByIdResponses[keyof UserGetByIdResponses];
 
-export type GetListingsData = {
+export type ListingListData = {
     body?: never;
     path?: never;
     query?: {
@@ -410,59 +478,69 @@ export type GetListingsData = {
         seller?: string;
         province?: string;
         condition?: 'new' | 'like_new' | 'used';
-        status?: 'draft' | 'pending' | 'active' | 'sold' | 'expired' | 'rejected' | 'hidden';
         minPrice?: number | null;
         maxPrice?: number | null;
     };
     url: '/listings';
 };
 
-export type GetListingsErrors = {
+export type ListingListErrors = {
     /**
-     * Invalid query params
+     * Query không hợp lệ
      */
     400: ErrorResponse;
 };
 
-export type GetListingsError = GetListingsErrors[keyof GetListingsErrors];
+export type ListingListError = ListingListErrors[keyof ListingListErrors];
 
-export type GetListingsResponses = {
+export type ListingListResponses = {
     /**
-     * Paginated listings
+     * Danh sách tin
      */
     200: {
         success: true;
         message: string;
         data: Array<Listing>;
-        meta: PaginationMeta;
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNextPage: boolean;
+            hasPrevPage: boolean;
+        };
     };
 };
 
-export type GetListingsResponse = GetListingsResponses[keyof GetListingsResponses];
+export type ListingListResponse = ListingListResponses[keyof ListingListResponses];
 
-export type PostListingsData = {
+export type ListingCreateData = {
     body?: CreateListing;
     path?: never;
     query?: never;
     url: '/listings';
 };
 
-export type PostListingsErrors = {
+export type ListingCreateErrors = {
     /**
-     * Validation error
+     * Dữ liệu không hợp lệ
      */
     400: ErrorResponse;
     /**
-     * Missing or invalid access token
+     * Thiếu hoặc sai access token
      */
     401: ErrorResponse;
+    /**
+     * Quá nhiều request
+     */
+    429: ErrorResponse;
 };
 
-export type PostListingsError = PostListingsErrors[keyof PostListingsErrors];
+export type ListingCreateError = ListingCreateErrors[keyof ListingCreateErrors];
 
-export type PostListingsResponses = {
+export type ListingCreateResponses = {
     /**
-     * Listing created
+     * Đã tạo tin
      */
     201: {
         success: true;
@@ -471,9 +549,9 @@ export type PostListingsResponses = {
     };
 };
 
-export type PostListingsResponse = PostListingsResponses[keyof PostListingsResponses];
+export type ListingCreateResponse = ListingCreateResponses[keyof ListingCreateResponses];
 
-export type GetListingsNearbyData = {
+export type ListingNearbyData = {
     body?: never;
     path?: never;
     query?: {
@@ -486,18 +564,18 @@ export type GetListingsNearbyData = {
     url: '/listings/nearby';
 };
 
-export type GetListingsNearbyErrors = {
+export type ListingNearbyErrors = {
     /**
-     * Invalid query params
+     * Toạ độ không hợp lệ
      */
     400: ErrorResponse;
 };
 
-export type GetListingsNearbyError = GetListingsNearbyErrors[keyof GetListingsNearbyErrors];
+export type ListingNearbyError = ListingNearbyErrors[keyof ListingNearbyErrors];
 
-export type GetListingsNearbyResponses = {
+export type ListingNearbyResponses = {
     /**
-     * Nearby listings
+     * Danh sách tin gần đó
      */
     200: {
         success: true;
@@ -510,9 +588,9 @@ export type GetListingsNearbyResponses = {
     };
 };
 
-export type GetListingsNearbyResponse = GetListingsNearbyResponses[keyof GetListingsNearbyResponses];
+export type ListingNearbyResponse = ListingNearbyResponses[keyof ListingNearbyResponses];
 
-export type DeleteListingsByIdData = {
+export type ListingRemoveData = {
     body?: never;
     path: {
         id: string;
@@ -521,30 +599,26 @@ export type DeleteListingsByIdData = {
     url: '/listings/{id}';
 };
 
-export type DeleteListingsByIdErrors = {
+export type ListingRemoveErrors = {
     /**
-     * Invalid listing id
-     */
-    400: ErrorResponse;
-    /**
-     * Missing or invalid access token
+     * Thiếu hoặc sai access token
      */
     401: ErrorResponse;
     /**
-     * Not the listing owner
+     * Không phải tin của bạn
      */
     403: ErrorResponse;
     /**
-     * Listing not found
+     * Không tìm thấy tin
      */
     404: ErrorResponse;
 };
 
-export type DeleteListingsByIdError = DeleteListingsByIdErrors[keyof DeleteListingsByIdErrors];
+export type ListingRemoveError = ListingRemoveErrors[keyof ListingRemoveErrors];
 
-export type DeleteListingsByIdResponses = {
+export type ListingRemoveResponses = {
     /**
-     * Listing deleted
+     * Đã xoá
      */
     200: {
         success: true;
@@ -553,9 +627,9 @@ export type DeleteListingsByIdResponses = {
     };
 };
 
-export type DeleteListingsByIdResponse = DeleteListingsByIdResponses[keyof DeleteListingsByIdResponses];
+export type ListingRemoveResponse = ListingRemoveResponses[keyof ListingRemoveResponses];
 
-export type GetListingsByIdData = {
+export type ListingGetByIdData = {
     body?: never;
     path: {
         id: string;
@@ -564,22 +638,18 @@ export type GetListingsByIdData = {
     url: '/listings/{id}';
 };
 
-export type GetListingsByIdErrors = {
+export type ListingGetByIdErrors = {
     /**
-     * Invalid listing id
-     */
-    400: ErrorResponse;
-    /**
-     * Listing not found
+     * Không tìm thấy tin hoặc tin chưa được public
      */
     404: ErrorResponse;
 };
 
-export type GetListingsByIdError = GetListingsByIdErrors[keyof GetListingsByIdErrors];
+export type ListingGetByIdError = ListingGetByIdErrors[keyof ListingGetByIdErrors];
 
-export type GetListingsByIdResponses = {
+export type ListingGetByIdResponses = {
     /**
-     * Listing detail
+     * Chi tiết tin
      */
     200: {
         success: true;
@@ -588,9 +658,9 @@ export type GetListingsByIdResponses = {
     };
 };
 
-export type GetListingsByIdResponse = GetListingsByIdResponses[keyof GetListingsByIdResponses];
+export type ListingGetByIdResponse = ListingGetByIdResponses[keyof ListingGetByIdResponses];
 
-export type PatchListingsByIdData = {
+export type ListingUpdateData = {
     body?: UpdateListing;
     path: {
         id: string;
@@ -599,30 +669,26 @@ export type PatchListingsByIdData = {
     url: '/listings/{id}';
 };
 
-export type PatchListingsByIdErrors = {
+export type ListingUpdateErrors = {
     /**
-     * Validation error
-     */
-    400: ErrorResponse;
-    /**
-     * Missing or invalid access token
+     * Thiếu hoặc sai access token
      */
     401: ErrorResponse;
     /**
-     * Not the listing owner
+     * Không phải tin của bạn
      */
     403: ErrorResponse;
     /**
-     * Listing not found
+     * Không tìm thấy tin
      */
     404: ErrorResponse;
 };
 
-export type PatchListingsByIdError = PatchListingsByIdErrors[keyof PatchListingsByIdErrors];
+export type ListingUpdateError = ListingUpdateErrors[keyof ListingUpdateErrors];
 
-export type PatchListingsByIdResponses = {
+export type ListingUpdateResponses = {
     /**
-     * Listing updated
+     * Đã cập nhật
      */
     200: {
         success: true;
@@ -631,112 +697,363 @@ export type PatchListingsByIdResponses = {
     };
 };
 
-export type PatchListingsByIdResponse = PatchListingsByIdResponses[keyof PatchListingsByIdResponses];
+export type ListingUpdateResponse = ListingUpdateResponses[keyof ListingUpdateResponses];
 
-export type GetCategoriesByPathData = {
+export type ChainStatsData = {
     body?: never;
     path: {
-        path: string;
+        chainId: string;
     };
     query?: never;
-    url: '/categories/{path}';
+    url: '/chains/{chainId}/stats';
 };
 
-export type GetCategoriesByPathErrors = {
+export type ChainStatsErrors = {
     /**
-     * Category module not implemented
+     * Thiếu hoặc sai access token
      */
-    501: ErrorResponse;
+    401: ErrorResponse;
+    /**
+     * Không phải chủ chain
+     */
+    403: ErrorResponse;
 };
 
-export type GetCategoriesByPathError = GetCategoriesByPathErrors[keyof GetCategoriesByPathErrors];
+export type ChainStatsError = ChainStatsErrors[keyof ChainStatsErrors];
 
-export type GetChatsByPathData = {
+export type ChainStatsResponses = {
+    /**
+     * Thống kê chain
+     */
+    200: {
+        success: true;
+        message: string;
+        data: ChainStats;
+    };
+};
+
+export type ChainStatsResponse = ChainStatsResponses[keyof ChainStatsResponses];
+
+export type ChainOrganizationsData = {
     body?: never;
     path: {
-        path: string;
+        chainId: string;
     };
     query?: never;
-    url: '/chats/{path}';
+    url: '/chains/{chainId}/organizations';
 };
 
-export type GetChatsByPathErrors = {
+export type ChainOrganizationsErrors = {
     /**
-     * Chat module not implemented
+     * Thiếu hoặc sai access token
      */
-    501: ErrorResponse;
+    401: ErrorResponse;
+    /**
+     * Không phải chủ chain
+     */
+    403: ErrorResponse;
 };
 
-export type GetChatsByPathError = GetChatsByPathErrors[keyof GetChatsByPathErrors];
+export type ChainOrganizationsError = ChainOrganizationsErrors[keyof ChainOrganizationsErrors];
 
-export type GetUploadsByPathData = {
+export type ChainOrganizationsResponses = {
+    /**
+     * Danh sách org
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<Organization>;
+    };
+};
+
+export type ChainOrganizationsResponse = ChainOrganizationsResponses[keyof ChainOrganizationsResponses];
+
+export type ChainBroadcastData = {
+    body?: CreateNotification;
+    path: {
+        chainId: string;
+    };
+    query?: never;
+    url: '/chains/{chainId}/notifications';
+};
+
+export type ChainBroadcastErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Không phải chủ chain
+     */
+    403: ErrorResponse;
+};
+
+export type ChainBroadcastError = ChainBroadcastErrors[keyof ChainBroadcastErrors];
+
+export type ChainBroadcastResponses = {
+    /**
+     * Đã fan-out
+     */
+    201: {
+        success: true;
+        message: string;
+        data: {
+            organizations: number;
+        };
+    };
+};
+
+export type ChainBroadcastResponse = ChainBroadcastResponses[keyof ChainBroadcastResponses];
+
+export type NotificationListData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        limit?: number;
+    };
+    url: '/notifications';
+};
+
+export type NotificationListErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+};
+
+export type NotificationListError = NotificationListErrors[keyof NotificationListErrors];
+
+export type NotificationListResponses = {
+    /**
+     * Danh sách thông báo
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<Notification>;
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNextPage: boolean;
+            hasPrevPage: boolean;
+        };
+    };
+};
+
+export type NotificationListResponse = NotificationListResponses[keyof NotificationListResponses];
+
+export type NotificationCreateData = {
+    body?: CreateNotification;
+    path?: never;
+    query?: never;
+    url: '/notifications';
+};
+
+export type NotificationCreateErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Chỉ owner/moderator được gửi
+     */
+    403: ErrorResponse;
+};
+
+export type NotificationCreateError = NotificationCreateErrors[keyof NotificationCreateErrors];
+
+export type NotificationCreateResponses = {
+    /**
+     * Đã gửi
+     */
+    201: {
+        success: true;
+        message: string;
+        data: Notification;
+    };
+};
+
+export type NotificationCreateResponse = NotificationCreateResponses[keyof NotificationCreateResponses];
+
+export type NotificationMarkReadData = {
     body?: never;
     path: {
-        path: string;
+        id: string;
     };
     query?: never;
-    url: '/uploads/{path}';
+    url: '/notifications/{id}/read';
 };
 
-export type GetUploadsByPathErrors = {
+export type NotificationMarkReadErrors = {
     /**
-     * Upload module not implemented
+     * Thiếu hoặc sai access token
      */
-    501: ErrorResponse;
+    401: ErrorResponse;
+    /**
+     * Không tìm thấy thông báo
+     */
+    404: ErrorResponse;
 };
 
-export type GetUploadsByPathError = GetUploadsByPathErrors[keyof GetUploadsByPathErrors];
+export type NotificationMarkReadError = NotificationMarkReadErrors[keyof NotificationMarkReadErrors];
 
-export type GetSearchByPathData = {
-    body?: never;
+export type NotificationMarkReadResponses = {
+    /**
+     * Đã đánh dấu
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Notification;
+    };
+};
+
+export type NotificationMarkReadResponse = NotificationMarkReadResponses[keyof NotificationMarkReadResponses];
+
+export type PlatformAdminLoginData = {
+    body?: PlatformAdminLogin;
+    path?: never;
+    query?: never;
+    url: '/platform-admin/auth/login';
+};
+
+export type PlatformAdminLoginErrors = {
+    /**
+     * Sai thông tin đăng nhập
+     */
+    401: ErrorResponse;
+};
+
+export type PlatformAdminLoginError = PlatformAdminLoginErrors[keyof PlatformAdminLoginErrors];
+
+export type PlatformAdminLoginResponses = {
+    /**
+     * Đăng nhập thành công
+     */
+    200: {
+        success: true;
+        message: string;
+        data: PlatformAdminAuth;
+    };
+};
+
+export type PlatformAdminLoginResponse = PlatformAdminLoginResponses[keyof PlatformAdminLoginResponses];
+
+export type PlatformAdminCreateChainData = {
+    body?: CreateChain;
+    path?: never;
+    query?: never;
+    url: '/platform-admin/chains';
+};
+
+export type PlatformAdminCreateChainErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền super_admin
+     */
+    403: ErrorResponse;
+    /**
+     * Chain slug đã tồn tại
+     */
+    409: ErrorResponse;
+};
+
+export type PlatformAdminCreateChainError = PlatformAdminCreateChainErrors[keyof PlatformAdminCreateChainErrors];
+
+export type PlatformAdminCreateChainResponses = {
+    /**
+     * Đã tạo chain
+     */
+    201: {
+        success: true;
+        message: string;
+        data: Chain;
+    };
+};
+
+export type PlatformAdminCreateChainResponse = PlatformAdminCreateChainResponses[keyof PlatformAdminCreateChainResponses];
+
+export type PlatformAdminAssignChainData = {
+    body?: AssignChain;
     path: {
-        path: string;
+        organizationId: string;
     };
     query?: never;
-    url: '/search/{path}';
+    url: '/platform-admin/organizations/{organizationId}/chain';
 };
 
-export type GetSearchByPathErrors = {
+export type PlatformAdminAssignChainErrors = {
     /**
-     * Search module not implemented
+     * Thiếu hoặc sai access token
      */
-    501: ErrorResponse;
+    401: ErrorResponse;
+    /**
+     * Cần quyền super_admin
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy organization hoặc chain
+     */
+    404: ErrorResponse;
 };
 
-export type GetSearchByPathError = GetSearchByPathErrors[keyof GetSearchByPathErrors];
+export type PlatformAdminAssignChainError = PlatformAdminAssignChainErrors[keyof PlatformAdminAssignChainErrors];
 
-export type GetReviewsByPathData = {
-    body?: never;
+export type PlatformAdminAssignChainResponses = {
+    /**
+     * Đã cập nhật
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Organization;
+    };
+};
+
+export type PlatformAdminAssignChainResponse = PlatformAdminAssignChainResponses[keyof PlatformAdminAssignChainResponses];
+
+export type PlatformAdminSetOrganizationStatusData = {
+    body?: SetOrganizationStatus;
     path: {
-        path: string;
+        organizationId: string;
     };
     query?: never;
-    url: '/reviews/{path}';
+    url: '/platform-admin/organizations/{organizationId}/status';
 };
 
-export type GetReviewsByPathErrors = {
+export type PlatformAdminSetOrganizationStatusErrors = {
     /**
-     * Review module not implemented
+     * Thiếu hoặc sai access token
      */
-    501: ErrorResponse;
+    401: ErrorResponse;
+    /**
+     * Cần quyền super_admin
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy organization
+     */
+    404: ErrorResponse;
 };
 
-export type GetReviewsByPathError = GetReviewsByPathErrors[keyof GetReviewsByPathErrors];
+export type PlatformAdminSetOrganizationStatusError = PlatformAdminSetOrganizationStatusErrors[keyof PlatformAdminSetOrganizationStatusErrors];
 
-export type GetNotificationsByPathData = {
-    body?: never;
-    path: {
-        path: string;
+export type PlatformAdminSetOrganizationStatusResponses = {
+    /**
+     * Đã cập nhật
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Organization;
     };
-    query?: never;
-    url: '/notifications/{path}';
 };
 
-export type GetNotificationsByPathErrors = {
-    /**
-     * Notification module not implemented
-     */
-    501: ErrorResponse;
-};
-
-export type GetNotificationsByPathError = GetNotificationsByPathErrors[keyof GetNotificationsByPathErrors];
+export type PlatformAdminSetOrganizationStatusResponse = PlatformAdminSetOrganizationStatusResponses[keyof PlatformAdminSetOrganizationStatusResponses];

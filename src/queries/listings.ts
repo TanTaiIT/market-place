@@ -118,20 +118,3 @@ export function useUpdateProfile() {
     onSuccess: (data) => qc.setQueryData(qk.profile(), data),
   });
 }
-
-export function useLogin() {
-  return useMutation({
-    mutationFn: (v: { email: string; password: string; orgSlug?: string }) =>
-      api.login(v.email, v.password, v.orgSlug),
-  });
-}
-
-export function useRegister() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: api.register,
-    // Đăng ký trả về session (token + userId), không phải hồ sơ — nên invalidate để
-    // `useProfile()` gọi lại `GET /users/me` bằng token mới thay vì ghi cache bằng session.
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.profile() }),
-  });
-}

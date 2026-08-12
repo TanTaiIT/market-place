@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { DeleteListingsByIdData, DeleteListingsByIdErrors, DeleteListingsByIdResponses, DeleteUsersMeData, DeleteUsersMeErrors, DeleteUsersMeResponses, GetCategoriesByPathData, GetCategoriesByPathErrors, GetChatsByPathData, GetChatsByPathErrors, GetListingsByIdData, GetListingsByIdErrors, GetListingsByIdResponses, GetListingsData, GetListingsErrors, GetListingsNearbyData, GetListingsNearbyErrors, GetListingsNearbyResponses, GetListingsResponses, GetNotificationsByPathData, GetNotificationsByPathErrors, GetReviewsByPathData, GetReviewsByPathErrors, GetSearchByPathData, GetSearchByPathErrors, GetUploadsByPathData, GetUploadsByPathErrors, GetUsersByIdData, GetUsersByIdErrors, GetUsersByIdResponses, GetUsersMeData, GetUsersMeErrors, GetUsersMeResponses, PatchListingsByIdData, PatchListingsByIdErrors, PatchListingsByIdResponses, PatchUsersMeData, PatchUsersMeErrors, PatchUsersMeResponses, PostAuthLoginData, PostAuthLoginErrors, PostAuthLoginResponses, PostAuthRefreshData, PostAuthRefreshErrors, PostAuthRefreshResponses, PostAuthRegisterData, PostAuthRegisterErrors, PostAuthRegisterResponses, PostListingsData, PostListingsErrors, PostListingsResponses } from './types.gen';
+import type { AuthLoginData, AuthLoginErrors, AuthLoginResponses, AuthRefreshData, AuthRefreshErrors, AuthRefreshResponses, AuthRegisterData, AuthRegisterErrors, AuthRegisterResponses, ChainBroadcastData, ChainBroadcastErrors, ChainBroadcastResponses, ChainOrganizationsData, ChainOrganizationsErrors, ChainOrganizationsResponses, ChainStatsData, ChainStatsErrors, ChainStatsResponses, ListingCreateData, ListingCreateErrors, ListingCreateResponses, ListingGetByIdData, ListingGetByIdErrors, ListingGetByIdResponses, ListingListData, ListingListErrors, ListingListResponses, ListingNearbyData, ListingNearbyErrors, ListingNearbyResponses, ListingRemoveData, ListingRemoveErrors, ListingRemoveResponses, ListingUpdateData, ListingUpdateErrors, ListingUpdateResponses, NotificationCreateData, NotificationCreateErrors, NotificationCreateResponses, NotificationListData, NotificationListErrors, NotificationListResponses, NotificationMarkReadData, NotificationMarkReadErrors, NotificationMarkReadResponses, PlatformAdminAssignChainData, PlatformAdminAssignChainErrors, PlatformAdminAssignChainResponses, PlatformAdminCreateChainData, PlatformAdminCreateChainErrors, PlatformAdminCreateChainResponses, PlatformAdminLoginData, PlatformAdminLoginErrors, PlatformAdminLoginResponses, PlatformAdminSetOrganizationStatusData, PlatformAdminSetOrganizationStatusErrors, PlatformAdminSetOrganizationStatusResponses, UserDeleteMeData, UserDeleteMeErrors, UserDeleteMeResponses, UserGetByIdData, UserGetByIdErrors, UserGetByIdResponses, UserGetMeData, UserGetMeErrors, UserGetMeResponses, UserUpdateMeData, UserUpdateMeErrors, UserUpdateMeResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -19,9 +19,9 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 };
 
 /**
- * Register a new account
+ * Tạo Organization mới + tài khoản owner đầu tiên
  */
-export const postAuthRegister = <ThrowOnError extends boolean = false>(options?: Options<PostAuthRegisterData, ThrowOnError>) => (options?.client ?? client).post<PostAuthRegisterResponses, PostAuthRegisterErrors, ThrowOnError>({
+export const authRegister = <ThrowOnError extends boolean = false>(options?: Options<AuthRegisterData, ThrowOnError>) => (options?.client ?? client).post<AuthRegisterResponses, AuthRegisterErrors, ThrowOnError>({
     url: '/auth/register',
     ...options,
     headers: {
@@ -31,9 +31,9 @@ export const postAuthRegister = <ThrowOnError extends boolean = false>(options?:
 });
 
 /**
- * Login with email and password
+ * Đăng nhập trong phạm vi một Organization (subdomain hoặc orgSlug)
  */
-export const postAuthLogin = <ThrowOnError extends boolean = false>(options?: Options<PostAuthLoginData, ThrowOnError>) => (options?.client ?? client).post<PostAuthLoginResponses, PostAuthLoginErrors, ThrowOnError>({
+export const authLogin = <ThrowOnError extends boolean = false>(options?: Options<AuthLoginData, ThrowOnError>) => (options?.client ?? client).post<AuthLoginResponses, AuthLoginErrors, ThrowOnError>({
     url: '/auth/login',
     ...options,
     headers: {
@@ -43,9 +43,9 @@ export const postAuthLogin = <ThrowOnError extends boolean = false>(options?: Op
 });
 
 /**
- * Refresh access token
+ * Lấy cặp token mới từ refresh token
  */
-export const postAuthRefresh = <ThrowOnError extends boolean = false>(options?: Options<PostAuthRefreshData, ThrowOnError>) => (options?.client ?? client).post<PostAuthRefreshResponses, PostAuthRefreshErrors, ThrowOnError>({
+export const authRefresh = <ThrowOnError extends boolean = false>(options?: Options<AuthRefreshData, ThrowOnError>) => (options?.client ?? client).post<AuthRefreshResponses, AuthRefreshErrors, ThrowOnError>({
     url: '/auth/refresh',
     ...options,
     headers: {
@@ -55,27 +55,27 @@ export const postAuthRefresh = <ThrowOnError extends boolean = false>(options?: 
 });
 
 /**
- * Soft delete current user account
+ * Xoá tài khoản (soft delete)
  */
-export const deleteUsersMe = <ThrowOnError extends boolean = false>(options?: Options<DeleteUsersMeData, ThrowOnError>) => (options?.client ?? client).delete<DeleteUsersMeResponses, DeleteUsersMeErrors, ThrowOnError>({
+export const userDeleteMe = <ThrowOnError extends boolean = false>(options?: Options<UserDeleteMeData, ThrowOnError>) => (options?.client ?? client).delete<UserDeleteMeResponses, UserDeleteMeErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/users/me',
     ...options
 });
 
 /**
- * Get current user profile
+ * Hồ sơ của chính mình
  */
-export const getUsersMe = <ThrowOnError extends boolean = false>(options?: Options<GetUsersMeData, ThrowOnError>) => (options?.client ?? client).get<GetUsersMeResponses, GetUsersMeErrors, ThrowOnError>({
+export const userGetMe = <ThrowOnError extends boolean = false>(options?: Options<UserGetMeData, ThrowOnError>) => (options?.client ?? client).get<UserGetMeResponses, UserGetMeErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/users/me',
     ...options
 });
 
 /**
- * Update current user profile
+ * Cập nhật hồ sơ của chính mình
  */
-export const patchUsersMe = <ThrowOnError extends boolean = false>(options?: Options<PatchUsersMeData, ThrowOnError>) => (options?.client ?? client).patch<PatchUsersMeResponses, PatchUsersMeErrors, ThrowOnError>({
+export const userUpdateMe = <ThrowOnError extends boolean = false>(options?: Options<UserUpdateMeData, ThrowOnError>) => (options?.client ?? client).patch<UserUpdateMeResponses, UserUpdateMeErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/users/me',
     ...options,
@@ -86,19 +86,21 @@ export const patchUsersMe = <ThrowOnError extends boolean = false>(options?: Opt
 });
 
 /**
- * Get public seller profile by id
+ * Hồ sơ công khai của người bán
  */
-export const getUsersById = <ThrowOnError extends boolean = false>(options: Options<GetUsersByIdData, ThrowOnError>) => (options.client ?? client).get<GetUsersByIdResponses, GetUsersByIdErrors, ThrowOnError>({ url: '/users/{id}', ...options });
+export const userGetById = <ThrowOnError extends boolean = false>(options: Options<UserGetByIdData, ThrowOnError>) => (options.client ?? client).get<UserGetByIdResponses, UserGetByIdErrors, ThrowOnError>({ url: '/users/{id}', ...options });
 
 /**
- * List marketplace listings
+ * Danh sách tin đăng (filter + full-text search)
+ *
+ * Chỉ trả tin ở trạng thái public — không lộ draft/pending/rejected/hidden.
  */
-export const getListings = <ThrowOnError extends boolean = false>(options?: Options<GetListingsData, ThrowOnError>) => (options?.client ?? client).get<GetListingsResponses, GetListingsErrors, ThrowOnError>({ url: '/listings', ...options });
+export const listingList = <ThrowOnError extends boolean = false>(options?: Options<ListingListData, ThrowOnError>) => (options?.client ?? client).get<ListingListResponses, ListingListErrors, ThrowOnError>({ url: '/listings', ...options });
 
 /**
- * Create a new listing
+ * Đăng tin mới (vào trạng thái pending chờ duyệt)
  */
-export const postListings = <ThrowOnError extends boolean = false>(options?: Options<PostListingsData, ThrowOnError>) => (options?.client ?? client).post<PostListingsResponses, PostListingsErrors, ThrowOnError>({
+export const listingCreate = <ThrowOnError extends boolean = false>(options?: Options<ListingCreateData, ThrowOnError>) => (options?.client ?? client).post<ListingCreateResponses, ListingCreateErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/listings',
     ...options,
@@ -109,28 +111,30 @@ export const postListings = <ThrowOnError extends boolean = false>(options?: Opt
 });
 
 /**
- * Find nearby listings by coordinates
+ * Tin gần một toạ độ (sắp xếp theo khoảng cách)
  */
-export const getListingsNearby = <ThrowOnError extends boolean = false>(options?: Options<GetListingsNearbyData, ThrowOnError>) => (options?.client ?? client).get<GetListingsNearbyResponses, GetListingsNearbyErrors, ThrowOnError>({ url: '/listings/nearby', ...options });
+export const listingNearby = <ThrowOnError extends boolean = false>(options?: Options<ListingNearbyData, ThrowOnError>) => (options?.client ?? client).get<ListingNearbyResponses, ListingNearbyErrors, ThrowOnError>({ url: '/listings/nearby', ...options });
 
 /**
- * Delete an owned listing
+ * Xoá tin của chính mình (soft delete)
  */
-export const deleteListingsById = <ThrowOnError extends boolean = false>(options: Options<DeleteListingsByIdData, ThrowOnError>) => (options.client ?? client).delete<DeleteListingsByIdResponses, DeleteListingsByIdErrors, ThrowOnError>({
+export const listingRemove = <ThrowOnError extends boolean = false>(options: Options<ListingRemoveData, ThrowOnError>) => (options.client ?? client).delete<ListingRemoveResponses, ListingRemoveErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/listings/{id}',
     ...options
 });
 
 /**
- * Get listing details
+ * Chi tiết tin đăng (tăng viewCount)
+ *
+ * Chỉ trả tin ở trạng thái public — không lộ draft/pending/rejected/hidden.
  */
-export const getListingsById = <ThrowOnError extends boolean = false>(options: Options<GetListingsByIdData, ThrowOnError>) => (options.client ?? client).get<GetListingsByIdResponses, GetListingsByIdErrors, ThrowOnError>({ url: '/listings/{id}', ...options });
+export const listingGetById = <ThrowOnError extends boolean = false>(options: Options<ListingGetByIdData, ThrowOnError>) => (options.client ?? client).get<ListingGetByIdResponses, ListingGetByIdErrors, ThrowOnError>({ url: '/listings/{id}', ...options });
 
 /**
- * Update an owned listing
+ * Sửa tin của chính mình
  */
-export const patchListingsById = <ThrowOnError extends boolean = false>(options: Options<PatchListingsByIdData, ThrowOnError>) => (options.client ?? client).patch<PatchListingsByIdResponses, PatchListingsByIdErrors, ThrowOnError>({
+export const listingUpdate = <ThrowOnError extends boolean = false>(options: Options<ListingUpdateData, ThrowOnError>) => (options.client ?? client).patch<ListingUpdateResponses, ListingUpdateErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/listings/{id}',
     ...options,
@@ -141,43 +145,114 @@ export const patchListingsById = <ThrowOnError extends boolean = false>(options:
 });
 
 /**
- * Category module placeholder
- *
- * This module has not been implemented yet and currently returns HTTP 501.
+ * Thống kê tổng hợp toàn chain (read-only)
  */
-export const getCategoriesByPath = <ThrowOnError extends boolean = false>(options: Options<GetCategoriesByPathData, ThrowOnError>) => (options.client ?? client).get<unknown, GetCategoriesByPathErrors, ThrowOnError>({ url: '/categories/{path}', ...options });
+export const chainStats = <ThrowOnError extends boolean = false>(options: Options<ChainStatsData, ThrowOnError>) => (options.client ?? client).get<ChainStatsResponses, ChainStatsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/chains/{chainId}/stats',
+    ...options
+});
 
 /**
- * Chat module placeholder
- *
- * This module has not been implemented yet and currently returns HTTP 501.
+ * Danh sách organization trong chain
  */
-export const getChatsByPath = <ThrowOnError extends boolean = false>(options: Options<GetChatsByPathData, ThrowOnError>) => (options.client ?? client).get<unknown, GetChatsByPathErrors, ThrowOnError>({ url: '/chats/{path}', ...options });
+export const chainOrganizations = <ThrowOnError extends boolean = false>(options: Options<ChainOrganizationsData, ThrowOnError>) => (options.client ?? client).get<ChainOrganizationsResponses, ChainOrganizationsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/chains/{chainId}/organizations',
+    ...options
+});
 
 /**
- * Upload module placeholder
- *
- * This module has not been implemented yet and currently returns HTTP 501.
+ * Gửi thông báo tới mọi org trong chain (fan-out mỗi org một bản ghi)
  */
-export const getUploadsByPath = <ThrowOnError extends boolean = false>(options: Options<GetUploadsByPathData, ThrowOnError>) => (options.client ?? client).get<unknown, GetUploadsByPathErrors, ThrowOnError>({ url: '/uploads/{path}', ...options });
+export const chainBroadcast = <ThrowOnError extends boolean = false>(options: Options<ChainBroadcastData, ThrowOnError>) => (options.client ?? client).post<ChainBroadcastResponses, ChainBroadcastErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/chains/{chainId}/notifications',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
- * Search module placeholder
- *
- * This module has not been implemented yet and currently returns HTTP 501.
+ * Thông báo của organization hiện tại (gồm cả bản fan-out từ chain)
  */
-export const getSearchByPath = <ThrowOnError extends boolean = false>(options: Options<GetSearchByPathData, ThrowOnError>) => (options.client ?? client).get<unknown, GetSearchByPathErrors, ThrowOnError>({ url: '/search/{path}', ...options });
+export const notificationList = <ThrowOnError extends boolean = false>(options?: Options<NotificationListData, ThrowOnError>) => (options?.client ?? client).get<NotificationListResponses, NotificationListErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/notifications',
+    ...options
+});
 
 /**
- * Review module placeholder
- *
- * This module has not been implemented yet and currently returns HTTP 501.
+ * Gửi thông báo trong phạm vi organization
  */
-export const getReviewsByPath = <ThrowOnError extends boolean = false>(options: Options<GetReviewsByPathData, ThrowOnError>) => (options.client ?? client).get<unknown, GetReviewsByPathErrors, ThrowOnError>({ url: '/reviews/{path}', ...options });
+export const notificationCreate = <ThrowOnError extends boolean = false>(options?: Options<NotificationCreateData, ThrowOnError>) => (options?.client ?? client).post<NotificationCreateResponses, NotificationCreateErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/notifications',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
 
 /**
- * Notification module placeholder
- *
- * This module has not been implemented yet and currently returns HTTP 501.
+ * Đánh dấu đã đọc
  */
-export const getNotificationsByPath = <ThrowOnError extends boolean = false>(options: Options<GetNotificationsByPathData, ThrowOnError>) => (options.client ?? client).get<unknown, GetNotificationsByPathErrors, ThrowOnError>({ url: '/notifications/{path}', ...options });
+export const notificationMarkRead = <ThrowOnError extends boolean = false>(options: Options<NotificationMarkReadData, ThrowOnError>) => (options.client ?? client).patch<NotificationMarkReadResponses, NotificationMarkReadErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/notifications/{id}/read',
+    ...options
+});
+
+/**
+ * Đăng nhập bên bán phần mềm (JWT type riêng, không thuộc organization nào)
+ */
+export const platformAdminLogin = <ThrowOnError extends boolean = false>(options?: Options<PlatformAdminLoginData, ThrowOnError>) => (options?.client ?? client).post<PlatformAdminLoginResponses, PlatformAdminLoginErrors, ThrowOnError>({
+    url: '/platform-admin/auth/login',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+/**
+ * Tạo chain mới và chỉ định chain owner
+ */
+export const platformAdminCreateChain = <ThrowOnError extends boolean = false>(options?: Options<PlatformAdminCreateChainData, ThrowOnError>) => (options?.client ?? client).post<PlatformAdminCreateChainResponses, PlatformAdminCreateChainErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/platform-admin/chains',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+/**
+ * Gán org vào chain, hoặc tách ra độc lập với chainId = null
+ */
+export const platformAdminAssignChain = <ThrowOnError extends boolean = false>(options: Options<PlatformAdminAssignChainData, ThrowOnError>) => (options.client ?? client).patch<PlatformAdminAssignChainResponses, PlatformAdminAssignChainErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/platform-admin/organizations/{organizationId}/chain',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Khoá/mở organization — có hiệu lực ngay, không đợi access token hết hạn
+ */
+export const platformAdminSetOrganizationStatus = <ThrowOnError extends boolean = false>(options: Options<PlatformAdminSetOrganizationStatusData, ThrowOnError>) => (options.client ?? client).patch<PlatformAdminSetOrganizationStatusResponses, PlatformAdminSetOrganizationStatusErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/platform-admin/organizations/{organizationId}/status',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});

@@ -14,7 +14,6 @@ const CLOUD_NAME = 'ds4dqc7s5';
 const UPLOAD_PRESET = 'ghim_unsigned';
 
 const UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
-const FOLDER = 'ghim/listings';
 
 type CloudinaryUploadResponse = {
   secure_url?: string;
@@ -42,13 +41,17 @@ export async function uploadImage(uri: string): Promise<string> {
   // chỉ khai `Blob | string` — ép kiểu ở đúng một dòng này thay vì nới lỏng cả file.
   form.append('file', { uri, name, type: mimeOf(name) } as unknown as Blob);
   form.append('upload_preset', UPLOAD_PRESET);
-  form.append('folder', FOLDER);
 
   const res = await fetch(UPLOAD_URL, { method: 'POST', body: form });
   const json = (await res.json()) as CloudinaryUploadResponse;
 
   if (!res.ok || !json.secure_url) {
-    throw new Error(json.error?.message ?? 'Tải ảnh lên thất bại, thử lại nhé');
+    // Kèm nguyên văn message của Cloudinary sau phần copy tiếng Việt: nó là thứ duy nhất phân biệt
+    // được lỗi cấu hình vĩnh viễn ("Upload preset not found") với lỗi tạm thời đáng thử lại.
+    const detail = json.error?.message;
+    throw new Error(
+      detail ? `Tải ảnh lên thất bại — Cloudinary: ${detail}` : 'Tải ảnh lên thất bại, thử lại nhé',
+    );
   }
   return json.secure_url;
 }

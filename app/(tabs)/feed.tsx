@@ -30,7 +30,13 @@ export default function Feed() {
           gap: 14,
         }}
         refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={C.paperWarm} />
+          // Bọc `refetch` chứ không truyền thẳng: RefreshControl gọi handler không tham số nhưng
+          // `refetch` nhận `RefetchOptions`, và nó trả Promise mà prop này không nhận.
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={() => void refetch()}
+            tintColor={C.paperWarm}
+          />
         }
         ListHeaderComponent={
           <View>

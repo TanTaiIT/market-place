@@ -148,7 +148,7 @@ export default function Chat() {
                   <TypingDot delay={300} />
                 </View>
               </Animated.View>
-            ) : null
+            ) : undefined
           }
         />
 

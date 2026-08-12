@@ -96,7 +96,9 @@ Tên preset và cloud name khai ở đầu `src/api/cloudinary.ts`.
 
 Nên đặt luôn cho preset đó:
 
-- *Folder* = `ghim/listings`
+- *Asset folder* = `ghim/listings` — product environment này ở **Dynamic folders**, nên là *Asset folder*
+  chứ không phải *Folder*; ở chế độ đó `folder` chỉ còn để tương thích ngược và sẽ nhét luôn đường dẫn
+  vào public ID
 - *Incoming transformation* = `c_limit,w_1600,q_auto,f_auto` — chặn ảnh quá khổ ngay từ đầu vào
 - *Max file size* — Cloudinary từ chối sớm thay vì để người dùng chờ hết upload
 

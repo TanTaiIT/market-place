@@ -6,7 +6,7 @@ import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withDelay, with
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Field, GhostButton, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
-import { useLogin } from '@/queries/listings';
+import { useLogin } from '@/queries/auth';
 import { useSignIn } from '@/stores/auth';
 import { C, F, shadow } from '@/theme';
 

@@ -6,7 +6,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Field, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
-import { useRegister } from '@/queries/listings';
+import { useRegister } from '@/queries/auth';
 import { useSignIn } from '@/stores/auth';
 import { C, F, shadow } from '@/theme';
 

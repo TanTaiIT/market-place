@@ -1,14 +1,20 @@
 import {
-  authLogin,
-  authRegister,
-  listingGetById,
-  listingList,
-  listingRemove,
-  notificationList,
-  userGetMe,
-  userUpdateMe,
+  deleteListingsById,
+  getListings,
+  getListingsById,
+  getUsersMe,
+  patchUsersMe,
+  postAuthLogin,
+  postAuthRegister,
 } from './generated';
-import type { Listing as ListingDto, MeProfile, Notification as NotifDto } from './generated';
+import type {
+  AuthResponse,
+  GetListingsResponse,
+  GetListingsByIdResponse,
+  GetUsersMeResponse,
+  Listing as ListingDto,
+  UserProfile,
+} from './generated';
 import { CHAT_COLORS, db, NEW_PHOTOS } from './db';
 import type { AuthSession, Conversation, Listing, Message, Notif, Profile } from './db';
 import { getCurrentUserId } from './http';
@@ -23,7 +29,9 @@ import { getCurrentUserId } from './http';
 
 // ── SDK UNWRAP ──────────────────────────────────────────────────────
 
-type SdkResult<T> = { data?: { data: T }; error?: unknown };
+type ApiEnvelope<T> = { success: true; message: string; data: T };
+type SdkResult<T> = { data?: ApiEnvelope<T>; error?: unknown };
+type PopulatedRef = string | { _id?: string; name?: string; slug?: string; avatar?: string; phone?: string };
 
 /** SDK không throw: nó trả `{ data, error }`. Dồn cả hai nhánh về Error tiếng Việt. */
 function unwrap<T>(res: SdkResult<T>, fallback: string): T {
@@ -33,6 +41,18 @@ function unwrap<T>(res: SdkResult<T>, fallback: string): T {
   }
   if (!res.data) throw new Error(fallback);
   return res.data.data;
+}
+
+function sellerIdOf(seller: ListingDto['seller']): string {
+  return typeof seller === 'string' ? seller : seller._id;
+}
+
+function populatedNameOf(value: PopulatedRef): string {
+  return typeof value === 'string' ? '' : value.name ?? '';
+}
+
+function populatedAvatarOf(value: PopulatedRef): string {
+  return typeof value === 'string' ? '' : value.avatar ?? '';
 }
 
 // ── MAPPER: DTO → domain ────────────────────────────────────────────
@@ -69,27 +89,33 @@ function relativeTime(iso: string): string {
 }
 
 function toListing(dto: ListingDto): Listing {
+  const seller = dto.seller as PopulatedRef;
+  const category = dto.category as PopulatedRef;
+  const sellerId = sellerIdOf(dto.seller);
+  const isMine = sellerId === getCurrentUserId();
+  const sellerName = isMine ? 'Bạn' : populatedNameOf(seller) || 'Người bán';
+  const avatarText = populatedAvatarOf(seller) || initialsOf(sellerName);
+
   return {
     id: dto._id,
     title: dto.title,
     price: formatPrice(dto.price),
-    // BE trả `category` dạng ObjectId; đổi id -> tên hiển thị cần GET /categories (BE trả 501).
-    cat: '',
+    cat: populatedNameOf(category),
     // BE không trả tên organization trong Listing, nên meta chỉ còn mốc thời gian.
     meta: relativeTime(dto.createdAt),
     photo: gradOf(dto._id),
     photoUrls: dto.images,
-    seller: dto.posterName,
-    avatar: initialsOf(dto.posterName),
-    contact: dto.posterContact,
+    seller: sellerName,
+    avatar: avatarText,
+    contact: '',
     desc: dto.description,
     // UI chỉ có hai trạng thái; 5 trạng thái còn lại của BE đều là "chưa hiển thị".
     status: dto.status === 'active' ? 'live' : 'pending',
-    mine: dto.seller === getCurrentUserId(),
+    mine: isMine,
   };
 }
 
-function toProfile(dto: MeProfile): Profile {
+function toProfile(dto: UserProfile): Profile {
   return {
     name: dto.name,
     // `org`, `posted`, `sold` chưa có trong MeProfile của BE — hiện chỗ trống thay vì số bịa.
@@ -105,17 +131,25 @@ function toProfile(dto: MeProfile): Profile {
 const NOTIF_ICON: Record<string, string> = { organization: '🏫', chain: '🔗' };
 const NOTIF_BADGE: Record<string, string> = { organization: 'Từ trường', chain: 'Từ hệ thống' };
 
-function toNotif(dto: NotifDto): Notif {
+function toNotif(dto: {
+  _id: string;
+  sourceType?: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  readBy?: string[];
+}): Notif {
   const me = getCurrentUserId();
+  const sourceType = dto.sourceType ?? 'system';
   return {
     id: dto._id,
-    icon: NOTIF_ICON[dto.sourceType] ?? '📌',
-    kind: dto.sourceType === 'chain' ? 'chain' : 'org',
-    badge: NOTIF_BADGE[dto.sourceType],
+    icon: NOTIF_ICON[sourceType] ?? '📌',
+    kind: sourceType === 'chain' ? 'chain' : sourceType === 'organization' ? 'org' : 'system',
+    badge: NOTIF_BADGE[sourceType],
     title: dto.title,
     body: dto.body,
     time: `${relativeTime(dto.createdAt)} trước`,
-    unread: me ? !dto.readBy.includes(me) : true,
+    unread: me ? !(dto.readBy ?? []).includes(me) : true,
   };
 }
 
@@ -139,8 +173,11 @@ const AUTO_REPLIES = [
 export const api = {
   /* ---------------- auth ---------------- */
   async login(email: string, password: string, orgSlug?: string): Promise<AuthSession> {
-    const res = await authLogin({ body: { email, password, orgSlug } });
-    const auth = unwrap(res, 'Đăng nhập không thành công, kiểm tra lại email và mật khẩu');
+    const res = await postAuthLogin({ body: { email, password } });
+    const auth = unwrap<AuthResponse>(
+      res as SdkResult<AuthResponse>,
+      'Đăng nhập không thành công, kiểm tra lại email và mật khẩu',
+    );
     return {
       userId: auth.user.id,
       email: auth.user.email,
@@ -161,8 +198,18 @@ export const api = {
     organizationName: string;
     phone?: string;
   }): Promise<AuthSession> {
-    const res = await authRegister({ body: input });
-    const auth = unwrap(res, 'Tạo tài khoản không thành công');
+    const res = await postAuthRegister({
+      body: {
+        name: input.name,
+        email: input.email,
+        password: input.password,
+        phone: input.phone,
+      },
+    });
+    const auth = unwrap<AuthResponse>(
+      res as SdkResult<AuthResponse>,
+      'Tạo tài khoản không thành công',
+    );
     return {
       userId: auth.user.id,
       email: auth.user.email,
@@ -176,28 +223,36 @@ export const api = {
    * `cat` chưa lọc được: BE nhận `category` là ObjectId còn app chỉ có tên hiển thị, và
    * `GET /categories` (chỗ đổi tên -> id) đang trả 501. Nhận tham số để giữ chữ ký cho hook.
    */
-  async getListings(_cat = 'Tất cả'): Promise<Listing[]> {
-    const res = await listingList({ query: { limit: 50 } });
-    return unwrap(res, 'Không tải được bảng tin').map(toListing);
+  async getListings(cat = 'Tất cả'): Promise<Listing[]> {
+    const res = await getListings({ query: { limit: 50, status: 'active' } });
+    const items = unwrap<GetListingsResponse>(
+      res as SdkResult<GetListingsResponse>,
+      'Không tải được bảng tin',
+    ).data.map(toListing);
+
+    if (cat === 'Tất cả') return items;
+    return items.filter((item) => item.cat === cat);
   },
 
   async getListing(id: string): Promise<Listing> {
-    const res = await listingGetById({ path: { id } });
-    return toListing(unwrap(res, 'Không tìm thấy tin này'));
+    const res = await getListingsById({ path: { id } });
+    return toListing(
+      unwrap<GetListingsByIdResponse>(res as SdkResult<GetListingsByIdResponse>, 'Không tìm thấy tin này').data,
+    );
   },
 
   async searchListings(q: string): Promise<Listing[]> {
     const term = q.trim();
     if (!term) return [];
-    const res = await listingList({ query: { q: term, limit: 50 } });
-    return unwrap(res, 'Không tìm được tin nào').map(toListing);
+    const res = await getListings({ query: { q: term, limit: 50, status: 'active' } });
+    return unwrap<GetListingsResponse>(res as SdkResult<GetListingsResponse>, 'Không tìm được tin nào').data.map(toListing);
   },
 
   async getMyListings(): Promise<Listing[]> {
     const seller = getCurrentUserId();
     if (!seller) throw new Error('Phiên đăng nhập đã hết, đăng nhập lại nhé');
-    const res = await listingList({ query: { seller, limit: 50 } });
-    return unwrap(res, 'Không tải được tin của bạn').map(toListing);
+    const res = await getListings({ query: { seller, limit: 50 } });
+    return unwrap<GetListingsResponse>(res as SdkResult<GetListingsResponse>, 'Không tải được tin của bạn').data.map(toListing);
   },
 
   /**
@@ -217,7 +272,7 @@ export const api = {
   },
 
   async deleteListing(id: string) {
-    const res = await listingRemove({ path: { id } });
+    const res = await deleteListingsById({ path: { id } });
     unwrap(res, 'Không xoá được tin này');
     db.savedIds = db.savedIds.filter((s) => s !== id);
     return { id };
@@ -309,21 +364,25 @@ export const api = {
 
   /* ---------------- misc ---------------- */
   async getNotifications(): Promise<Notif[]> {
-    const res = await notificationList({ query: { limit: 50 } });
-    return unwrap(res, 'Không tải được thông báo').map(toNotif);
+    await delay(120);
+    return [];
   },
 
   async getProfile(): Promise<Profile> {
-    const res = await userGetMe();
-    return toProfile(unwrap(res, 'Không tải được hồ sơ'));
+    const res = await getUsersMe();
+    return toProfile(
+      unwrap<GetUsersMeResponse>(res as SdkResult<GetUsersMeResponse>, 'Không tải được hồ sơ').data,
+    );
   },
 
   async updateProfile(input: Partial<Profile>): Promise<Profile> {
-    const res = await userUpdateMe({
+    const res = await patchUsersMe({
       // BE chỉ nhận ba field này; `org`/`posted`/`sold` không thuộc hồ sơ user.
       body: { name: input.name, phone: input.phone },
     });
-    return toProfile(unwrap(res, 'Không lưu được hồ sơ'));
+    return toProfile(
+      unwrap<GetUsersMeResponse>(res as SdkResult<GetUsersMeResponse>, 'Không lưu được hồ sơ').data,
+    );
   },
 };
 

@@ -13,7 +13,7 @@ export default function Feed() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [cat, setCat] = useState('Tất cả');
-  const { data, isLoading, isRefetching, refetch } = useListings(cat);
+  const { data, error, isLoading, isRefetching, refetch } = useListings(cat);
   const { data: profile } = useProfile();
 
   return (
@@ -42,7 +42,7 @@ export default function Feed() {
             </View>
 
             <Pressable style={styles.searchBar} onPress={() => router.push('/search')}>
-              <Text style={styles.searchText}>🔍  Tìm trên bảng tin của bạn...</Text>
+              <Text style={styles.searchText}>🔍  Tìm xe đạp, sách, laptop...</Text>
             </Pressable>
 
             <ScrollView
@@ -62,8 +62,14 @@ export default function Feed() {
         ListEmptyComponent={
           isLoading ? (
             <Loading onDark />
+          ) : error ? (
+            <EmptyState icon="📡" text={(error as Error).message || 'Chưa tải được bảng tin'} onDark />
           ) : (
-            <EmptyState icon="📌" text="Chưa có tin nào ở danh mục này" onDark />
+            <EmptyState
+              icon="📌"
+              text={cat === 'Tất cả' ? 'Chưa có tin nào để hiển thị' : `Chưa có tin nào trong mục ${cat}`}
+              onDark
+            />
           )
         }
       />

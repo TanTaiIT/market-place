@@ -77,9 +77,11 @@ export default function ListingDetail() {
         </ListingGallery>
 
         <Animated.View entering={FadeInDown.duration(380)} style={styles.body}>
-          <View style={styles.catBadge}>
-            <Text style={styles.catBadgeText}>{listing.cat}</Text>
-          </View>
+          {!!listing.cat && (
+            <View style={styles.catBadge}>
+              <Text style={styles.catBadgeText}>{listing.cat}</Text>
+            </View>
+          )}
 
           <Text style={styles.title}>{listing.title}</Text>
           <Text style={styles.meta}>{listing.meta.replace('·', '· đăng')} trước</Text>
@@ -88,7 +90,7 @@ export default function ListingDetail() {
             <Avatar text={listing.avatar} size={42} color={C.amber} textColor={C.amberInk} />
             <View style={{ flex: 1 }}>
               <Text style={styles.sellerName}>{listing.seller}</Text>
-              <Text style={styles.sellerOrg}>{listing.contact}</Text>
+              {!!listing.contact && <Text style={styles.sellerOrg}>{listing.contact}</Text>}
             </View>
           </View>
 

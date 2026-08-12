@@ -46,10 +46,18 @@ export function NoteCard({
           </View>
         </ListingPhoto>
         <View style={styles.body}>
+          {!!item.cat && (
+            <View style={styles.catPill}>
+              <Text style={styles.catText}>{item.cat}</Text>
+            </View>
+          )}
           <Text numberOfLines={2} style={styles.title}>
             {item.title}
           </Text>
           <Text style={styles.meta}>{item.meta}</Text>
+          <Text numberOfLines={1} style={styles.seller}>
+            {item.seller}
+          </Text>
         </View>
       </Pressable>
     </Animated.View>
@@ -96,6 +104,16 @@ const styles = StyleSheet.create({
   },
   priceText: { color: '#fff', fontFamily: F.monoBold, fontSize: 11 },
   body: { paddingHorizontal: 10, paddingTop: 10, paddingBottom: 12 },
+  catPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: C.tape,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 3,
+    marginBottom: 6,
+  },
+  catText: { fontFamily: F.uiBold, fontSize: 10, color: C.tapeInk },
   title: { fontFamily: F.uiBold, fontSize: 13, color: C.ink, lineHeight: 17, marginBottom: 4 },
   meta: { fontFamily: F.mono, fontSize: 10, color: C.inkSoft },
+  seller: { fontFamily: F.uiSemi, fontSize: 10.5, color: C.inkSoft, marginTop: 4 },
 });

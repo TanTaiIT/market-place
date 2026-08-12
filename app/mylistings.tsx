@@ -1,9 +1,9 @@
 import React from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, SlideOutRight } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ListingPhoto } from '@/components/ListingPhoto';
 import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useDeleteListing, useMyListings } from '@/queries/listings';
@@ -28,11 +28,11 @@ export default function MyListings() {
             exiting={SlideOutRight.duration(280)}
             style={styles.row}
           >
-            <LinearGradient
-              colors={item.photo}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+            <ListingPhoto
+              photo={item.photo}
+              photoUrl={item.photoUrls?.[0]}
               style={styles.photo}
+              imageStyle={styles.photoRadius}
             />
             <View style={{ flex: 1 }}>
               <Text numberOfLines={2} style={styles.title}>
@@ -90,6 +90,7 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   photo: { width: 60, height: 60, borderRadius: 6 },
+  photoRadius: { borderRadius: 6 },
   title: { fontFamily: F.uiBold, fontSize: 13, color: C.ink, marginBottom: 3 },
   price: { fontFamily: F.monoBold, fontSize: 12, color: C.moss, marginBottom: 4 },
   badge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },

@@ -1,20 +1,31 @@
 import React, { useState } from 'react';
-import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  FlatList,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Corkboard } from '@/components/Corkboard';
 import { NoteCard } from '@/components/NoteCard';
 import { Avatar, EmptyState, Loading, TapeChip } from '@/components/ui';
-import { CATEGORIES } from '@/api/db';
-import { useListings, useProfile } from '@/queries/listings';
+import { useCategories, useListings, useProfile } from '@/queries/listings';
 import { C, F, shadow } from '@/theme';
 
 export default function Feed() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [cat, setCat] = useState('Tất cả');
-  const { data, error, isLoading, isRefetching, refetch } = useListings(cat);
+  // Chuỗi rỗng = "Tất cả". Giữ id chứ không giữ tên: BE lọc theo ObjectId của danh mục.
+  const [categoryId, setCategoryId] = useState('');
+  const { data: categories } = useCategories();
+  const { data, error, isLoading, isRefetching, refetch } = useListings(categoryId);
   const { data: profile } = useProfile();
+
+  const activeCategory = categories?.find((c) => c.id === categoryId);
 
   return (
     <Corkboard>
@@ -42,8 +53,18 @@ export default function Feed() {
           <View>
             <View style={styles.header}>
               <Text style={styles.title}>Bảng tin của bạn</Text>
+
+              {/* TẠM — lối tắt xem UI bàn quản trị, cố tình bỏ qua `canOpenAdmin` để vào được
+                  bằng tài khoản bất kỳ. Xoá khối này + hai style `devAdmin*` khi xem xong. */}
+              <Pressable
+                onPress={() => router.push('/admin')}
+                style={({ pressed }) => [styles.devAdmin, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.devAdminText}>🗂 Admin</Text>
+              </Pressable>
+
               <Pressable onPress={() => router.push('/(tabs)/profile')}>
-                <Avatar text={profile?.avatar ?? 'MV'} ring />
+                <Avatar text={profile?.avatar ?? '·'} ring />
               </Pressable>
             </View>
 
@@ -51,15 +72,31 @@ export default function Feed() {
               <Text style={styles.searchText}>🔍  Tìm xe đạp, sách, laptop...</Text>
             </Pressable>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chipRow}
-            >
-              {CATEGORIES.map((c, i) => (
-                <TapeChip key={c} label={c} index={i} active={cat === c} onPress={() => setCat(c)} />
-              ))}
-            </ScrollView>
+            {/* Chỉ hiện khi BE trả về danh mục — hỏng hoặc rỗng thì giấu hẳn hàng chip thay
+                vì để một hàng trơ ra không bấm được gì. */}
+            {!!categories?.length && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chipRow}
+              >
+                <TapeChip
+                  label="Tất cả"
+                  index={0}
+                  active={categoryId === ''}
+                  onPress={() => setCategoryId('')}
+                />
+                {categories.map((c, i) => (
+                  <TapeChip
+                    key={c.id}
+                    label={c.icon ? `${c.icon} ${c.name}` : c.name}
+                    index={i + 1}
+                    active={categoryId === c.id}
+                    onPress={() => setCategoryId(c.id)}
+                  />
+                ))}
+              </ScrollView>
+            )}
           </View>
         }
         renderItem={({ item, index }) => (
@@ -73,7 +110,11 @@ export default function Feed() {
           ) : (
             <EmptyState
               icon="📌"
-              text={cat === 'Tất cả' ? 'Chưa có tin nào để hiển thị' : `Chưa có tin nào trong mục ${cat}`}
+              text={
+                activeCategory
+                  ? `Chưa có tin nào trong mục ${activeCategory.name}`
+                  : 'Chưa có tin nào để hiển thị'
+              }
               onDark
             />
           )
@@ -104,4 +145,18 @@ const styles = StyleSheet.create({
   },
   searchText: { fontFamily: F.ui, fontSize: 13.5, color: C.inkSoft },
   chipRow: { paddingBottom: 6, paddingRight: 8 },
+
+  // TẠM — đi cùng nút Admin ở trên, xoá chung một lượt.
+  // `marginLeft: auto` nuốt hết khoảng trống của `space-between` nên tiêu đề vẫn nằm trái,
+  // còn nút và avatar dính vào nhau bên phải.
+  devAdmin: {
+    marginLeft: 'auto',
+    marginRight: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: C.ink,
+    ...shadow,
+  },
+  devAdminText: { fontFamily: F.uiBold, fontSize: 11.5, color: C.paperWarm },
 });

@@ -10,6 +10,8 @@ export const C = {
   corkDark: '#8C6539',
   pin: '#E8432E',
   pinDark: '#B92E1D',
+  /** Vệt sáng trên đầu đinh ghim — luôn đi cùng `pin`, không dùng làm màu nền. */
+  pinLight: '#ff9b8a',
   tape: '#FFE066',
   tapeDark: '#E0B93F',
   moss: '#3F6B4A',
@@ -26,6 +28,33 @@ export const C = {
   scrim: 'rgba(24,36,18,0.32)',
   /** Lớp phủ báo lỗi trên ảnh — `pinDark` pha alpha */
   scrimError: 'rgba(185,46,29,0.72)',
+
+  /*
+   * Bàn quản trị dùng nền tối — không phải đổi theme, mà là phân vai: màn người dùng là tờ
+   * giấy ghim lên bảng bần, màn quản trị là mặt bàn làm việc phía sau. Tách tiền tố `desk*`
+   * để không ai lỡ tay dùng nền tối cho màn người dùng.
+   */
+  desk: '#11170F',
+  deskPanel: '#171F13',
+  deskRaise: '#1F2A19',
+  deskHi: '#27331F',
+  deskLine: 'rgba(243,239,225,0.10)',
+  deskLineStrong: 'rgba(243,239,225,0.18)',
+  deskTxt: '#EDE9DA',
+  deskTxtSoft: '#A3AC96',
+  deskTxtDim: '#6C7862',
+  /** `moss` bản sáng, đủ tương phản trên nền tối — `C.moss` chìm mất ở đó. */
+  mossBright: '#5FA36E',
+  mossDeep: '#2C5238',
+  sky: '#7FA8C9',
+  /** Chữ trạng thái trên nền tối: `moss`/`pin` gốc quá tối để đọc. */
+  okText: '#7FBE8C',
+  badText: '#F2705E',
+  /** Nền huy hiệu trạng thái — cùng màu chữ pha alpha, để token hoá thay vì rải rgba ở call-site. */
+  okTint: 'rgba(95,163,110,0.14)',
+  warnTint: 'rgba(255,224,102,0.14)',
+  badTint: 'rgba(232,67,46,0.15)',
+  mutedTint: 'rgba(243,239,225,0.07)',
 } as const;
 
 /** Tên font sau khi load bằng @expo-google-fonts */
@@ -49,16 +78,6 @@ export const shadow = Platform.select({
     shadowOffset: { width: 0, height: 6 },
   },
   default: { elevation: 4 },
-}) as object;
-
-export const shadowSoft = Platform.select({
-  ios: {
-    shadowColor: '#182412',
-    shadowOpacity: 0.12,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 3 },
-  },
-  default: { elevation: 2 },
 }) as object;
 
 /** Cặp màu gradient cho ảnh giả lập của từng tin (thay linear-gradient của web) */

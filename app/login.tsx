@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     backgroundColor: C.pin,
     borderTopWidth: 6,
-    borderTopColor: '#ff9b8a',
+    borderTopColor: C.pinLight,
     alignSelf: 'center',
     marginBottom: -17,
     zIndex: 5,

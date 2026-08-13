@@ -1,25 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Field, Loading, PinButton, ScreenHeader } from '@/components/ui';
+import { EmptyState, Field, Loading, PinButton, ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useProfile, useUpdateProfile } from '@/queries/listings';
 import { C } from '@/theme';
 
 export default function Settings() {
   const toast = useToast();
-  const { data: profile, isLoading } = useProfile();
+  const { data: profile, error, isLoading } = useProfile();
   const update = useUpdateProfile();
 
-  const [form, setForm] = useState({ name: '', phone: '', org: '' });
+  // Chỉ hai field này: `PATCH /users/me` của BE chỉ nhận `name` + `phone`, còn tổ chức thì
+  // không thuộc hồ sơ user. Cho sửa `org` ở đây là hứa suông — lưu xong nó lại rỗng.
+  const [form, setForm] = useState({ name: '', phone: '' });
 
   useEffect(() => {
-    if (profile) setForm({ name: profile.name, phone: profile.phone, org: profile.org });
+    if (profile) setForm({ name: profile.name, phone: profile.phone });
   }, [profile]);
 
   const set = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   if (isLoading) return <Loading />;
+  if (error || !profile) {
+    return <EmptyState icon="📡" text={(error as Error | null)?.message ?? 'Không tải được hồ sơ'} />;
+  }
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -39,7 +44,6 @@ export default function Settings() {
             onChangeText={set('phone')}
             keyboardType="phone-pad"
           />
-          <Field label="Trường / tổ chức" value={form.org} onChangeText={set('org')} />
           <View style={{ marginTop: 8 }}>
             <PinButton
               label="Lưu thay đổi"
@@ -47,7 +51,7 @@ export default function Settings() {
               onPress={() =>
                 update.mutate(form, {
                   onSuccess: () => toast('✓ Đã lưu thay đổi!'),
-                  onError: () => toast('⚠️ Không lưu được, thử lại nhé'),
+                  onError: (e: Error) => toast(`⚠️ ${e.message}`),
                 })
               }
             />

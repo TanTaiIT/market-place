@@ -9,7 +9,7 @@ import { C } from '@/theme';
 
 export default function Saved() {
   const router = useRouter();
-  const { data, isLoading } = useSavedListings();
+  const { data, error, isLoading } = useSavedListings();
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -24,7 +24,13 @@ export default function Saved() {
           <NoteCard item={item} index={index} onPress={() => router.push(`/listing/${item.id}`)} />
         )}
         ListEmptyComponent={
-          isLoading ? <Loading /> : <EmptyState icon="🤍" text="Chưa lưu tin nào. Thả tim ở trang chi tiết nhé!" />
+          isLoading ? (
+            <Loading />
+          ) : error ? (
+            <EmptyState icon="📡" text={(error as Error).message} />
+          ) : (
+            <EmptyState icon="🤍" text="Chưa lưu tin nào. Thả tim ở trang chi tiết nhé!" />
+          )
         }
       />
     </SafeAreaView>

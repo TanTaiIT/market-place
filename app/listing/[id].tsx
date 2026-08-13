@@ -11,7 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ListingGallery } from '@/components/ListingGallery';
-import { Avatar, Loading, PinButton } from '@/components/ui';
+import { Avatar, EmptyState, Loading, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useListing, useSavedIds, useToggleSaved } from '@/queries/listings';
 import { useOpenConversation } from '@/queries/chat';
@@ -25,7 +25,7 @@ export default function ListingDetail() {
   const toast = useToast();
   const insets = useSafeAreaInsets();
 
-  const { data: listing, isLoading } = useListing(listingId);
+  const { data: listing, error, isLoading } = useListing(listingId);
   const { data: savedIds } = useSavedIds();
   const toggleSaved = useToggleSaved();
   const openChat = useOpenConversation();
@@ -42,7 +42,7 @@ export default function ListingDetail() {
   const onToggleSave = () => {
     bounce.value = withSequence(withSpring(1.3, { damping: 6 }), withSpring(1));
     rot.value = withSequence(withSpring(-10, { damping: 6 }), withSpring(0));
-    toggleSaved.mutate(listingId);
+    toggleSaved.mutate(listingId, { onError: (e: Error) => toast(`⚠️ ${e.message}`) });
   };
 
   const onMessage = () => {
@@ -52,7 +52,12 @@ export default function ListingDetail() {
     });
   };
 
-  if (isLoading || !listing) return <Loading />;
+  if (isLoading) return <Loading />;
+  // `isLoading` chỉ true ở lần fetch đầu: query hỏng hoặc id không tồn tại đều rơi xuống đây,
+  // nếu không có nhánh này màn hình đứng ở spinner vĩnh viễn và lỗi không hiện ở đâu cả.
+  if (error || !listing) {
+    return <EmptyState icon="📡" text={(error as Error | null)?.message ?? 'Không tìm thấy tin này'} />;
+  }
 
   return (
     <View style={styles.screen}>
@@ -84,7 +89,7 @@ export default function ListingDetail() {
           )}
 
           <Text style={styles.title}>{listing.title}</Text>
-          <Text style={styles.meta}>{listing.meta.replace('·', '· đăng')} trước</Text>
+          <Text style={styles.meta}>{listing.meta} trước</Text>
 
           <View style={styles.sellerCard}>
             <Avatar text={listing.avatar} size={42} color={C.amber} textColor={C.amberInk} />

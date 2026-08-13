@@ -62,7 +62,7 @@ src/api/**  ─────────┘
 - `src/queries/**` được đọc/ghi store (`queries/auth.ts`); chiều ngược lại thì cấm.
 - `src/api/db.ts` khai báo domain type + giữ phần state còn local (tin đã lưu, hội thoại). Tin đăng, hồ sơ
   và thông báo đã đi qua BE thật: `client.ts` gọi SDK trong `src/api/generated/**` (generate từ OpenAPI của
-  repo `market` bằng `npm run api:sync`, **không sửa tay**), `http.ts` giữ base URL + Bearer token.
+  repo `docs/Vue` bằng `npm run api:sync`, **không sửa tay**), `http.ts` giữ base URL + Bearer token.
   Chi tiết phần nào thật / phần nào còn local: `query.convention.md` §1.
 
 ---

@@ -44,9 +44,9 @@ export function Corkboard({
   return (
     <View style={[styles.base, style]}>
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        {dots.map((d, i) => (
+        {dots.map((d) => (
           <View
-            key={i}
+            key={`${d.x}-${d.y}`}
             style={{
               position: 'absolute',
               left: d.x,

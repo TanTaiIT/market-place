@@ -9,7 +9,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import { Kalam_400Regular, Kalam_700Bold } from '@expo-google-fonts/kalam';
 import {
-  Manrope_400Regular,
   Manrope_500Medium,
   Manrope_600SemiBold,
   Manrope_700Bold,
@@ -21,6 +20,7 @@ import {
 } from '@expo-google-fonts/jetbrains-mono';
 import { ToastProvider } from '@/components/Toast';
 import { useSyncAccessToken } from '@/queries/auth';
+import { useChatSocket } from '@/queries/chat';
 import { useAuthHydrated, useIsAuthenticated } from '@/stores/auth';
 import { C } from '@/theme';
 
@@ -40,7 +40,6 @@ export default function RootLayout() {
   const [loaded, error] = useFonts({
     Kalam_400Regular,
     Kalam_700Bold,
-    Manrope_400Regular,
     Manrope_500Medium,
     Manrope_600SemiBold,
     Manrope_700Bold,
@@ -54,6 +53,8 @@ export default function RootLayout() {
   // Đẩy token của phiên xuống tầng HTTP trước khi bất kỳ màn con nào mount và gọi query.
   // Truyền thẳng `queryClient` vì ở đây còn ở NGOÀI `<QueryClientProvider>` bên dưới.
   useSyncAccessToken(queryClient);
+  // Mở kết nối realtime theo phiên. Effect nên nó chạy sau khi token đã được đẩy xuống ở trên.
+  useChatSocket();
   // Font lỗi vẫn cho chạy tiếp, chỉ rơi về font hệ thống. Nhưng phiên đăng nhập thì phải
   // đọc xong mới render: guard chạy sớm sẽ nháy qua màn login rồi mới nhảy vào feed.
   const ready = (loaded || error) && authHydrated;
@@ -93,6 +94,8 @@ export default function RootLayout() {
                 <Stack.Screen name="settings" />
                 <Stack.Screen name="listing/[id]" />
                 <Stack.Screen name="chat/[id]" />
+                {/* Khai cả cụm `admin` một lần: `app/admin/_layout.tsx` giữ Stack riêng bên trong */}
+                <Stack.Screen name="admin" />
               </Stack.Protected>
             </Stack>
           </ToastProvider>

@@ -17,6 +17,7 @@ import { C, F, shadow } from '@/theme';
 
 const CHIP_TILTS = [-1.5, 1.2, -0.8, 1.6, -1.1];
 
+/** Băng dính nghiêng ở hàng lọc danh mục của bảng tin */
 export function TapeChip({
   label,
   active,
@@ -40,13 +41,7 @@ export function TapeChip({
         { transform: [{ rotate: `${tilt}deg` }, { scale: pressed ? 0.94 : active ? 1.05 : 1 }] },
       ]}
     >
-      <Text
-        style={[
-          styles.chipText,
-          alt && { color: C.inkSoft },
-          active && { color: '#fff' },
-        ]}
-      >
+      <Text style={[styles.chipText, alt && { color: C.inkSoft }, active && { color: '#fff' }]}>
         {label}
       </Text>
     </Pressable>
@@ -88,6 +83,7 @@ export function PinButton({
   loading,
   disabled,
   depth = 6,
+  tone = 'pin',
   style,
 }: {
   label: string;
@@ -95,26 +91,40 @@ export function PinButton({
   loading?: boolean;
   disabled?: boolean;
   depth?: number;
+  /** `ok` = hành động thuận (duyệt tin) — cùng khối 3D, chỉ đổi bảng màu. */
+  tone?: 'pin' | 'ok';
   style?: ViewStyle;
 }) {
   const [pressed, setPressed] = React.useState(false);
   const off = pressed ? depth - 2 : 0;
   const isOff = disabled || loading;
+  const ok = tone === 'ok';
 
   return (
     <View style={[{ paddingBottom: depth }, style]}>
-      <View style={[styles.btnShadowLayer, { bottom: 0, opacity: isOff ? 0.5 : 1 }]} />
+      <View
+        style={[
+          styles.btnShadowLayer,
+          { bottom: 0, opacity: isOff ? 0.5 : 1 },
+          ok && { backgroundColor: C.mossDeep },
+        ]}
+      />
       <Pressable
         onPressIn={() => setPressed(true)}
         onPressOut={() => setPressed(false)}
         onPress={onPress}
         disabled={isOff}
-        style={[styles.btnFace, { transform: [{ translateY: off }] }, isOff && { opacity: 0.6 }]}
+        style={[
+          styles.btnFace,
+          ok && { backgroundColor: C.mossBright },
+          { transform: [{ translateY: off }] },
+          isOff && { opacity: 0.6 },
+        ]}
       >
         {loading ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={ok ? C.desk : '#fff'} />
         ) : (
-          <Text style={styles.btnText}>{label}</Text>
+          <Text style={[styles.btnText, ok && { color: C.desk }]}>{label}</Text>
         )}
       </Pressable>
     </View>
@@ -197,15 +207,21 @@ export function Loading({ onDark }: { onDark?: boolean }) {
 export function Field({
   label,
   hand,
+  onDark,
   style,
   ...props
-}: TextInputProps & { label: string; hand?: boolean }) {
+}: TextInputProps & {
+  label: string;
+  hand?: boolean;
+  /** Đặt trên nền tối của bàn quản trị — `inkSoft` ở đó gần như không đọc được. */
+  onDark?: boolean;
+}) {
   const [focused, setFocused] = React.useState(false);
   return (
     <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+      <Text style={[styles.fieldLabel, onDark && { color: C.deskTxtDim }]}>{label}</Text>
       <TextInput
-        placeholderTextColor={C.muted}
+        placeholderTextColor={onDark ? C.deskTxtDim : C.muted}
         {...props}
         onFocus={(e) => {
           setFocused(true);
@@ -218,6 +234,7 @@ export function Field({
         style={[
           styles.input,
           hand && { fontFamily: F.handLight, fontSize: 18 },
+          onDark && { color: C.deskTxt, borderBottomColor: C.deskLineStrong },
           focused && { borderBottomColor: C.pin },
           style,
         ]}

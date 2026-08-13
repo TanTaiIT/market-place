@@ -11,58 +11,49 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withRepeat,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Avatar, Loading } from '@/components/ui';
+import { Avatar, EmptyState, Loading } from '@/components/ui';
 import { chatColor } from '@/api/client';
-import { useConversation, useSendMessage } from '@/queries/chat';
+import {
+  useConversation,
+  useConversationRoom,
+  useMarkConversationRead,
+  useMessages,
+  useSendMessage,
+} from '@/queries/chat';
 import { useListing } from '@/queries/listings';
 import { C, F, shadow } from '@/theme';
 
-/* Ba chấm nhấp nhô — @keyframes typingDot */
-function TypingDot({ delay }: { delay: number }) {
-  const y = useSharedValue(0);
-  useEffect(() => {
-    y.value = withDelay(
-      delay,
-      withRepeat(
-        withSequence(withTiming(-4, { duration: 300 }), withTiming(0, { duration: 700 })),
-        -1,
-      ),
-    );
-  }, [delay, y]);
-  const style = useAnimatedStyle(() => ({ transform: [{ translateY: y.value }] }));
-  return <Animated.View style={[styles.typingDot, style]} />;
-}
-
 export default function Chat() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const conversationId = Number(id);
+  // ObjectId 24 hex của BE — `Number()` ở đây sẽ ra NaN.
+  const conversationId = id ?? '';
   const router = useRouter();
   const listRef = useRef<FlatList>(null);
   const [text, setText] = useState('');
 
-  const { data: conversation, isLoading } = useConversation(conversationId);
+  const { data: conversation, error, isLoading } = useConversation(conversationId);
+  const { data: messages } = useMessages(conversationId);
+  // Vào phòng để nhận tin của người kia ngay, không chờ lượt refetch nào.
+  useConversationRoom(conversationId);
   // Chuỗi rỗng = chưa có hội thoại -> `useListing` tự tắt qua `enabled`.
   const { data: listing } = useListing(conversation?.listingId ?? '');
   const send = useSendMessage(conversationId);
 
+  const markRead = useMarkConversationRead();
+  const markReadRef = useRef(markRead.mutate);
+  markReadRef.current = markRead.mutate;
+  // Tắt huy hiệu chưa đọc đúng một lần khi mở màn. Qua ref để `mutate` đổi identity mỗi
+  // render không kéo theo một lượt gọi mới.
+  useEffect(() => {
+    if (conversationId) markReadRef.current(conversationId);
+  }, [conversationId]);
+
+  // Tin mới và bong bóng "đang nhập" đều làm đổi chiều cao nội dung, nên `onContentSizeChange`
+  // của FlatList đã phủ hết các nhịp cần cuộn — không cần effect theo dõi riêng.
   const scrollToEnd = () =>
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 60);
-
-  useEffect(() => {
-    scrollToEnd();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversation?.messages.length, send.isPending]);
 
   const onSend = () => {
     const t = text.trim();
@@ -72,14 +63,16 @@ export default function Chat() {
     scrollToEnd();
   };
 
-  if (isLoading || !conversation) return <Loading />;
+  if (isLoading) return <Loading />;
+  if (error || !conversation) {
+    return <EmptyState icon="💬" text={(error as Error | null)?.message ?? 'Cuộc trò chuyện không tồn tại'} />;
+  }
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <View style={styles.header}>
           <Pressable
@@ -88,7 +81,7 @@ export default function Chat() {
           >
             <Text style={{ fontSize: 16 }}>←</Text>
           </Pressable>
-          <Avatar text={conversation.avatar} size={36} color={chatColor(conversation.id - 1)} />
+          <Avatar text={conversation.avatar} size={36} color={chatColor(conversation.name)} />
           <View style={{ flex: 1 }}>
             <Text style={styles.name}>{conversation.name}</Text>
             <Text style={styles.sub}>Đang hoạt động</Text>
@@ -117,7 +110,7 @@ export default function Chat() {
 
         <FlatList
           ref={listRef}
-          data={conversation.messages}
+          data={messages ?? []}
           keyExtractor={(m) => m.id}
           contentContainerStyle={{ padding: 16, gap: 12, flexGrow: 1 }}
           onContentSizeChange={scrollToEnd}
@@ -138,17 +131,6 @@ export default function Chat() {
           }}
           ListEmptyComponent={
             <Text style={styles.msgEmpty}>📌 Bắt đầu trò chuyện với {conversation.name} nhé!</Text>
-          }
-          ListFooterComponent={
-            send.isPending ? (
-              <Animated.View entering={FadeIn} style={styles.msgRow}>
-                <View style={[styles.bubble, styles.bubbleThem, styles.typing]}>
-                  <TypingDot delay={0} />
-                  <TypingDot delay={150} />
-                  <TypingDot delay={300} />
-                </View>
-              </Animated.View>
-            ) : undefined
           }
         />
 

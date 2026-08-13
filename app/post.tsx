@@ -64,7 +64,7 @@ export default function Post() {
       {
         onSuccess: () => {
           toast('✓ Đã ghim tin lên bảng thành công!');
-          setTimeout(() => router.replace('/(tabs)/feed'), 1200);
+          router.replace('/(tabs)/feed');
         },
         onError: (e: Error) => toast(`⚠️ ${e.message}`),
       },

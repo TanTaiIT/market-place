@@ -64,6 +64,9 @@ export function useSendMessage(conversationId: number) {
       );
     },
     onSettled: () => {
+      // Phải invalidate cả `key`: `onMutate` đã ghi đè nó bằng bong bóng tạm, nên nhánh lỗi
+      // (rollback) sẽ đứng lại ở bản cũ mãi nếu không có ai kéo lại trạng thái thật.
+      qc.invalidateQueries({ queryKey: key });
       qc.invalidateQueries({ queryKey: qk.conversations() });
     },
   });

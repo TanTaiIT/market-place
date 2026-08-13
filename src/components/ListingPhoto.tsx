@@ -5,8 +5,8 @@ import type { Grad } from '@/theme';
 
 /**
  * **Ảnh bìa** của một tin đăng — call-site truyền `listing.photoUrls?.[0]`.
- * Có ảnh thật thì hiện ảnh, chưa có thì rơi về cặp màu gradient (6 tin mẫu trong `db.ts`
- * đều thuộc nhánh sau). Cần xem cả bộ ảnh thì dùng `ListingGallery`.
+ * Có ảnh thật thì hiện ảnh, chưa có thì rơi về cặp màu gradient suy từ id (`gradOf`).
+ * Cần xem cả bộ ảnh thì dùng `ListingGallery`.
  */
 export function ListingPhoto({
   photo,

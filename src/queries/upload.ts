@@ -40,7 +40,6 @@ export function useListingPhotos() {
     } catch (e) {
       // Báo lỗi ngay trên thumbnail (chạm để thử lại) thay vì toast: 6 ảnh hỏng
       // sẽ đẩy ra 6 toast chồng nhau, và người dùng không biết ảnh nào hỏng.
-      console.log('error', (e as Error).message);
       patch(uri, { status: 'error', error: (e as Error).message });
     }
     // `patch` là map theo uri nên ảnh bị xoá giữa chừng sẽ tự no-op, không cần huỷ tay

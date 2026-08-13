@@ -6,13 +6,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar, EmptyState, Loading, TabHeader } from '@/components/ui';
 import { chatColor } from '@/api/client';
 import { useConversations } from '@/queries/chat';
-import { useListings } from '@/queries/listings';
 import { C, F, shadow } from '@/theme';
 
 export default function ChatList() {
   const router = useRouter();
-  const { data, isLoading } = useConversations();
-  const { data: listings } = useListings('Tất cả');
+  const { data, error, isLoading } = useConversations();
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -21,35 +19,38 @@ export default function ChatList() {
         data={data ?? []}
         keyExtractor={(c) => String(c.id)}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, gap: 10 }}
-        renderItem={({ item, index }) => {
-          const listing = listings?.find((l) => l.id === item.listingId);
-          return (
-            <Animated.View entering={FadeInDown.delay(index * 70).duration(340)}>
-              <Pressable
-                onPress={() => router.push(`/chat/${item.id}`)}
-                style={({ pressed }) => [styles.row, pressed && { transform: [{ scale: 0.98 }] }]}
-              >
-                <Avatar text={item.avatar} size={46} color={chatColor(index)} />
-                <View style={{ flex: 1 }}>
-                  <View style={styles.top}>
-                    <Text style={[styles.name, item.unread && { color: C.pin }]}>{item.name}</Text>
-                    <Text style={styles.time}>{item.time}</Text>
-                  </View>
-                  <Text
-                    numberOfLines={1}
-                    style={[styles.preview, item.unread && { color: C.ink, fontFamily: F.uiSemi }]}
-                  >
-                    {item.lastMsg}
-                  </Text>
-                  {listing && <Text style={styles.tag}>Về: {listing.title}</Text>}
+        renderItem={({ item, index }) => (
+          <Animated.View entering={FadeInDown.delay(index * 70).duration(340)}>
+            <Pressable
+              onPress={() => router.push(`/chat/${item.id}`)}
+              style={({ pressed }) => [styles.row, pressed && { transform: [{ scale: 0.98 }] }]}
+            >
+              <Avatar text={item.avatar} size={46} color={chatColor(index)} />
+              <View style={{ flex: 1 }}>
+                <View style={styles.top}>
+                  <Text style={[styles.name, item.unread && { color: C.pin }]}>{item.name}</Text>
+                  <Text style={styles.time}>{item.time}</Text>
                 </View>
-                {item.unread && <View style={styles.dot} />}
-              </Pressable>
-            </Animated.View>
-          );
-        }}
+                <Text
+                  numberOfLines={1}
+                  style={[styles.preview, item.unread && { color: C.ink, fontFamily: F.uiSemi }]}
+                >
+                  {item.lastMsg}
+                </Text>
+                {!!item.listingTitle && <Text style={styles.tag}>Về: {item.listingTitle}</Text>}
+              </View>
+              {item.unread && <View style={styles.dot} />}
+            </Pressable>
+          </Animated.View>
+        )}
         ListEmptyComponent={
-          isLoading ? <Loading /> : <EmptyState icon="💬" text="Chưa có cuộc trò chuyện nào" />
+          isLoading ? (
+            <Loading />
+          ) : error ? (
+            <EmptyState icon="📡" text={(error as Error).message} />
+          ) : (
+            <EmptyState icon="💬" text="Chưa có cuộc trò chuyện nào" />
+          )
         }
       />
     </SafeAreaView>

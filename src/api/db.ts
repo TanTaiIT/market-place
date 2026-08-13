@@ -33,6 +33,8 @@ export type Conversation = {
   /** Chat còn là fixture in-memory (BE `/chats` trả 501) nên id vẫn là số tự tăng. */
   id: number;
   listingId: string;
+  /** Snapshot lúc mở hội thoại — tránh phải fetch lại bảng tin chỉ để hiện dòng "Về: …". */
+  listingTitle: string;
   name: string;
   avatar: string;
   lastMsg: string;
@@ -69,12 +71,12 @@ export type Profile = {
   org: string;
   phone: string;
   avatar: string;
-  posted: number;
-  sold: number;
+  /** Chuỗi chứ không phải số: BE chưa trả thống kê nào, nên `—` là giá trị hợp lệ. */
+  posted: string;
+  sold: string;
   rating: string;
 };
 
-export const CATEGORIES = ['Tất cả', 'Sách vở', 'Xe đạp', 'Điện tử', 'Đồ dùng'];
 export const POST_CATEGORIES = ['Sách vở', 'Xe đạp', 'Điện tử', 'Đồ dùng'];
 
 /** State local — mất khi tắt app, đúng bản chất "chưa có BE" chứ không phải cache. */

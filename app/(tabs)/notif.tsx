@@ -11,7 +11,7 @@ const BADGE_BG = { org: C.moss, chain: C.amber, system: C.sand } as const;
 const BADGE_FG = { org: '#fff', chain: C.amberInk, system: C.inkSoft } as const;
 
 export default function Notifications() {
-  const { data, isLoading } = useNotifications();
+  const { data, error, isLoading } = useNotifications();
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -39,7 +39,13 @@ export default function Notifications() {
           </Animated.View>
         )}
         ListEmptyComponent={
-          isLoading ? <Loading /> : <EmptyState icon="🔔" text="Chưa có thông báo nào" />
+          isLoading ? (
+            <Loading />
+          ) : error ? (
+            <EmptyState icon="📡" text={(error as Error).message} />
+          ) : (
+            <EmptyState icon="🔔" text="Chưa có thông báo nào" />
+          )
         }
       />
     </SafeAreaView>

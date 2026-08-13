@@ -9,7 +9,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import { Kalam_400Regular, Kalam_700Bold } from '@expo-google-fonts/kalam';
 import {
-  Manrope_400Regular,
   Manrope_500Medium,
   Manrope_600SemiBold,
   Manrope_700Bold,
@@ -40,7 +39,6 @@ export default function RootLayout() {
   const [loaded, error] = useFonts({
     Kalam_400Regular,
     Kalam_700Bold,
-    Manrope_400Regular,
     Manrope_500Medium,
     Manrope_600SemiBold,
     Manrope_700Bold,

@@ -1,6 +1,5 @@
 import React from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, SlideOutRight } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ListingPhoto } from '@/components/ListingPhoto';
@@ -10,9 +9,8 @@ import { useDeleteListing, useMyListings } from '@/queries/listings';
 import { C, F, shadow } from '@/theme';
 
 export default function MyListings() {
-  const router = useRouter();
   const toast = useToast();
-  const { data, isLoading } = useMyListings();
+  const { data, error, isLoading } = useMyListings();
   const del = useDeleteListing();
 
   return (
@@ -56,15 +54,16 @@ export default function MyListings() {
               </View>
             </View>
             <View style={{ gap: 6, justifyContent: 'center' }}>
-              <Pressable style={styles.iconBtn} onPress={() => router.push('/post')}>
-                <Text style={{ fontSize: 12 }}>✎</Text>
-              </Pressable>
               <Pressable
                 style={[styles.iconBtn, { backgroundColor: '#FCE4E1' }]}
-                onPress={() => {
-                  del.mutate(item.id);
-                  toast('🗑 Đã xoá tin đăng');
-                }}
+                onPress={() =>
+                  // Toast nằm trong `onSuccess`: báo "đã xoá" ngay lúc bấm là nói dối khi
+                  // request hỏng — optimistic update sẽ rollback mà người dùng không hay.
+                  del.mutate(item.id, {
+                    onSuccess: () => toast('🗑 Đã xoá tin đăng'),
+                    onError: (e: Error) => toast(`⚠️ ${e.message}`),
+                  })
+                }
               >
                 <Text style={{ fontSize: 12 }}>🗑</Text>
               </Pressable>
@@ -72,7 +71,13 @@ export default function MyListings() {
           </Animated.View>
         )}
         ListEmptyComponent={
-          isLoading ? <Loading /> : <EmptyState icon="📌" text="Bạn chưa ghim tin nào lên bảng" />
+          isLoading ? (
+            <Loading />
+          ) : error ? (
+            <EmptyState icon="📡" text={(error as Error).message} />
+          ) : (
+            <EmptyState icon="📌" text="Bạn chưa ghim tin nào lên bảng" />
+          )
         }
       />
     </SafeAreaView>

@@ -47,4 +47,4 @@ Index **duy nhất** cho convention của repo này. Quy tắc dùng: tra ở đ
 - Comment tiếng Việt, WHY-only.
 - Dữ liệu đến từ BE thật qua SDK generated; `src/api/generated/**` không sửa tay, regen bằng `npm run api:sync`.
 - Base URL của BE: `EXPO_PUBLIC_API_URL` trong `.env` (xem `.env.example`) — thiết bị thật phải dùng IP LAN.
-- Verify: `npm run lint` + `npm run typecheck` (cwd = `docs/market-place`).
+- Verify: `npm run lint` + `npm run typecheck` (cwd = `docs/VueRoute`).

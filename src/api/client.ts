@@ -46,7 +46,7 @@ function unwrap<TPayload>(res: SdkResult<TPayload>, fallback: string): TPayload 
 
 /** Hermes không có Intl đầy đủ nên `toLocaleString` không tin được — chấm nghìn bằng tay. */
 function formatPrice(price: number): string {
-  if (price <= 0) return 'Free';
+  if (price <= 0) return 'Miễn phí';
   return `${String(Math.round(price)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}đ`;
 }
 
@@ -126,38 +126,14 @@ function toSession(auth: AuthResponse, orgSlug?: string): AuthSession {
 function toProfile(dto: MeProfile): Profile {
   return {
     name: dto.name,
-    // `org`, `posted`, `sold` chưa có trong MeProfile của BE — hiện chỗ trống thay vì số bịa.
+    // `org`, `posted`, `sold` chưa có trong MeProfile của BE. Trả `—` chứ không phải 0: số 0
+    // hiện lên UI trông y hệt một thống kê thật, tức là con số bịa.
     org: '',
     phone: dto.phone ?? '',
     avatar: dto.avatar || initialsOf(dto.name),
-    posted: 0,
-    sold: 0,
+    posted: '—',
+    sold: '—',
     rating: dto.ratingCount > 0 ? dto.ratingAvg.toFixed(1) : '—',
-  };
-}
-
-const NOTIF_ICON: Record<string, string> = { organization: '🏫', chain: '🔗' };
-const NOTIF_BADGE: Record<string, string> = { organization: 'Từ trường', chain: 'Từ hệ thống' };
-
-function toNotif(dto: {
-  _id: string;
-  sourceType?: string;
-  title: string;
-  body: string;
-  createdAt: string;
-  readBy?: string[];
-}): Notif {
-  const me = getCurrentUserId();
-  const sourceType = dto.sourceType ?? 'system';
-  return {
-    id: dto._id,
-    icon: NOTIF_ICON[sourceType] ?? '📌',
-    kind: sourceType === 'chain' ? 'chain' : sourceType === 'organization' ? 'org' : 'system',
-    badge: NOTIF_BADGE[sourceType],
-    title: dto.title,
-    body: dto.body,
-    time: `${relativeTime(dto.createdAt)} trước`,
-    unread: me ? !(dto.readBy ?? []).includes(me) : true,
   };
 }
 
@@ -237,17 +213,14 @@ export const api = {
 
   /* ---------------- listings ---------------- */
   /**
-   * `cat` chưa lọc được: BE nhận `category` là ObjectId còn app chỉ có tên hiển thị, và
-   * `GET /categories` (chỗ đổi tên -> id) đang trả 501. Nhận tham số để giữ chữ ký cho hook.
+   * Chưa lọc theo danh mục: BE nhận `category` là ObjectId còn app chỉ có tên hiển thị, và
+   * `GET /categories` (chỗ đổi tên -> id) đang trả 501. Mở lại tham số lọc khi BE có endpoint đó.
    */
-  async getListings(cat = 'Tất cả'): Promise<Listing[]> {
+  async getListings(): Promise<Listing[]> {
     // Không gửi `status`: `listingQuerySchema` của BE không khai field đó (chỉ caller nội bộ mới
     // được ép status), và `buildFilter` đã mặc định ACTIVE. Gửi thêm chỉ bị zod strip im lặng.
     const res = await withAuthRetry(() => listingList({ query: { limit: 50 } }));
-    const items = unwrap(res, 'Không tải được bảng tin').map(toListing);
-
-    if (cat === 'Tất cả') return items;
-    return items.filter((item) => item.cat === cat);
+    return unwrap(res, 'Không tải được bảng tin').map(toListing);
   },
 
   async getListing(id: string): Promise<Listing> {
@@ -338,6 +311,9 @@ export const api = {
       c = {
         id: Math.max(0, ...db.conversations.map((x) => x.id)) + 1,
         listingId,
+        // Chốt tiêu đề ngay tại đây: đây là chỗ duy nhất đã có sẵn listing, nên màn danh sách
+        // chat không phải kéo cả bảng tin về chỉ để tra một cái tên.
+        listingTitle: listing.title,
         name: listing.seller,
         avatar: listing.avatar,
         lastMsg: 'Bắt đầu cuộc trò chuyện',

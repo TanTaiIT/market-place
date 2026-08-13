@@ -1,19 +1,17 @@
-import React, { useState } from 'react';
-import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Corkboard } from '@/components/Corkboard';
 import { NoteCard } from '@/components/NoteCard';
-import { Avatar, EmptyState, Loading, TapeChip } from '@/components/ui';
-import { CATEGORIES } from '@/api/db';
+import { Avatar, EmptyState, Loading } from '@/components/ui';
 import { useListings, useProfile } from '@/queries/listings';
 import { C, F, shadow } from '@/theme';
 
 export default function Feed() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [cat, setCat] = useState('Tất cả');
-  const { data, error, isLoading, isRefetching, refetch } = useListings(cat);
+  const { data, error, isLoading, isRefetching, refetch } = useListings();
   const { data: profile } = useProfile();
 
   return (
@@ -43,23 +41,13 @@ export default function Feed() {
             <View style={styles.header}>
               <Text style={styles.title}>Bảng tin của bạn</Text>
               <Pressable onPress={() => router.push('/(tabs)/profile')}>
-                <Avatar text={profile?.avatar ?? 'MV'} ring />
+                <Avatar text={profile?.avatar ?? '·'} ring />
               </Pressable>
             </View>
 
             <Pressable style={styles.searchBar} onPress={() => router.push('/search')}>
               <Text style={styles.searchText}>🔍  Tìm xe đạp, sách, laptop...</Text>
             </Pressable>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chipRow}
-            >
-              {CATEGORIES.map((c, i) => (
-                <TapeChip key={c} label={c} index={i} active={cat === c} onPress={() => setCat(c)} />
-              ))}
-            </ScrollView>
           </View>
         }
         renderItem={({ item, index }) => (
@@ -71,11 +59,7 @@ export default function Feed() {
           ) : error ? (
             <EmptyState icon="📡" text={(error as Error).message || 'Chưa tải được bảng tin'} onDark />
           ) : (
-            <EmptyState
-              icon="📌"
-              text={cat === 'Tất cả' ? 'Chưa có tin nào để hiển thị' : `Chưa có tin nào trong mục ${cat}`}
-              onDark
-            />
+            <EmptyState icon="📌" text="Chưa có tin nào để hiển thị" onDark />
           )
         }
       />
@@ -103,5 +87,4 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   searchText: { fontFamily: F.ui, fontSize: 13.5, color: C.inkSoft },
-  chipRow: { paddingBottom: 6, paddingRight: 8 },
 });

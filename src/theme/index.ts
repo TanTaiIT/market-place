@@ -51,15 +51,5 @@ export const shadow = Platform.select({
   default: { elevation: 4 },
 }) as object;
 
-export const shadowSoft = Platform.select({
-  ios: {
-    shadowColor: '#182412',
-    shadowOpacity: 0.12,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 3 },
-  },
-  default: { elevation: 2 },
-}) as object;
-
 /** Cặp màu gradient cho ảnh giả lập của từng tin (thay linear-gradient của web) */
 export type Grad = readonly [string, string];

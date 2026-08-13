@@ -8,12 +8,8 @@ import { api } from '@/api/client';
 import type { Listing, Profile } from '@/api/db';
 import { qk } from './keys';
 
-export function useListings(cat: string) {
-  return useQuery({
-    queryKey: qk.listings(cat),
-    queryFn: () => api.getListings(cat),
-    placeholderData: keepPreviousData,
-  });
+export function useListings() {
+  return useQuery({ queryKey: qk.listings(), queryFn: api.getListings });
 }
 
 export function useListing(id: string) {
@@ -61,7 +57,7 @@ export function useCreateListing() {
   return useMutation({
     mutationFn: api.createListing,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['listings'] });
+      qc.invalidateQueries({ queryKey: qk.listings() });
       qc.invalidateQueries({ queryKey: qk.profile() });
     },
   });
@@ -85,7 +81,7 @@ export function useToggleSaved() {
       if (ctx?.prev) qc.setQueryData(qk.savedIds(), ctx.prev);
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['saved'] });
+      qc.invalidateQueries({ queryKey: qk.savedRoot() });
     },
   });
 }
@@ -105,8 +101,8 @@ export function useDeleteListing() {
       if (ctx?.prev) qc.setQueryData(qk.myListings(), ctx.prev);
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['listings'] });
-      qc.invalidateQueries({ queryKey: ['saved'] });
+      qc.invalidateQueries({ queryKey: qk.listings() });
+      qc.invalidateQueries({ queryKey: qk.savedRoot() });
     },
   });
 }

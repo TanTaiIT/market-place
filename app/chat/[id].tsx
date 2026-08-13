@@ -22,7 +22,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Avatar, Loading } from '@/components/ui';
+import { Avatar, EmptyState, Loading } from '@/components/ui';
 import { chatColor } from '@/api/client';
 import { useConversation, useSendMessage } from '@/queries/chat';
 import { useListing } from '@/queries/listings';
@@ -51,18 +51,15 @@ export default function Chat() {
   const listRef = useRef<FlatList>(null);
   const [text, setText] = useState('');
 
-  const { data: conversation, isLoading } = useConversation(conversationId);
+  const { data: conversation, error, isLoading } = useConversation(conversationId);
   // Chuỗi rỗng = chưa có hội thoại -> `useListing` tự tắt qua `enabled`.
   const { data: listing } = useListing(conversation?.listingId ?? '');
   const send = useSendMessage(conversationId);
 
+  // Tin mới và bong bóng "đang nhập" đều làm đổi chiều cao nội dung, nên `onContentSizeChange`
+  // của FlatList đã phủ hết các nhịp cần cuộn — không cần effect theo dõi riêng.
   const scrollToEnd = () =>
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 60);
-
-  useEffect(() => {
-    scrollToEnd();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversation?.messages.length, send.isPending]);
 
   const onSend = () => {
     const t = text.trim();
@@ -72,14 +69,16 @@ export default function Chat() {
     scrollToEnd();
   };
 
-  if (isLoading || !conversation) return <Loading />;
+  if (isLoading) return <Loading />;
+  if (error || !conversation) {
+    return <EmptyState icon="💬" text={(error as Error | null)?.message ?? 'Cuộc trò chuyện không tồn tại'} />;
+  }
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <View style={styles.header}>
           <Pressable

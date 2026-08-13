@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar, Loading } from '@/components/ui';
+import { Avatar, EmptyState, Loading } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useSignOut } from '@/queries/auth';
 import { useProfile } from '@/queries/listings';
@@ -14,10 +14,13 @@ export default function Profile() {
   const router = useRouter();
   const toast = useToast();
   const insets = useSafeAreaInsets();
-  const { data: profile, isLoading } = useProfile();
+  const { data: profile, error, isLoading } = useProfile();
   const signOut = useSignOut();
 
-  if (isLoading || !profile) return <Loading />;
+  if (isLoading) return <Loading />;
+  if (error || !profile) {
+    return <EmptyState icon="📡" text={(error as Error | null)?.message ?? 'Không tải được hồ sơ'} />;
+  }
 
   const menu = [
     { icon: '📌', text: 'Tin đã đăng', go: () => router.push('/mylistings') },
@@ -35,8 +38,8 @@ export default function Profile() {
         <Text style={styles.org}>{profile.org}</Text>
 
         <View style={styles.stats}>
-          <Stat num={String(profile.posted)} label="Tin đã ghim" />
-          <Stat num={String(profile.sold)} label="Đã bán" />
+          <Stat num={profile.posted} label="Tin đã ghim" />
+          <Stat num={profile.sold} label="Đã bán" />
           <Stat num={profile.rating} label="Đánh giá" />
         </View>
       </LinearGradient>

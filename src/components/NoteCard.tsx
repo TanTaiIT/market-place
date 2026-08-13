@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: C.pin,
     borderTopWidth: 3,
-    borderTopColor: '#ff9b8a',
+    borderTopColor: C.pinLight,
     zIndex: 3,
     ...shadow,
   },

@@ -71,6 +71,8 @@ export type Profile = {
   org: string;
   phone: string;
   avatar: string;
+  /** Vai trò BE trả ra — chuỗi tự do, xem `canOpenAdmin` bên `@/api/admin`. */
+  role: string;
   /** Chuỗi chứ không phải số: BE chưa trả thống kê nào, nên `—` là giá trị hợp lệ. */
   posted: string;
   sold: string;

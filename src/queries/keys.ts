@@ -12,4 +12,20 @@ export const qk = {
   conversation: (id: number) => ['conversation', id] as const,
   notifications: () => ['notifications'] as const,
   profile: () => ['profile'] as const,
+
+  /*
+   * Bàn quản trị. Mọi thao tác duyệt đều đổi nhiều mặt cùng lúc (hàng đợi, bảng tin, thẻ số),
+   * nên `adminRoot()` là prefix để quét cả cụm sau mỗi mutation thay vì liệt kê từng key.
+   */
+  adminRoot: () => ['admin'] as const,
+  adminOverview: (school: string) => ['admin', 'overview', school] as const,
+  adminListings: (school: string, status: string) => ['admin', 'listings', school, status] as const,
+  adminReports: () => ['admin', 'reports'] as const,
+  adminUsers: (school: string) => ['admin', 'users', school] as const,
+  adminSchools: () => ['admin', 'schools'] as const,
+  adminSchoolLinks: () => ['admin', 'school-links'] as const,
+  adminCategories: (school: string) => ['admin', 'categories', school] as const,
+  adminNotices: () => ['admin', 'notices'] as const,
+  adminRules: () => ['admin', 'rules'] as const,
+  adminLimits: () => ['admin', 'limits'] as const,
 };

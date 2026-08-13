@@ -8,6 +8,7 @@ import { Avatar, EmptyState, Loading } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useSignOut } from '@/queries/auth';
 import { useProfile } from '@/queries/listings';
+import { canOpenAdmin } from '@/api/admin';
 import { C, F, shadow } from '@/theme';
 
 export default function Profile() {
@@ -23,6 +24,9 @@ export default function Profile() {
   }
 
   const menu = [
+    ...(canOpenAdmin(profile.role)
+      ? [{ icon: '🗂', text: 'Bàn quản trị', admin: true, go: () => router.push('/admin') }]
+      : []),
     { icon: '📌', text: 'Tin đã đăng', go: () => router.push('/mylistings') },
     { icon: '🤍', text: 'Tin đã lưu', go: () => router.push('/saved') },
     { icon: '⚙️', text: 'Cài đặt tài khoản', go: () => router.push('/settings') },
@@ -52,7 +56,20 @@ export default function Profile() {
               style={({ pressed }) => [styles.row, pressed && { transform: [{ scale: 0.98 }] }]}
             >
               <Text style={styles.rowIcon}>{m.icon}</Text>
-              <Text style={[styles.rowText, m.danger && { color: C.pin }]}>{m.text}</Text>
+              <Text
+                style={[
+                  styles.rowText,
+                  m.danger && { color: C.pin },
+                  m.admin && { color: C.moss, fontFamily: F.uiBold },
+                ]}
+              >
+                {m.text}
+              </Text>
+              {m.admin && (
+                <View style={styles.adminTag}>
+                  <Text style={styles.adminTagText}>{profile.role.toUpperCase()}</Text>
+                </View>
+              )}
               <Text style={styles.arrow}>›</Text>
             </Pressable>
           </Animated.View>
@@ -93,4 +110,11 @@ const styles = StyleSheet.create({
   rowIcon: { fontSize: 17, width: 22, textAlign: 'center' },
   rowText: { flex: 1, fontFamily: F.uiSemi, fontSize: 13.5, color: C.ink },
   arrow: { color: C.muted, fontSize: 18 },
+  adminTag: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 3,
+    backgroundColor: C.mossLight,
+  },
+  adminTagText: { fontFamily: F.mono, fontSize: 9, color: C.moss },
 });

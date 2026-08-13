@@ -131,6 +131,7 @@ function toProfile(dto: MeProfile): Profile {
     org: '',
     phone: dto.phone ?? '',
     avatar: dto.avatar || initialsOf(dto.name),
+    role: dto.role,
     posted: '—',
     sold: '—',
     rating: dto.ratingCount > 0 ? dto.ratingAvg.toFixed(1) : '—',

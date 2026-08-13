@@ -40,6 +40,16 @@ export default function Feed() {
           <View>
             <View style={styles.header}>
               <Text style={styles.title}>Bảng tin của bạn</Text>
+
+              {/* TẠM — lối tắt xem UI bàn quản trị, cố tình bỏ qua `canOpenAdmin` để vào được
+                  bằng tài khoản bất kỳ. Xoá khối này + hai style `devAdmin*` khi xem xong. */}
+              <Pressable
+                onPress={() => router.push('/admin')}
+                style={({ pressed }) => [styles.devAdmin, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.devAdminText}>🗂 Admin</Text>
+              </Pressable>
+
               <Pressable onPress={() => router.push('/(tabs)/profile')}>
                 <Avatar text={profile?.avatar ?? '·'} ring />
               </Pressable>
@@ -87,4 +97,18 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   searchText: { fontFamily: F.ui, fontSize: 13.5, color: C.inkSoft },
+
+  // TẠM — đi cùng nút Admin ở trên, xoá chung một lượt.
+  // `marginLeft: auto` nuốt hết khoảng trống của `space-between` nên tiêu đề vẫn nằm trái,
+  // còn nút và avatar dính vào nhau bên phải.
+  devAdmin: {
+    marginLeft: 'auto',
+    marginRight: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: C.ink,
+    ...shadow,
+  },
+  devAdminText: { fontFamily: F.uiBold, fontSize: 11.5, color: C.paperWarm },
 });

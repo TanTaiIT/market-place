@@ -91,6 +91,8 @@ export default function RootLayout() {
                 <Stack.Screen name="settings" />
                 <Stack.Screen name="listing/[id]" />
                 <Stack.Screen name="chat/[id]" />
+                {/* Khai cả cụm `admin` một lần: `app/admin/_layout.tsx` giữ Stack riêng bên trong */}
+                <Stack.Screen name="admin" />
               </Stack.Protected>
             </Stack>
           </ToastProvider>

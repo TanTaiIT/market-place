@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import { setHttpSession, setSessionRefresher } from '@/api/http';
@@ -87,4 +88,34 @@ export function useSyncAccessToken(qc: QueryClient): void {
   // 401. Layout cha render trước con, nên ghi ở đây là kịp. An toàn vì lệnh này idempotent.
   setHttpSession(session ? { accessToken: session.accessToken, userId: session.userId } : null);
   setSessionRefresher(() => refreshSession(qc));
+}
+
+/**
+ * Hỏi BE xem người đang đăng nhập còn tồn tại không, mỗi khi app mở lại hoặc phiên đổi chủ.
+ *
+ * Cần một lượt gọi RIÊNG vì không màn nào phát hiện hộ được: `authenticate` bên BE dựng
+ * `req.user` thẳng từ JWT mà không tra DB, nên user bị xoá khỏi database vẫn có `GET /listings`
+ * trả **200** — bảng tin đầy tin như thường, người dùng thao tác bình thường, và chỉ vỡ ra khi
+ * chạm đúng một endpoint nào đó cần bản ghi user. `GET /users/me` là chỗ duy nhất trả lời thật
+ * (404), và `withAuthRetry` biến 404 đó thành một lượt refresh; refresh trả 401
+ * `User no longer valid` nên `refreshSession` dọn phiên và guard đưa về màn đăng nhập.
+ *
+ * `fetchQuery` chứ không phải `useQuery`: hook này chạy trong thân `RootLayout`, ở NGOÀI
+ * `<QueryClientProvider>` — cùng lý do `qc` phải truyền vào như `useSyncAccessToken`. Kết quả
+ * ghi thẳng vào `qk.profile()` nên màn Hồ sơ dùng lại luôn, không tốn thêm một vòng gọi.
+ *
+ * `.catch` rỗng là cố ý: mọi lỗi ở đây đã được `withAuthRetry` phân loại xong (phiên chết thì
+ * đã đăng xuất, mạng hỏng thì cứ để phiên yên). Bắt lại chỉ để chặn unhandled rejection —
+ * KHÔNG toast, vì lỗi của query không phải bề mặt lỗi của người dùng (query.convention §5).
+ */
+export function useValidateSession(qc: QueryClient): void {
+  const hydrated = useAuthStore((s) => s.hydrated);
+  // Theo `userId` chứ không theo cả object `session`: refresh token xoay vòng ghi lại session
+  // mới sau mỗi lần làm mới, bám vào object là chạy lại kiểm tra sau từng lượt refresh.
+  const userId = useAuthStore((s) => s.session?.userId);
+
+  useEffect(() => {
+    if (!hydrated || !userId) return;
+    qc.fetchQuery({ queryKey: qk.profile(), queryFn: api.getProfile }).catch(() => {});
+  }, [hydrated, userId, qc]);
 }

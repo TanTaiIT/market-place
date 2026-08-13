@@ -176,6 +176,7 @@ function toMessage(dto: MessageDto): Message {
     from: dto.senderId === getCurrentUserId() ? 'me' : 'them',
     text: dto.text,
     time: clockTime(dto.createdAt),
+    clientMsgId: dto.clientMsgId,
   };
 }
 
@@ -195,7 +196,10 @@ export function messageFromSocket(payload: unknown): Message | null {
   ) {
     return null;
   }
-  return toMessage(p as MessageDto);
+  // `clientMsgId` là khoá render nên không nhận bừa kiểu khác; hỏng field này thì bỏ riêng nó
+  // và rơi về `id`, đừng vứt cả tin nhắn chỉ vì phần phụ trợ sai.
+  const clientMsgId = typeof p.clientMsgId === 'string' ? p.clientMsgId : undefined;
+  return toMessage({ ...p, clientMsgId } as MessageDto);
 }
 
 // ── LOCAL HELPERS (phần chưa có BE) ─────────────────────────────────
@@ -404,9 +408,18 @@ export const api = {
     return toConversation(unwrap(res, 'Không mở được cuộc trò chuyện'));
   },
 
-  async sendMessage(conversationId: string, text: string): Promise<Message> {
+  /**
+   * `clientMsgId` do call-site sinh trước khi vẽ bong bóng lạc quan và truyền xuống đây; BE lưu
+   * rồi trả lại nguyên vẹn trong cả response lẫn sự kiện socket. Nhờ vậy bản thật ghép được với
+   * bong bóng đang hiển thị mà không phải dò theo nội dung hay đổi khoá render giữa chừng.
+   */
+  async sendMessage(
+    conversationId: string,
+    text: string,
+    clientMsgId?: string,
+  ): Promise<Message> {
     const res = await withAuthRetry(() =>
-      chatSend({ path: { id: conversationId }, body: { text } }),
+      chatSend({ path: { id: conversationId }, body: { text, clientMsgId } }),
     );
     return toMessage(unwrap(res, 'Không gửi được tin nhắn'));
   },

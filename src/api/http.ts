@@ -76,23 +76,57 @@ function refreshOnce(): Promise<string | null> {
 /** Sentinel của `TenantScopeMissingError` bên BE — khớp theo tiền tố, không phải toàn chuỗi. */
 const TENANT_SCOPE_ERROR = 'Missing tenant context';
 
-type SdkOutcome = { error?: unknown; response?: Response };
+/**
+ * Sentinel 403 của `resolveTenant`/`readUserPayload`: org trong token đã bị xoá hoặc khoá, hoặc
+ * token thuộc org khác. Refresh token cũng mang đúng org đó nên không tự cứu được — mục đích
+ * duy nhất của việc nhận diện chúng là để `withAuthRetry` dẫn tới đường đăng xuất.
+ */
+const ORG_GONE_ERRORS = ['Organization đã bị khoá', 'Organization không tồn tại', 'organization khác'];
 
 /**
- * Access token hết hạn nhưng BE trả về **hai** dạng khác nhau, phải nhận cả hai:
- *  - route có `authenticate` (`/users/me`, xoá tin) → 401.
- *  - route public đọc collection có tenant (`GET /listings`) → **400** `Missing tenant context`:
- *    `resolveTenant` nuốt lỗi verify token rồi không mở scope, và `tenantPlugin` fail-closed nên
- *    query ném lỗi trước khi tới `authenticate` nào cả.
- * Chỉ nhìn 401 thì bảng tin sẽ không bao giờ tự hồi phục sau khi token hết hạn.
+ * Endpoint DUY NHẤT mà 404 mang nghĩa "phiên trỏ tới một user không còn tồn tại". Ở mọi đường
+ * khác 404 chỉ là "không tìm thấy tin/hội thoại này" — đăng xuất vì nó là sai hoàn toàn.
  */
-function isExpiredSession(outcome: SdkOutcome): boolean {
+const ME_ENDPOINT = '/users/me';
+
+type SdkOutcome = { error?: unknown; response?: Response };
+
+function errorMessage(outcome: SdkOutcome): string {
+  const message = (outcome.error as { message?: unknown } | undefined)?.message;
+  return typeof message === 'string' ? message : '';
+}
+
+/**
+ * Phiên không còn dùng được nữa — hoặc vì token hết hạn (cứu được bằng refresh), hoặc vì thứ
+ * đứng sau token đã biến mất (user/org bị xoá; chỉ còn đường đăng xuất). Gộp chung vì cả hai
+ * đi qua đúng một lối: thử refresh một lần, refresh hỏng thì `refreshSession` dọn phiên.
+ *
+ * BE trả bốn dạng khác nhau, phải nhận đủ:
+ *  - **401** — route có `authenticate`, hoặc `/auth/refresh` khi user đã bị xoá
+ *    (`User no longer valid`).
+ *  - **400** `Missing tenant context` — route đọc collection có tenant mà `resolveTenant`
+ *    không mở được scope; `tenantPlugin` fail-closed ném trước khi tới `authenticate` nào cả.
+ *  - **403** — org trong token đã bị xoá/khoá, hoặc token thuộc org khác.
+ *  - **404 trên `/users/me`** — user bị xoá khỏi DB **nhưng org vẫn còn**. Đây là trường hợp
+ *    duy nhất không có mã 4xx nào khác báo hiệu: `authenticate` dựng `req.user` thẳng từ JWT
+ *    mà không tra DB, nên `GET /listings` vẫn trả **200** như thường và app không hề hay biết
+ *    mình đang chạy bằng danh tính của một người không còn tồn tại.
+ */
+function isDeadSession(outcome: SdkOutcome): boolean {
   const status = outcome.response?.status;
   if (status === 401) return true;
-  if (status !== 400) return false;
 
-  const message = (outcome.error as { message?: unknown } | undefined)?.message;
-  return typeof message === 'string' && message.includes(TENANT_SCOPE_ERROR);
+  if (status === 400 || status === 403) {
+    const message = errorMessage(outcome);
+    return (
+      message.includes(TENANT_SCOPE_ERROR) || ORG_GONE_ERRORS.some((s) => message.includes(s))
+    );
+  }
+
+  // `response.url` là URL tuyệt đối đã resolve, nên so bằng `includes` chứ không phải `===`.
+  if (status === 404) return (outcome.response?.url ?? '').includes(ME_ENDPOINT);
+
+  return false;
 }
 
 /**
@@ -106,8 +140,8 @@ function isExpiredSession(outcome: SdkOutcome): boolean {
 export async function withAuthRetry<T extends SdkOutcome>(call: () => Promise<T>): Promise<T> {
   const sentWith = generation;
   const first = await call();
-  // Chưa đăng nhập thì 401/400 là lỗi thật của request, không phải phiên hết hạn.
-  if (!session || !isExpiredSession(first)) return first;
+  // Chưa đăng nhập thì 401/403/404 là lỗi thật của request, không phải phiên hỏng.
+  if (!session || !isDeadSession(first)) return first;
 
   // Phiên đã được làm mới trong lúc request này đang bay: nó chỉ hỏng vì mang token cũ, gọi lại
   // là đủ. Thiếu nhánh này thì mỗi request lỡ nhịp lại kéo thêm một lần refresh — mà BE rotate

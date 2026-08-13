@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/api/admin';
 import type { AdminEvent, ModStatus } from '@/api/admin';
-import { getSocket } from '@/api/socket';
+import { joinAdminRoom, leaveAdminRoom, onSocketEvent } from '@/api/socket';
 import { qk } from './keys';
 import { useCategories } from './listings';
 
@@ -81,14 +81,14 @@ export function useResolveReport() {
  *
  * BE chặn ở `admin:join` bằng role trong JWT, nên thành viên thường có emit thẳng cũng không
  * vào được — `canOpenAdmin` phía app chỉ là cửa giao diện.
+ *
+ * Không chạm tới instance socket: `socket.ts` giữ nguyện vọng và dựng lại sau mỗi lần nối lại,
+ * nên bàn quản trị mở lâu không bị chết realtime sau một lần app xuống background.
  */
 export function useAdminActivityStream(): void {
   const qc = useQueryClient();
 
   useEffect(() => {
-    const socket = getSocket();
-    if (!socket) return;
-
     const onActivity = (payload: unknown) => {
       const log = payload as { actorName?: string; summary?: string; createdAt?: string };
       if (!log?.summary || !log.actorName) return;
@@ -101,10 +101,12 @@ export function useAdminActivityStream(): void {
       qc.invalidateQueries({ queryKey: qk.adminOverview() });
     };
 
-    socket.emit('admin:join');
-    socket.on('admin:activity', onActivity);
+    joinAdminRoom();
+    const off = onSocketEvent('admin:activity', onActivity);
+
     return () => {
-      socket.off('admin:activity', onActivity);
+      leaveAdminRoom();
+      off();
     };
   }, [qc]);
 }

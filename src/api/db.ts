@@ -28,7 +28,19 @@ export type Listing = {
 };
 
 /** `from` suy từ `senderId` so với người đang đăng nhập — UI chỉ cần biết bên nào. */
-export type Message = { id: string; from: 'me' | 'them'; text: string; time: string };
+export type Message = {
+  id: string;
+  from: 'me' | 'them';
+  text: string;
+  time: string;
+  /**
+   * Mã client tự sinh trước khi gửi, BE trả lại nguyên vẹn. Là **khoá render** của tin nhắn:
+   * `id` thật chỉ có sau khi server ghi xong, nên dùng nó làm key thì bong bóng vừa vẽ sẽ đổi
+   * khoá giữa chừng và danh sách dựng lại đúng dòng đó. Tin cũ và tin của người dùng bản cũ
+   * không có mã này — lúc đó `id` là khoá, và nó vốn đã ổn định.
+   */
+  clientMsgId?: string;
+};
 
 export type Conversation = {
   /** ObjectId 24 hex của BE, không phải số. */

@@ -42,8 +42,17 @@ export const useAuthStore = create<AuthState>()(
       storage: createJSONStorage(() => AsyncStorage),
       // `hydrated` là cờ runtime; ghi xuống đĩa thì lần mở sau sẽ đọc lại đúng giá trị cũ (false)
       partialize: (s) => ({ session: s.session }),
-      // Callback này chạy cả khi đọc đĩa lỗi — luôn mở khoá splash, đừng để app treo ở màn boot
-      onRehydrateStorage: () => () => useAuthStore.setState({ hydrated: true }),
+      // Callback này chạy cả khi đọc đĩa lỗi — luôn mở khoá splash, đừng để app treo ở màn boot.
+      //
+      // Bản ghi thiếu field thì vứt luôn thay vì mang vào phiên chạy: `useIsAuthenticated` chỉ
+      // hỏi `session !== null`, nên một object rỗng cũng đủ để guard thả vào bảng tin, rồi mọi
+      // request bay đi không kèm token và hỏng theo kiểu chẳng ai đọc ra nguyên nhân. Gặp ở
+      // máy còn giữ dữ liệu của bản app cũ, hoặc khi ghi xuống đĩa bị cắt ngang giữa chừng.
+      onRehydrateStorage: () => (state) => {
+        const s = state?.session;
+        const usable = Boolean(s?.userId && s.accessToken && s.refreshToken);
+        useAuthStore.setState({ hydrated: true, ...(s && !usable && { session: null }) });
+      },
     },
   ),
 );

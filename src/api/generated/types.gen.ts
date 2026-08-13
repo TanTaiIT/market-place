@@ -248,6 +248,7 @@ export type OpenConversation = {
 
 export type SendMessage = {
     text: string;
+    clientMsgId?: string;
 };
 
 export type Conversation = {
@@ -270,6 +271,7 @@ export type Message = {
     senderId: string;
     senderName: string;
     text: string;
+    clientMsgId?: string;
     createdAt: string;
 };
 

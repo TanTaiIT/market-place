@@ -111,7 +111,12 @@ export default function Chat() {
         <FlatList
           ref={listRef}
           data={messages ?? []}
-          keyExtractor={(m) => m.id}
+          // `clientMsgId` trước `id`: bong bóng vừa gửi và bản thật của nó từ server là hai
+          // object khác `id` nhưng cùng `clientMsgId`. Lấy `id` làm khoá thì lúc thay bản thật,
+          // FlatList coi là phần tử mới, unmount rồi mount lại và `entering` chạy lần nữa —
+          // đúng dòng người dùng vừa gửi bị nháy. Tin cũ không có `clientMsgId` thì `id` vốn
+          // đã ổn định.
+          keyExtractor={(m) => m.clientMsgId ?? m.id}
           contentContainerStyle={{ padding: 16, gap: 12, flexGrow: 1 }}
           onContentSizeChange={scrollToEnd}
           keyboardShouldPersistTaps="handled"

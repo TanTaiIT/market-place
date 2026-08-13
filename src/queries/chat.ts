@@ -1,10 +1,30 @@
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, messageFromSocket } from '@/api/client';
-import { connectSocket, disconnectSocket, getSocket } from '@/api/socket';
+import {
+  connectSocket,
+  disconnectSocket,
+  joinConversation,
+  leaveConversation,
+  onSocketEvent,
+  reconnectSocket,
+} from '@/api/socket';
 import type { Message } from '@/api/db';
 import { useAuthStore } from '@/stores/auth';
 import { qk } from './keys';
+
+/**
+ * Mã nhận dạng tin nhắn do client tự sinh, gửi kèm lên BE và được trả lại nguyên vẹn.
+ *
+ * Nó là **khoá render** của tin nhắn suốt vòng đời: bong bóng lạc quan mang mã này ngay lúc bấm
+ * gửi, bản thật từ server mang đúng mã đó, nên thay bản này bằng bản kia không làm đổi khoá —
+ * danh sách không dựng lại dòng đó và không có cú nháy nào.
+ *
+ * Không cần chuẩn UUID: phạm vi trùng lặp chỉ trong một hội thoại, và BE giới hạn 64 ký tự.
+ */
+const newClientMsgId = () =>
+  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 export function useConversations() {
   return useQuery({ queryKey: qk.conversations(), queryFn: api.getConversations });
@@ -43,40 +63,78 @@ export function useChatSocket(): void {
       return;
     }
     connectSocket(token);
-    return () => disconnectSocket();
+
+    /**
+     * iOS đình chỉ JS khi app xuống background, nên client không trả lời heartbeat và server
+     * đóng kết nối sau 45 giây (pingInterval 25s + pingTimeout 20s). Lúc quay lại foreground,
+     * socket.io đang nằm trong một nhịp backoff có thể dài tới 5 giây — gọi thẳng cho nó nối
+     * lại để tin nhắn không trễ nguyên nhịp đó. Việc vào lại phòng do `socket.ts` lo.
+     */
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') reconnectSocket();
+    });
+
+    return () => {
+      subscription.remove();
+      disconnectSocket();
+    };
   }, [token]);
 }
 
 /**
  * Vào phòng của một hội thoại và đẩy tin nhận được thẳng vào cache.
  *
- * Chống trùng bằng `id`: BE phát cho **cả người gửi**, nên tin của chính mình sẽ về hai lần —
- * một từ response REST, một từ socket.
+ * BE phát `chat:message` cho **cả người gửi**, nên tin của chính mình về hai đường: một từ
+ * response REST (đang là bong bóng lạc quan trên màn hình), một từ socket. Xử lý hai đường đó
+ * là phần lắt léo nhất ở đây — xem `onMessage` bên dưới.
+ *
+ * Không chạm tới instance socket: `joinConversation`/`onSocketEvent` chỉ ghi nhận nguyện vọng,
+ * `socket.ts` chịu trách nhiệm dựng lại sau mỗi lần nối lại. Nhờ vậy hook này đúng cả khi socket
+ * chưa kịp mở (deep-link thẳng vào màn chat) lẫn khi kết nối rớt giữa chừng.
  */
 export function useConversationRoom(conversationId: string): void {
   const qc = useQueryClient();
 
   useEffect(() => {
-    const socket = getSocket();
-    if (!socket || !conversationId) return;
+    if (!conversationId) return;
 
     const onMessage = (payload: unknown) => {
+      // Listener nghe sự kiện `chat:message` nói chung, không phải của riêng phòng này: mở
+      // chồng hai màn chat (A rồi push sang B) là hai handler cùng sống, thiếu chốt này thì
+      // tin của phòng kia rơi vào cache của phòng này.
+      if ((payload as { conversationId?: unknown })?.conversationId !== conversationId) return;
+
       const message = messageFromSocket(payload);
       if (!message) return;
 
-      qc.setQueryData<Message[]>(qk.messages(conversationId), (old = []) =>
-        old.some((m) => m.id === message.id) ? old : [...old, message],
-      );
+      qc.setQueryData<Message[]>(qk.messages(conversationId), (old = []) => {
+        if (old.some((m) => m.id === message.id)) return old;
+
+        // Tin của CHÍNH MÌNH về qua socket chính là bản thật của bong bóng lạc quan đang hiển
+        // thị — `clientMsgId` khớp là bằng chứng chắc chắn, không phải suy đoán theo nội dung.
+        // Nối thêm thì màn chat hiện hai tin y hệt, rồi lượt refetch của `onSettled` xoá bớt
+        // còn một. Thay tại chỗ để giữ nguyên vị trí tin, không đẩy nó xuống cuối.
+        const pending = message.clientMsgId
+          ? old.findIndex((m) => m.clientMsgId === message.clientMsgId)
+          : -1;
+        if (pending >= 0) return [...old.slice(0, pending), message, ...old.slice(pending + 1)];
+
+        return [...old, message];
+      });
+
       // Dòng tóm tắt + thứ tự ở màn danh sách do BE tính, không dựng lại ở client.
-      qc.invalidateQueries({ queryKey: qk.conversations() });
+      //
+      // Chỉ làm với tin của người khác: tin mình gửi đã có `useSendMessage.onSettled` invalidate
+      // rồi, thêm lượt này là hai `GET /chats` song song cho cùng một sự kiện.
+      if (message.from !== 'me') qc.invalidateQueries({ queryKey: qk.conversations() });
     };
 
-    socket.emit('chat:join', conversationId);
-    socket.on('chat:message', onMessage);
+    joinConversation(conversationId);
+    const off = onSocketEvent('chat:message', onMessage);
 
     return () => {
-      socket.emit('chat:leave', conversationId);
-      socket.off('chat:message', onMessage);
+      leaveConversation(conversationId);
+      off();
     };
   }, [conversationId, qc]);
 }
@@ -95,21 +153,34 @@ export function useOpenConversation() {
 /**
  * Gửi tin nhắn — đẩy bong bóng lên ngay rồi mới đồng bộ.
  *
- * Refetch contract: `onSettled` invalidate cả `messages(id)` (thay bong bóng tạm bằng bản ghi
- * thật của BE, kèm id và giờ chính xác) lẫn `conversations()` (dòng tóm tắt + thứ tự danh sách).
+ * Refetch contract: `onSettled` invalidate cả `messages(id)` (chốt lại id + giờ thật của BE cho
+ * trường hợp socket không tới) lẫn `conversations()` (dòng tóm tắt + thứ tự danh sách). Đây là
+ * lượt invalidate DUY NHẤT của `conversations()` cho một tin mình gửi — `useConversationRoom`
+ * cố tình bỏ qua tin của chính mình để không thành hai lượt cho cùng một sự kiện.
+ *
+ * Bong bóng lạc quan thường bị thay sớm hơn thế: socket echo về trước và
+ * `useConversationRoom` đổi nó thành bản thật tại chỗ, nên lượt refetch bên dưới chỉ xác nhận
+ * lại chứ không còn gì để sửa.
  */
 export function useSendMessage(conversationId: string) {
   const qc = useQueryClient();
   const key = qk.messages(conversationId);
 
-  return useMutation({
-    mutationFn: (text: string) => api.sendMessage(conversationId, text),
-    onMutate: async (text) => {
+  const mutation = useMutation({
+    // Gói object vì `mutationFn` chỉ nhận một tham số, mà `clientMsgId` phải tồn tại TRƯỚC
+    // `onMutate` — bong bóng lạc quan cần mang sẵn nó, còn `onMutate` thì không có đường đưa
+    // giá trị ngược lại cho `mutationFn`.
+    mutationFn: (v: { text: string; clientMsgId: string }) =>
+      api.sendMessage(conversationId, v.text, v.clientMsgId),
+    onMutate: async ({ text, clientMsgId }) => {
       await qc.cancelQueries({ queryKey: key });
       const prev = qc.getQueryData<Message[]>(key);
       const now = new Date();
       const optimistic: Message = {
-        id: `tmp-${now.getTime()}`,
+        // `id` tạm chỉ để thoả kiểu; khoá render là `clientMsgId`, và nó không đổi khi bản
+        // thật về nên danh sách không dựng lại dòng vừa gửi.
+        id: clientMsgId,
+        clientMsgId,
         from: 'me',
         text,
         time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
@@ -117,7 +188,7 @@ export function useSendMessage(conversationId: string) {
       qc.setQueryData<Message[]>(key, (old) => [...(old ?? []), optimistic]);
       return { prev };
     },
-    onError: (_e, _text, ctx) => {
+    onError: (_e, _vars, ctx) => {
       if (ctx?.prev) qc.setQueryData(key, ctx.prev);
     },
     onSettled: () => {
@@ -125,6 +196,13 @@ export function useSendMessage(conversationId: string) {
       qc.invalidateQueries({ queryKey: qk.conversations() });
     },
   });
+
+  // Màn hình vẫn chỉ gọi `send.mutate(text)`: sinh `clientMsgId` là luật của tầng dữ liệu, để
+  // route tự sinh là đẩy business logic vào `app/**` (HARD#2) và mỗi call-site lại một kiểu.
+  return {
+    isPending: mutation.isPending,
+    mutate: (text: string) => mutation.mutate({ text, clientMsgId: newClientMsgId() }),
+  };
 }
 
 /** Tắt huy hiệu chưa đọc. Gọi khi mở màn chat, không cần chờ kết quả. */

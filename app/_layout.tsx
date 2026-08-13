@@ -19,7 +19,7 @@ import {
   JetBrainsMono_600SemiBold,
 } from '@expo-google-fonts/jetbrains-mono';
 import { ToastProvider } from '@/components/Toast';
-import { useSyncAccessToken } from '@/queries/auth';
+import { useSyncAccessToken, useValidateSession } from '@/queries/auth';
 import { useChatSocket } from '@/queries/chat';
 import { useAuthHydrated, useIsAuthenticated } from '@/stores/auth';
 import { C } from '@/theme';
@@ -53,6 +53,9 @@ export default function RootLayout() {
   // Đẩy token của phiên xuống tầng HTTP trước khi bất kỳ màn con nào mount và gọi query.
   // Truyền thẳng `queryClient` vì ở đây còn ở NGOÀI `<QueryClientProvider>` bên dưới.
   useSyncAccessToken(queryClient);
+  // Đá phiên trỏ tới user đã bị xoá khỏi DB về màn đăng nhập. Phải hỏi tường minh: BE vẫn phục
+  // vụ bảng tin bình thường cho token của một user không còn tồn tại.
+  useValidateSession(queryClient);
   // Mở kết nối realtime theo phiên. Effect nên nó chạy sau khi token đã được đẩy xuống ở trên.
   useChatSocket();
   // Font lỗi vẫn cho chạy tiếp, chỉ rơi về font hệ thống. Nhưng phiên đăng nhập thì phải

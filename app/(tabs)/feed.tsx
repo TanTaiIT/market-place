@@ -1,18 +1,31 @@
-import React from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import {
+  FlatList,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Corkboard } from '@/components/Corkboard';
 import { NoteCard } from '@/components/NoteCard';
-import { Avatar, EmptyState, Loading } from '@/components/ui';
-import { useListings, useProfile } from '@/queries/listings';
+import { Avatar, EmptyState, Loading, TapeChip } from '@/components/ui';
+import { useCategories, useListings, useProfile } from '@/queries/listings';
 import { C, F, shadow } from '@/theme';
 
 export default function Feed() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { data, error, isLoading, isRefetching, refetch } = useListings();
+  // Chuỗi rỗng = "Tất cả". Giữ id chứ không giữ tên: BE lọc theo ObjectId của danh mục.
+  const [categoryId, setCategoryId] = useState('');
+  const { data: categories } = useCategories();
+  const { data, error, isLoading, isRefetching, refetch } = useListings(categoryId);
   const { data: profile } = useProfile();
+
+  const activeCategory = categories?.find((c) => c.id === categoryId);
 
   return (
     <Corkboard>
@@ -58,6 +71,32 @@ export default function Feed() {
             <Pressable style={styles.searchBar} onPress={() => router.push('/search')}>
               <Text style={styles.searchText}>🔍  Tìm xe đạp, sách, laptop...</Text>
             </Pressable>
+
+            {/* Chỉ hiện khi BE trả về danh mục — hỏng hoặc rỗng thì giấu hẳn hàng chip thay
+                vì để một hàng trơ ra không bấm được gì. */}
+            {!!categories?.length && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chipRow}
+              >
+                <TapeChip
+                  label="Tất cả"
+                  index={0}
+                  active={categoryId === ''}
+                  onPress={() => setCategoryId('')}
+                />
+                {categories.map((c, i) => (
+                  <TapeChip
+                    key={c.id}
+                    label={c.icon ? `${c.icon} ${c.name}` : c.name}
+                    index={i + 1}
+                    active={categoryId === c.id}
+                    onPress={() => setCategoryId(c.id)}
+                  />
+                ))}
+              </ScrollView>
+            )}
           </View>
         }
         renderItem={({ item, index }) => (
@@ -69,7 +108,15 @@ export default function Feed() {
           ) : error ? (
             <EmptyState icon="📡" text={(error as Error).message || 'Chưa tải được bảng tin'} onDark />
           ) : (
-            <EmptyState icon="📌" text="Chưa có tin nào để hiển thị" onDark />
+            <EmptyState
+              icon="📌"
+              text={
+                activeCategory
+                  ? `Chưa có tin nào trong mục ${activeCategory.name}`
+                  : 'Chưa có tin nào để hiển thị'
+              }
+              onDark
+            />
           )
         }
       />
@@ -97,6 +144,7 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   searchText: { fontFamily: F.ui, fontSize: 13.5, color: C.inkSoft },
+  chipRow: { paddingBottom: 6, paddingRight: 8 },
 
   // TẠM — đi cùng nút Admin ở trên, xoá chung một lượt.
   // `marginLeft: auto` nuốt hết khoảng trống của `space-between` nên tiêu đề vẫn nằm trái,

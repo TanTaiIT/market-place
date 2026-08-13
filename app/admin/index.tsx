@@ -3,19 +3,18 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { CategoryBars, TrendChart } from '@/components/AdminChart';
 import { AdminKpis } from '@/components/AdminKpis';
 import { AdminReviewDesk } from '@/components/AdminReviewDesk';
-import { AdminFilter, AdminPanel, AdminScreen } from '@/components/AdminScreen';
+import { AdminPanel, AdminScreen } from '@/components/AdminScreen';
 import { EmptyState, Loading } from '@/components/ui';
 import { useToast } from '@/components/Toast';
-import { useAdminOverview, useModerationQueue, useSetListingStatus } from '@/queries/admin';
-import { SCHOOLS } from '@/api/admin';
+import {
+  useAdminActivity,
+  useAdminActivityStream,
+  useAdminListings,
+  useAdminOverview,
+  useSetListingStatus,
+} from '@/queries/admin';
 import type { AdminEvent, ModListing } from '@/api/admin';
-import { useAdminSchool, useSetAdminSchool } from '@/stores/admin';
 import { C, F } from '@/theme';
-
-const SCHOOL_OPTIONS = [
-  { value: 'all', label: 'Tất cả trường' },
-  ...SCHOOLS.map((s) => ({ value: s, label: s })),
-];
 
 const EVENT_TONE: Record<AdminEvent['tone'], string> = {
   ok: C.mossBright,
@@ -27,19 +26,20 @@ const EVENT_TONE: Record<AdminEvent['tone'], string> = {
 
 export default function AdminOverview() {
   const toast = useToast();
-  const school = useAdminSchool();
-  const setSchool = useSetAdminSchool();
-
-  const { data: overview, error, isLoading } = useAdminOverview(school);
-  const { data: queue } = useModerationQueue(school);
+  const { data: overview, error, isLoading } = useAdminOverview();
+  const { data: events } = useAdminActivity();
+  const { data: queue } = useAdminListings('pending');
   const setStatus = useSetListingStatus();
 
-  const decide = (item: ModListing, status: 'live' | 'rejected', reason?: string) =>
+  // Vào phòng quản trị: thao tác của người khác hiện lên ngay ở "Vừa diễn ra".
+  useAdminActivityStream();
+
+  const decide = (item: ModListing, status: 'active' | 'rejected', reason?: string) =>
     setStatus.mutate(
       { id: item.id, status, reason },
       {
         onSuccess: () =>
-          toast(status === 'live' ? `📌 Đã ghim "${item.title}" lên bảng` : `Đã từ chối · ${reason}`),
+          toast(status === 'active' ? `📌 Đã ghim "${item.title}" lên bảng` : `Đã từ chối · ${reason}`),
         onError: (e: Error) => toast(`⚠️ ${e.message}`),
       },
     );
@@ -47,12 +47,14 @@ export default function AdminOverview() {
   return (
     <AdminScreen title="Bàn quản trị" note="việc hôm nay">
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-        <AdminFilter options={SCHOOL_OPTIONS} value={school} onChange={setSchool} />
-
         {isLoading ? (
           <Loading onDark />
         ) : error || !overview ? (
-          <EmptyState icon="📡" onDark text={(error as Error | null)?.message ?? 'Không tải được số liệu'} />
+          <EmptyState
+            icon="📡"
+            onDark
+            text={(error as Error | null)?.message ?? 'Không tải được số liệu'}
+          />
         ) : (
           <View style={styles.stack}>
             <AdminKpis data={overview.kpis} />
@@ -63,22 +65,26 @@ export default function AdminOverview() {
                 <AdminReviewDesk
                   queue={queue ?? []}
                   busy={setStatus.isPending}
-                  onApprove={(item) => decide(item, 'live')}
+                  onApprove={(item) => decide(item, 'active')}
                   onReject={(item, reason) => decide(item, 'rejected', reason)}
                 />
               </AdminPanel>
             </View>
 
             <AdminPanel title="Vừa diễn ra" note="trực tiếp">
-              {overview.events.map((ev, i) => (
-                <View key={ev.text} style={[styles.ev, i > 0 && styles.evDivider]}>
-                  <View style={[styles.evDot, { backgroundColor: EVENT_TONE[ev.tone] }]} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.evText}>{ev.text}</Text>
-                    <Text style={styles.evTime}>{ev.time}</Text>
+              {(events ?? []).length === 0 ? (
+                <Text style={styles.evEmpty}>Chưa có thao tác quản trị nào được ghi lại.</Text>
+              ) : (
+                (events ?? []).map((ev, i) => (
+                  <View key={`${ev.time}-${ev.text}`} style={[styles.ev, i > 0 && styles.evDivider]}>
+                    <View style={[styles.evDot, { backgroundColor: EVENT_TONE[ev.tone] }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.evText}>{ev.text}</Text>
+                      <Text style={styles.evTime}>{ev.time}</Text>
+                    </View>
                   </View>
-                </View>
-              ))}
+                ))
+              )}
             </AdminPanel>
 
             <View>
@@ -122,4 +128,5 @@ const styles = StyleSheet.create({
   evDot: { width: 8, height: 8, borderRadius: 4, marginTop: 5 },
   evText: { fontFamily: F.ui, fontSize: 12.5, lineHeight: 19, color: C.deskTxtSoft },
   evTime: { fontFamily: F.mono, fontSize: 10, color: C.deskTxtDim, marginTop: 4 },
+  evEmpty: { fontFamily: F.ui, fontSize: 12.5, color: C.deskTxtDim },
 });

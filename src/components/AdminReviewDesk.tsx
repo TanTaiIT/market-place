@@ -43,8 +43,8 @@ export function AdminReviewDesk({
   onApprove: (item: ModListing) => void;
   onReject: (item: ModListing, reason: string) => void;
 }) {
-  const [handled, setHandled] = useState<number[]>([]);
-  const [deferred, setDeferred] = useState<number[]>([]);
+  const [handled, setHandled] = useState<string[]>([]);
+  const [deferred, setDeferred] = useState<string[]>([]);
   const [showReasons, setShowReasons] = useState(false);
 
   const left = queue.filter((l) => !handled.includes(l.id));
@@ -73,7 +73,7 @@ export function AdminReviewDesk({
    * của `runOnJS`: callback của `withTiming` chạy trên luồng UI, mà đẩy một closure JS qua ranh
    * giới luồng thì Reanimated phải serialize — ref thì luồng JS đọc trực tiếp, không phải gửi gì.
    */
-  const decided = useRef<{ id: number; send: () => void } | null>(null);
+  const decided = useRef<{ id: string; send: () => void } | null>(null);
 
   /** Chạy sau khi animation xong: giấu tin, trả tờ giấy về vị trí cho tin kế tiếp. */
   const settle = () => {
@@ -145,9 +145,9 @@ export function AdminReviewDesk({
 
             <View style={styles.slipMeta}>
               <Text style={styles.slipMetaText}>
-                <Text style={styles.slipMetaStrong}>{current.seller}</Text> · {current.school}
+                <Text style={styles.slipMetaStrong}>{current.seller}</Text> · {current.cat}
               </Text>
-              <Text style={styles.slipMetaText}>gửi {current.at} trước · #{current.id}</Text>
+              <Text style={styles.slipMetaText}>gửi {current.at} trước</Text>
             </View>
           </Animated.View>
         </Animated.View>

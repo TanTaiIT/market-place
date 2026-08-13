@@ -14,7 +14,7 @@ import { C, F } from '@/theme';
  */
 
 const BADGE: Record<ModStatus, { label: string; fg: string; bg: string }> = {
-  live: { label: 'Đang hiển thị', fg: C.okText, bg: C.okTint },
+  active: { label: 'Đang hiển thị', fg: C.okText, bg: C.okTint },
   pending: { label: 'Chờ duyệt', fg: C.tape, bg: C.warnTint },
   rejected: { label: 'Đã từ chối', fg: C.badText, bg: C.badTint },
   hidden: { label: 'Đã ẩn', fg: C.deskTxtDim, bg: C.mutedTint },
@@ -86,7 +86,7 @@ export function AdminListingRow({
         <View style={styles.seller}>
           <Avatar text={item.avatar} size={20} color={colorOf(item.seller)} textColor={C.desk} />
           <Text numberOfLines={1} style={styles.sellerText}>
-            {item.seller} · {item.school} · gửi {item.at} trước
+            {item.seller} · gửi {item.at} trước
           </Text>
         </View>
 

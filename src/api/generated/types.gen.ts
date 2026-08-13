@@ -219,6 +219,116 @@ export type Notification = {
     createdAt: string;
 };
 
+export type CreateCategory = {
+    name: string;
+    slug?: string;
+    icon?: string;
+    order?: number;
+};
+
+export type UpdateCategory = {
+    name?: string;
+    icon?: string;
+    order?: number;
+    isActive?: boolean;
+};
+
+export type Category = {
+    id: string;
+    name: string;
+    slug: string;
+    icon: string;
+    order: number;
+    isActive: boolean;
+};
+
+export type OpenConversation = {
+    listingId: string;
+};
+
+export type SendMessage = {
+    text: string;
+};
+
+export type Conversation = {
+    id: string;
+    listingId: string;
+    listingTitle: string;
+    partnerId: string;
+    partnerName: string;
+    lastMessage: string;
+    lastMessageAt: string;
+    /**
+     * Có tin mới do người kia gửi kể từ lần mình đọc gần nhất
+     */
+    unread: boolean;
+};
+
+export type Message = {
+    id: string;
+    conversationId: string;
+    senderId: string;
+    senderName: string;
+    text: string;
+    createdAt: string;
+};
+
+export type SetListingStatus = {
+    status: 'active' | 'rejected' | 'hidden';
+    reason?: string;
+};
+
+export type AuditEvent = {
+    id: string;
+    actorName: string;
+    action: 'listing.approve' | 'listing.reject' | 'listing.hide' | 'listing.unhide' | 'listing.remove' | 'report.resolve' | 'report.dismiss';
+    summary: string;
+    createdAt: string;
+};
+
+export type ModerationOverview = {
+    pending: number;
+    live: number;
+    hidden: number;
+    rejected: number;
+    users: number;
+    openReports: number;
+    trend: Array<{
+        day: string;
+        approved: number;
+        pending: number;
+    }>;
+    categories: Array<{
+        categoryId: string;
+        name: string;
+        count: number;
+    }>;
+};
+
+export type CreateReport = {
+    targetType: 'listing' | 'user';
+    targetId: string;
+    kind: 'scam' | 'wrong_info' | 'harassment' | 'banned_item' | 'other';
+    quote: string;
+};
+
+export type ResolveReport = {
+    action: 'hide_target' | 'ignore';
+};
+
+export type Report = {
+    id: string;
+    targetType: 'listing' | 'user';
+    targetId: string;
+    targetTitle: string;
+    kind: 'scam' | 'wrong_info' | 'harassment' | 'banned_item' | 'other';
+    quote: string;
+    reporterName: string;
+    status: 'open' | 'resolved' | 'dismissed';
+    count: number;
+    createdAt: string;
+};
+
 export type PlatformAdminLogin = {
     email: string;
     password: string;
@@ -806,6 +916,308 @@ export type ChainBroadcastResponses = {
 
 export type ChainBroadcastResponse = ChainBroadcastResponses[keyof ChainBroadcastResponses];
 
+export type CategoryListData = {
+    body?: never;
+    path?: never;
+    query?: {
+        includeInactive?: 'true' | 'false';
+    };
+    url: '/categories';
+};
+
+export type CategoryListErrors = {
+    /**
+     * Query không hợp lệ
+     */
+    400: ErrorResponse;
+};
+
+export type CategoryListError = CategoryListErrors[keyof CategoryListErrors];
+
+export type CategoryListResponses = {
+    /**
+     * Danh sách danh mục
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<Category>;
+    };
+};
+
+export type CategoryListResponse = CategoryListResponses[keyof CategoryListResponses];
+
+export type CategoryGetByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/categories/{id}';
+};
+
+export type CategoryGetByIdErrors = {
+    /**
+     * Không tìm thấy danh mục
+     */
+    404: ErrorResponse;
+};
+
+export type CategoryGetByIdError = CategoryGetByIdErrors[keyof CategoryGetByIdErrors];
+
+export type CategoryGetByIdResponses = {
+    /**
+     * Chi tiết danh mục
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Category;
+    };
+};
+
+export type CategoryGetByIdResponse = CategoryGetByIdResponses[keyof CategoryGetByIdResponses];
+
+export type ChatListData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        limit?: number;
+    };
+    url: '/chats';
+};
+
+export type ChatListErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+};
+
+export type ChatListError = ChatListErrors[keyof ChatListErrors];
+
+export type ChatListResponses = {
+    /**
+     * Danh sách hội thoại
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<Conversation>;
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNextPage: boolean;
+            hasPrevPage: boolean;
+        };
+    };
+};
+
+export type ChatListResponse = ChatListResponses[keyof ChatListResponses];
+
+export type ChatOpenData = {
+    body?: OpenConversation;
+    path?: never;
+    query?: never;
+    url: '/chats';
+};
+
+export type ChatOpenErrors = {
+    /**
+     * Đây là tin của bạn
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Người bán ở trường khác
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy tin
+     */
+    404: ErrorResponse;
+};
+
+export type ChatOpenError = ChatOpenErrors[keyof ChatOpenErrors];
+
+export type ChatOpenResponses = {
+    /**
+     * Hội thoại
+     */
+    201: {
+        success: true;
+        message: string;
+        data: Conversation;
+    };
+};
+
+export type ChatOpenResponse = ChatOpenResponses[keyof ChatOpenResponses];
+
+export type ChatGetByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/chats/{id}';
+};
+
+export type ChatGetByIdErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Không tìm thấy hội thoại, hoặc bạn không thuộc hội thoại này
+     */
+    404: ErrorResponse;
+};
+
+export type ChatGetByIdError = ChatGetByIdErrors[keyof ChatGetByIdErrors];
+
+export type ChatGetByIdResponses = {
+    /**
+     * Hội thoại
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Conversation;
+    };
+};
+
+export type ChatGetByIdResponse = ChatGetByIdResponses[keyof ChatGetByIdResponses];
+
+export type ChatMessagesData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        page?: number;
+        limit?: number;
+    };
+    url: '/chats/{id}/messages';
+};
+
+export type ChatMessagesErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Không tìm thấy hội thoại, hoặc bạn không thuộc hội thoại này
+     */
+    404: ErrorResponse;
+};
+
+export type ChatMessagesError = ChatMessagesErrors[keyof ChatMessagesErrors];
+
+export type ChatMessagesResponses = {
+    /**
+     * Danh sách tin nhắn
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<Message>;
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNextPage: boolean;
+            hasPrevPage: boolean;
+        };
+    };
+};
+
+export type ChatMessagesResponse = ChatMessagesResponses[keyof ChatMessagesResponses];
+
+export type ChatSendData = {
+    body?: SendMessage;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/chats/{id}/messages';
+};
+
+export type ChatSendErrors = {
+    /**
+     * Nội dung rỗng hoặc quá dài
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Không tìm thấy hội thoại, hoặc bạn không thuộc hội thoại này
+     */
+    404: ErrorResponse;
+    /**
+     * Quá nhiều request
+     */
+    429: ErrorResponse;
+};
+
+export type ChatSendError = ChatSendErrors[keyof ChatSendErrors];
+
+export type ChatSendResponses = {
+    /**
+     * Đã gửi
+     */
+    201: {
+        success: true;
+        message: string;
+        data: Message;
+    };
+};
+
+export type ChatSendResponse = ChatSendResponses[keyof ChatSendResponses];
+
+export type ChatMarkReadData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/chats/{id}/read';
+};
+
+export type ChatMarkReadErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Không tìm thấy hội thoại, hoặc bạn không thuộc hội thoại này
+     */
+    404: ErrorResponse;
+};
+
+export type ChatMarkReadError = ChatMarkReadErrors[keyof ChatMarkReadErrors];
+
+export type ChatMarkReadResponses = {
+    /**
+     * Đã cập nhật
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Conversation;
+    };
+};
+
+export type ChatMarkReadResponse = ChatMarkReadResponses[keyof ChatMarkReadResponses];
+
 export type NotificationListData = {
     body?: never;
     path?: never;
@@ -913,6 +1325,339 @@ export type NotificationMarkReadResponses = {
 };
 
 export type NotificationMarkReadResponse = NotificationMarkReadResponses[keyof NotificationMarkReadResponses];
+
+export type ModerationOverviewData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/moderation/overview';
+};
+
+export type ModerationOverviewErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền owner hoặc moderator
+     */
+    403: ErrorResponse;
+};
+
+export type ModerationOverviewError = ModerationOverviewErrors[keyof ModerationOverviewErrors];
+
+export type ModerationOverviewResponses = {
+    /**
+     * Số liệu tổng quan
+     */
+    200: {
+        success: true;
+        message: string;
+        data: ModerationOverview;
+    };
+};
+
+export type ModerationOverviewResponse = ModerationOverviewResponses[keyof ModerationOverviewResponses];
+
+export type ModerationActivityData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        limit?: number;
+    };
+    url: '/moderation/activity';
+};
+
+export type ModerationActivityErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền owner hoặc moderator
+     */
+    403: ErrorResponse;
+};
+
+export type ModerationActivityError = ModerationActivityErrors[keyof ModerationActivityErrors];
+
+export type ModerationActivityResponses = {
+    /**
+     * Dòng sự kiện
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<AuditEvent>;
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNextPage: boolean;
+            hasPrevPage: boolean;
+        };
+    };
+};
+
+export type ModerationActivityResponse = ModerationActivityResponses[keyof ModerationActivityResponses];
+
+export type ModerationListingsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: 'pending' | 'active' | 'rejected' | 'hidden';
+        page?: number;
+        limit?: number;
+    };
+    url: '/moderation/listings';
+};
+
+export type ModerationListingsErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền owner hoặc moderator
+     */
+    403: ErrorResponse;
+};
+
+export type ModerationListingsError = ModerationListingsErrors[keyof ModerationListingsErrors];
+
+export type ModerationListingsResponses = {
+    /**
+     * Danh sách tin
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<Listing>;
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNextPage: boolean;
+            hasPrevPage: boolean;
+        };
+    };
+};
+
+export type ModerationListingsResponse = ModerationListingsResponses[keyof ModerationListingsResponses];
+
+export type ModerationRemoveListingData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/moderation/listings/{id}';
+};
+
+export type ModerationRemoveListingErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền owner hoặc moderator
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy tin
+     */
+    404: ErrorResponse;
+};
+
+export type ModerationRemoveListingError = ModerationRemoveListingErrors[keyof ModerationRemoveListingErrors];
+
+export type ModerationRemoveListingResponses = {
+    /**
+     * Đã gỡ
+     */
+    200: {
+        success: true;
+        message: string;
+        data: unknown;
+    };
+};
+
+export type ModerationRemoveListingResponse = ModerationRemoveListingResponses[keyof ModerationRemoveListingResponses];
+
+export type ModerationSetListingStatusData = {
+    body?: SetListingStatus;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/moderation/listings/{id}';
+};
+
+export type ModerationSetListingStatusErrors = {
+    /**
+     * Từ chối mà thiếu lý do
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền owner hoặc moderator
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy tin
+     */
+    404: ErrorResponse;
+};
+
+export type ModerationSetListingStatusError = ModerationSetListingStatusErrors[keyof ModerationSetListingStatusErrors];
+
+export type ModerationSetListingStatusResponses = {
+    /**
+     * Đã cập nhật
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Listing;
+    };
+};
+
+export type ModerationSetListingStatusResponse = ModerationSetListingStatusResponses[keyof ModerationSetListingStatusResponses];
+
+export type ReportListData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: 'open' | 'resolved' | 'dismissed';
+        page?: number;
+        limit?: number;
+    };
+    url: '/reports';
+};
+
+export type ReportListErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền owner hoặc moderator
+     */
+    403: ErrorResponse;
+};
+
+export type ReportListError = ReportListErrors[keyof ReportListErrors];
+
+export type ReportListResponses = {
+    /**
+     * Danh sách báo cáo
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<Report>;
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNextPage: boolean;
+            hasPrevPage: boolean;
+        };
+    };
+};
+
+export type ReportListResponse = ReportListResponses[keyof ReportListResponses];
+
+export type ReportCreateData = {
+    body?: CreateReport;
+    path?: never;
+    query?: never;
+    url: '/reports';
+};
+
+export type ReportCreateErrors = {
+    /**
+     * Nội dung quá ngắn, hoặc tự báo cáo chính mình
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Không tìm thấy đối tượng bị báo cáo
+     */
+    404: ErrorResponse;
+    /**
+     * Bạn đã báo cáo đối tượng này rồi
+     */
+    409: ErrorResponse;
+};
+
+export type ReportCreateError = ReportCreateErrors[keyof ReportCreateErrors];
+
+export type ReportCreateResponses = {
+    /**
+     * Đã gửi báo cáo
+     */
+    201: {
+        success: true;
+        message: string;
+        data: Report;
+    };
+};
+
+export type ReportCreateResponse = ReportCreateResponses[keyof ReportCreateResponses];
+
+export type ReportResolveData = {
+    body?: ResolveReport;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/reports/{id}';
+};
+
+export type ReportResolveErrors = {
+    /**
+     * Báo cáo này đã được xử lý rồi
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền owner hoặc moderator
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy báo cáo
+     */
+    404: ErrorResponse;
+};
+
+export type ReportResolveError = ReportResolveErrors[keyof ReportResolveErrors];
+
+export type ReportResolveResponses = {
+    /**
+     * Đã xử lý
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Report;
+    };
+};
+
+export type ReportResolveResponse = ReportResolveResponses[keyof ReportResolveResponses];
 
 export type PlatformAdminLoginData = {
     body?: PlatformAdminLogin;
@@ -1057,3 +1802,79 @@ export type PlatformAdminSetOrganizationStatusResponses = {
 };
 
 export type PlatformAdminSetOrganizationStatusResponse = PlatformAdminSetOrganizationStatusResponses[keyof PlatformAdminSetOrganizationStatusResponses];
+
+export type PlatformAdminCreateCategoryData = {
+    body?: CreateCategory;
+    path?: never;
+    query?: never;
+    url: '/platform-admin/categories';
+};
+
+export type PlatformAdminCreateCategoryErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền super_admin
+     */
+    403: ErrorResponse;
+    /**
+     * Slug danh mục đã tồn tại
+     */
+    409: ErrorResponse;
+};
+
+export type PlatformAdminCreateCategoryError = PlatformAdminCreateCategoryErrors[keyof PlatformAdminCreateCategoryErrors];
+
+export type PlatformAdminCreateCategoryResponses = {
+    /**
+     * Đã tạo danh mục
+     */
+    201: {
+        success: true;
+        message: string;
+        data: Category;
+    };
+};
+
+export type PlatformAdminCreateCategoryResponse = PlatformAdminCreateCategoryResponses[keyof PlatformAdminCreateCategoryResponses];
+
+export type PlatformAdminUpdateCategoryData = {
+    body?: UpdateCategory;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/platform-admin/categories/{id}';
+};
+
+export type PlatformAdminUpdateCategoryErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền super_admin
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy danh mục
+     */
+    404: ErrorResponse;
+};
+
+export type PlatformAdminUpdateCategoryError = PlatformAdminUpdateCategoryErrors[keyof PlatformAdminUpdateCategoryErrors];
+
+export type PlatformAdminUpdateCategoryResponses = {
+    /**
+     * Đã cập nhật
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Category;
+    };
+};
+
+export type PlatformAdminUpdateCategoryResponse = PlatformAdminUpdateCategoryResponses[keyof PlatformAdminUpdateCategoryResponses];

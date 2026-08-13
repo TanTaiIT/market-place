@@ -15,6 +15,39 @@ import { C, F, shadow } from '@/theme';
 
 /* ------------------------------- chips ------------------------------- */
 
+const CHIP_TILTS = [-1.5, 1.2, -0.8, 1.6, -1.1];
+
+/** Băng dính nghiêng ở hàng lọc danh mục của bảng tin */
+export function TapeChip({
+  label,
+  active,
+  index = 0,
+  onPress,
+}: {
+  label: string;
+  active?: boolean;
+  index?: number;
+  onPress: () => void;
+}) {
+  const tilt = active ? 0 : CHIP_TILTS[index % CHIP_TILTS.length];
+  const alt = !active && index % 2 === 1;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.chip,
+        alt && { backgroundColor: C.chipIdle },
+        active && { backgroundColor: C.pin },
+        { transform: [{ rotate: `${tilt}deg` }, { scale: pressed ? 0.94 : active ? 1.05 : 1 }] },
+      ]}
+    >
+      <Text style={[styles.chipText, alt && { color: C.inkSoft }, active && { color: '#fff' }]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 /** Nhãn băng dính vuông dùng ở màn Đăng tin */
 export function CatTape({
   label,
@@ -244,6 +277,16 @@ export function Avatar({
 }
 
 const styles = StyleSheet.create({
+  chip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: C.tape,
+    borderRadius: 3,
+    marginRight: 8,
+    ...shadow,
+  },
+  chipText: { fontFamily: F.uiBold, fontSize: 12.5, color: C.tapeInk },
+
   catTape: {
     paddingHorizontal: 14,
     paddingVertical: 7,

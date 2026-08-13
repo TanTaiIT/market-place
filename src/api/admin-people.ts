@@ -1,4 +1,8 @@
-import { countListings, SCHOOLS } from './admin';
+/**
+ * Danh sách trường của fixture. Ở bản đã nối BE, quản trị chỉ thấy trường của chính mình
+ * (BE scope theo organization trong JWT) — hằng số này chỉ còn nghĩa với màn chưa nối.
+ */
+export const SCHOOLS = ['Hùng Vương', 'Cao Thắng'];
 
 /**
  * Nhóm "Cộng đồng" của bàn quản trị: người dùng và trường. Tách khỏi `admin.ts` vì đó là
@@ -104,11 +108,9 @@ export const adminPeopleApi = {
 
   async getSchools(): Promise<School[]> {
     await delay(160);
-    return SCHOOLS.map((name) => ({
-      name,
-      ...SCHOOL_INFO[name],
-      listings: countListings((l) => l.school === name),
-    }));
+    // Số tin thật nằm ở `moderationOverview` của BE; màn Trường chưa nối nên để 0 thay vì
+    // dựng lại từ fixture đã bỏ.
+    return SCHOOLS.map((name) => ({ name, ...SCHOOL_INFO[name], listings: 0 }));
   },
 
   async getSchoolLinks(): Promise<SchoolLink[]> {

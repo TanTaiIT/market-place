@@ -15,7 +15,7 @@ export default function AdminReports() {
   const { data, error, isLoading } = useAdminReports();
   const resolve = useResolveReport();
 
-  const close = (id: number, hideTarget: boolean) =>
+  const close = (id: string, hideTarget: boolean) =>
     resolve.mutate(
       { id, hideTarget },
       {
@@ -29,7 +29,7 @@ export default function AdminReports() {
     <AdminScreen title="Báo cáo" note="xử lý trong 24 giờ">
       <FlatList
         data={data ?? []}
-        keyExtractor={(r) => String(r.id)}
+        keyExtractor={(r) => r.id}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
           <View style={[styles.card, item.urgent && styles.cardUrgent]}>

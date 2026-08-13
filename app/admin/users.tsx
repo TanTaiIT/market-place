@@ -6,7 +6,7 @@ import { Avatar, EmptyState, Loading } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useAdminUsers, useToggleUserLock, useVerifyUser } from '@/queries/admin-people';
 import type { UserStatus } from '@/api/admin-people';
-import { SCHOOLS } from '@/api/admin';
+import { SCHOOLS } from '@/api/admin-people';
 import { useAdminSchool, useSetAdminSchool } from '@/stores/admin';
 import { C, F } from '@/theme';
 

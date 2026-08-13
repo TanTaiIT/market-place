@@ -10,7 +10,7 @@ import {
   useRenameCategory,
 } from '@/queries/admin-content';
 import { MAX_CATEGORIES } from '@/api/admin-content';
-import { SCHOOLS } from '@/api/admin';
+import { SCHOOLS } from '@/api/admin-people';
 import { useAdminSchool, useSetAdminSchool } from '@/stores/admin';
 import { C, F, shadow } from '@/theme';
 

@@ -8,8 +8,26 @@ import { api } from '@/api/client';
 import type { Listing, Profile } from '@/api/db';
 import { qk } from './keys';
 
-export function useListings() {
-  return useQuery({ queryKey: qk.listings(), queryFn: api.getListings });
+/**
+ * Từ điển danh mục. `staleTime` dài vì nó gần như không đổi — mỗi lần mở bảng tin lại gọi
+ * `/categories` là lãng phí, mà danh mục mới thì vài tháng mới có một cái.
+ */
+export function useCategories() {
+  return useQuery({
+    queryKey: qk.categories(),
+    queryFn: api.getCategories,
+    staleTime: 30 * 60 * 1000,
+  });
+}
+
+/** `categoryId` rỗng = tất cả. Lọc chạy ở BE nên đổi chip là một lượt gọi mới, không cắt mảng. */
+export function useListings(categoryId = '') {
+  return useQuery({
+    queryKey: categoryId ? qk.listingsByCategory(categoryId) : qk.listings(),
+    queryFn: () => api.getListings(categoryId || undefined),
+    // Đổi chip không được để cả bảng nháy trắng rồi dựng lại từ đầu.
+    placeholderData: keepPreviousData,
+  });
 }
 
 export function useListing(id: string) {

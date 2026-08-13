@@ -1,7 +1,9 @@
 export const qk = {
-  /** Cũng là prefix của `myListings()` — invalidate key này là quét cả hai. */
+  /** Cũng là prefix của `listings(cat)` + `myListings()` — invalidate key này là quét cả cụm. */
   listings: () => ['listings'] as const,
+  listingsByCategory: (categoryId: string) => ['listings', 'cat', categoryId] as const,
   myListings: () => ['listings', 'mine'] as const,
+  categories: () => ['categories'] as const,
   listing: (id: string) => ['listing', id] as const,
   search: (q: string) => ['search', q] as const,
   /** Prefix thuần: không query nào dùng trực tiếp, chỉ để invalidate cả cụm `saved`. */
@@ -9,7 +11,8 @@ export const qk = {
   savedIds: () => ['saved', 'ids'] as const,
   savedListings: () => ['saved', 'listings'] as const,
   conversations: () => ['conversations'] as const,
-  conversation: (id: number) => ['conversation', id] as const,
+  conversation: (id: string) => ['conversation', id] as const,
+  messages: (conversationId: string) => ['conversation', conversationId, 'messages'] as const,
   notifications: () => ['notifications'] as const,
   profile: () => ['profile'] as const,
 
@@ -18,8 +21,9 @@ export const qk = {
    * nên `adminRoot()` là prefix để quét cả cụm sau mỗi mutation thay vì liệt kê từng key.
    */
   adminRoot: () => ['admin'] as const,
-  adminOverview: (school: string) => ['admin', 'overview', school] as const,
-  adminListings: (school: string, status: string) => ['admin', 'listings', school, status] as const,
+  adminOverview: () => ['admin', 'overview'] as const,
+  adminActivity: () => ['admin', 'activity'] as const,
+  adminListings: (status: string) => ['admin', 'listings', status] as const,
   adminReports: () => ['admin', 'reports'] as const,
   adminUsers: (school: string) => ['admin', 'users', school] as const,
   adminSchools: () => ['admin', 'schools'] as const,

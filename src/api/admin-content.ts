@@ -1,4 +1,5 @@
-import { countListings, MOD_CATEGORIES } from './admin';
+/** Bốn danh mục khởi điểm của fixture — trùng với seed bên BE. */
+const MOD_CATEGORIES = ['Sách vở', 'Xe đạp', 'Điện tử', 'Đồ dùng'];
 
 /**
  * Nhóm "Nội dung" + "Khác" của bàn quản trị: danh mục, thông báo đẩy, và luật của bảng tin.
@@ -94,12 +95,11 @@ const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
 // ── API ─────────────────────────────────────────────────────────────
 
 export const adminContentApi = {
-  async getCategories(school: string): Promise<Category[]> {
+  async getCategories(_school: string): Promise<Category[]> {
     await delay(150);
-    return categories.map((c) => ({
-      ...c,
-      count: countListings((l) => l.cat === c.name && (school === 'all' || l.school === school)),
-    }));
+    // Đếm tin theo danh mục thuộc về `OrganizationCategory` (bước 5 trong admin-console.md).
+    // Chưa có thì trả 0 chứ không dựng số từ fixture đã bỏ — thà trống còn hơn sai.
+    return categories.map((c) => ({ ...c, count: 0 }));
   },
 
   async addCategory(name: string, scope: string): Promise<Category> {
@@ -122,20 +122,14 @@ export const adminContentApi = {
     if (!clean) throw new Error('Nhập tên mới trước đã');
     const target = categories.find((c) => c.name === from);
     if (!target) throw new Error('Danh mục này không còn nữa');
-    // Không đổi `cat` của tin đang có: tin thuộc về danh mục theo tên, đổi tên mà không dời tin
-    // thì chúng rơi ra khỏi mọi bộ lọc. Chặn ở đây thay vì sửa nửa vời hai chỗ.
-    if (countListings((l) => l.cat === from) > 0) {
-      throw new Error(`Còn tin trong "${from}", chuyển tin đi trước khi đổi tên`);
-    }
+    // Chốt chặn "còn tin trong danh mục này" cần đếm tin theo danh mục — thuộc về
+    // `OrganizationCategory` (bước 5). Ở fixture này không kiểm được nên không giả vờ kiểm.
     target.name = clean;
     return { name: clean, scope: target.scope, count: 0 };
   },
 
   async removeCategory(name: string): Promise<{ name: string }> {
     await delay(200);
-    if (countListings((l) => l.cat === name) > 0) {
-      throw new Error(`Còn tin trong "${name}", chuyển tin đi trước`);
-    }
     categories = categories.filter((c) => c.name !== name);
     return { name };
   },

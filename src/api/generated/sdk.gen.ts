@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AuthLoginData, AuthLoginErrors, AuthLoginResponses, AuthRefreshData, AuthRefreshErrors, AuthRefreshResponses, AuthRegisterData, AuthRegisterErrors, AuthRegisterResponses, ChainBroadcastData, ChainBroadcastErrors, ChainBroadcastResponses, ChainOrganizationsData, ChainOrganizationsErrors, ChainOrganizationsResponses, ChainStatsData, ChainStatsErrors, ChainStatsResponses, ListingCreateData, ListingCreateErrors, ListingCreateResponses, ListingGetByIdData, ListingGetByIdErrors, ListingGetByIdResponses, ListingListData, ListingListErrors, ListingListResponses, ListingNearbyData, ListingNearbyErrors, ListingNearbyResponses, ListingRemoveData, ListingRemoveErrors, ListingRemoveResponses, ListingUpdateData, ListingUpdateErrors, ListingUpdateResponses, NotificationCreateData, NotificationCreateErrors, NotificationCreateResponses, NotificationListData, NotificationListErrors, NotificationListResponses, NotificationMarkReadData, NotificationMarkReadErrors, NotificationMarkReadResponses, PlatformAdminAssignChainData, PlatformAdminAssignChainErrors, PlatformAdminAssignChainResponses, PlatformAdminCreateChainData, PlatformAdminCreateChainErrors, PlatformAdminCreateChainResponses, PlatformAdminLoginData, PlatformAdminLoginErrors, PlatformAdminLoginResponses, PlatformAdminSetOrganizationStatusData, PlatformAdminSetOrganizationStatusErrors, PlatformAdminSetOrganizationStatusResponses, UserDeleteMeData, UserDeleteMeErrors, UserDeleteMeResponses, UserGetByIdData, UserGetByIdErrors, UserGetByIdResponses, UserGetMeData, UserGetMeErrors, UserGetMeResponses, UserUpdateMeData, UserUpdateMeErrors, UserUpdateMeResponses } from './types.gen';
+import type { AuthLoginData, AuthLoginErrors, AuthLoginResponses, AuthRefreshData, AuthRefreshErrors, AuthRefreshResponses, AuthRegisterData, AuthRegisterErrors, AuthRegisterResponses, CategoryGetByIdData, CategoryGetByIdErrors, CategoryGetByIdResponses, CategoryListData, CategoryListErrors, CategoryListResponses, ChainBroadcastData, ChainBroadcastErrors, ChainBroadcastResponses, ChainOrganizationsData, ChainOrganizationsErrors, ChainOrganizationsResponses, ChainStatsData, ChainStatsErrors, ChainStatsResponses, ChatGetByIdData, ChatGetByIdErrors, ChatGetByIdResponses, ChatListData, ChatListErrors, ChatListResponses, ChatMarkReadData, ChatMarkReadErrors, ChatMarkReadResponses, ChatMessagesData, ChatMessagesErrors, ChatMessagesResponses, ChatOpenData, ChatOpenErrors, ChatOpenResponses, ChatSendData, ChatSendErrors, ChatSendResponses, ListingCreateData, ListingCreateErrors, ListingCreateResponses, ListingGetByIdData, ListingGetByIdErrors, ListingGetByIdResponses, ListingListData, ListingListErrors, ListingListResponses, ListingNearbyData, ListingNearbyErrors, ListingNearbyResponses, ListingRemoveData, ListingRemoveErrors, ListingRemoveResponses, ListingUpdateData, ListingUpdateErrors, ListingUpdateResponses, ModerationActivityData, ModerationActivityErrors, ModerationActivityResponses, ModerationListingsData, ModerationListingsErrors, ModerationListingsResponses, ModerationOverviewData, ModerationOverviewErrors, ModerationOverviewResponses, ModerationRemoveListingData, ModerationRemoveListingErrors, ModerationRemoveListingResponses, ModerationSetListingStatusData, ModerationSetListingStatusErrors, ModerationSetListingStatusResponses, NotificationCreateData, NotificationCreateErrors, NotificationCreateResponses, NotificationListData, NotificationListErrors, NotificationListResponses, NotificationMarkReadData, NotificationMarkReadErrors, NotificationMarkReadResponses, PlatformAdminAssignChainData, PlatformAdminAssignChainErrors, PlatformAdminAssignChainResponses, PlatformAdminCreateCategoryData, PlatformAdminCreateCategoryErrors, PlatformAdminCreateCategoryResponses, PlatformAdminCreateChainData, PlatformAdminCreateChainErrors, PlatformAdminCreateChainResponses, PlatformAdminLoginData, PlatformAdminLoginErrors, PlatformAdminLoginResponses, PlatformAdminSetOrganizationStatusData, PlatformAdminSetOrganizationStatusErrors, PlatformAdminSetOrganizationStatusResponses, PlatformAdminUpdateCategoryData, PlatformAdminUpdateCategoryErrors, PlatformAdminUpdateCategoryResponses, ReportCreateData, ReportCreateErrors, ReportCreateResponses, ReportListData, ReportListErrors, ReportListResponses, ReportResolveData, ReportResolveErrors, ReportResolveResponses, UserDeleteMeData, UserDeleteMeErrors, UserDeleteMeResponses, UserGetByIdData, UserGetByIdErrors, UserGetByIdResponses, UserGetMeData, UserGetMeErrors, UserGetMeResponses, UserUpdateMeData, UserUpdateMeErrors, UserUpdateMeResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -176,6 +176,84 @@ export const chainBroadcast = <ThrowOnError extends boolean = false>(options: Op
 });
 
 /**
+ * Danh sách danh mục
+ *
+ * Từ điển dùng chung toàn hệ thống, không thuộc organization nào. Mặc định chỉ trả danh mục đang bật — dùng `includeInactive=true` khi cần thấy cả danh mục đã ngừng sử dụng.
+ */
+export const categoryList = <ThrowOnError extends boolean = false>(options?: Options<CategoryListData, ThrowOnError>) => (options?.client ?? client).get<CategoryListResponses, CategoryListErrors, ThrowOnError>({ url: '/categories', ...options });
+
+/**
+ * Chi tiết một danh mục
+ */
+export const categoryGetById = <ThrowOnError extends boolean = false>(options: Options<CategoryGetByIdData, ThrowOnError>) => (options.client ?? client).get<CategoryGetByIdResponses, CategoryGetByIdErrors, ThrowOnError>({ url: '/categories/{id}', ...options });
+
+/**
+ * Danh sách hội thoại của tôi, mới nhất trước
+ */
+export const chatList = <ThrowOnError extends boolean = false>(options?: Options<ChatListData, ThrowOnError>) => (options?.client ?? client).get<ChatListResponses, ChatListErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/chats',
+    ...options
+});
+
+/**
+ * Mở hội thoại với người bán của một tin (trả lại hội thoại cũ nếu đã có)
+ *
+ * Chỉ nhắn được trong cùng organization. Tin của trường khác trong hệ thống vẫn xem được nhưng chưa mở chat xuyên trường.
+ */
+export const chatOpen = <ThrowOnError extends boolean = false>(options?: Options<ChatOpenData, ThrowOnError>) => (options?.client ?? client).post<ChatOpenResponses, ChatOpenErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/chats',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+/**
+ * Chi tiết một hội thoại
+ */
+export const chatGetById = <ThrowOnError extends boolean = false>(options: Options<ChatGetByIdData, ThrowOnError>) => (options.client ?? client).get<ChatGetByIdResponses, ChatGetByIdErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/chats/{id}',
+    ...options
+});
+
+/**
+ * Lịch sử tin nhắn, mới nhất trước
+ */
+export const chatMessages = <ThrowOnError extends boolean = false>(options: Options<ChatMessagesData, ThrowOnError>) => (options.client ?? client).get<ChatMessagesResponses, ChatMessagesErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/chats/{id}/messages',
+    ...options
+});
+
+/**
+ * Gửi tin nhắn
+ *
+ * Đường ghi duy nhất. Socket.IO chỉ phát lại tin đã lưu tới phòng `org:<organizationId>:conversation:<id>`, client không ghi qua socket.
+ */
+export const chatSend = <ThrowOnError extends boolean = false>(options: Options<ChatSendData, ThrowOnError>) => (options.client ?? client).post<ChatSendResponses, ChatSendErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/chats/{id}/messages',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Đánh dấu đã đọc tới thời điểm hiện tại
+ */
+export const chatMarkRead = <ThrowOnError extends boolean = false>(options: Options<ChatMarkReadData, ThrowOnError>) => (options.client ?? client).patch<ChatMarkReadResponses, ChatMarkReadErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/chats/{id}/read',
+    ...options
+});
+
+/**
  * Thông báo của organization hiện tại (gồm cả bản fan-out từ chain)
  */
 export const notificationList = <ThrowOnError extends boolean = false>(options?: Options<NotificationListData, ThrowOnError>) => (options?.client ?? client).get<NotificationListResponses, NotificationListErrors, ThrowOnError>({
@@ -204,6 +282,98 @@ export const notificationMarkRead = <ThrowOnError extends boolean = false>(optio
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/notifications/{id}/read',
     ...options
+});
+
+/**
+ * Thẻ số + biểu đồ 14 ngày + phân bố danh mục cho màn tổng quan
+ */
+export const moderationOverview = <ThrowOnError extends boolean = false>(options?: Options<ModerationOverviewData, ThrowOnError>) => (options?.client ?? client).get<ModerationOverviewResponses, ModerationOverviewErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/moderation/overview',
+    ...options
+});
+
+/**
+ * Dòng "Vừa diễn ra" — vết kiểm toán thao tác quản trị
+ *
+ * Realtime đi kèm: sự kiện mới phát qua Socket.IO event `admin:activity`.
+ */
+export const moderationActivity = <ThrowOnError extends boolean = false>(options?: Options<ModerationActivityData, ThrowOnError>) => (options?.client ?? client).get<ModerationActivityResponses, ModerationActivityErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/moderation/activity',
+    ...options
+});
+
+/**
+ * Tin theo trạng thái, gồm cả pending/rejected/hidden
+ */
+export const moderationListings = <ThrowOnError extends boolean = false>(options?: Options<ModerationListingsData, ThrowOnError>) => (options?.client ?? client).get<ModerationListingsResponses, ModerationListingsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/moderation/listings',
+    ...options
+});
+
+/**
+ * Gỡ tin khỏi bảng (soft delete)
+ */
+export const moderationRemoveListing = <ThrowOnError extends boolean = false>(options: Options<ModerationRemoveListingData, ThrowOnError>) => (options.client ?? client).delete<ModerationRemoveListingResponses, ModerationRemoveListingErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/moderation/listings/{id}',
+    ...options
+});
+
+/**
+ * Ghim / từ chối / ẩn một tin
+ *
+ * Từ chối bắt buộc kèm `reason` — người đăng sẽ đọc lý do đó.
+ */
+export const moderationSetListingStatus = <ThrowOnError extends boolean = false>(options: Options<ModerationSetListingStatusData, ThrowOnError>) => (options.client ?? client).patch<ModerationSetListingStatusResponses, ModerationSetListingStatusErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/moderation/listings/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Hàng đợi báo cáo (quản trị)
+ *
+ * `count` là số người cùng báo cáo một đối tượng, tính lúc đọc.
+ */
+export const reportList = <ThrowOnError extends boolean = false>(options?: Options<ReportListData, ThrowOnError>) => (options?.client ?? client).get<ReportListResponses, ReportListErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/reports',
+    ...options
+});
+
+/**
+ * Báo cáo một tin đăng hoặc một người dùng
+ */
+export const reportCreate = <ThrowOnError extends boolean = false>(options?: Options<ReportCreateData, ThrowOnError>) => (options?.client ?? client).post<ReportCreateResponses, ReportCreateErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/reports',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+/**
+ * Đóng báo cáo — gỡ tin bị nhắm tới, hoặc bỏ qua
+ *
+ * Đóng luôn mọi báo cáo còn mở về cùng đối tượng: một tin bị ba người báo cáo thì xử một lần là xong cả ba.
+ */
+export const reportResolve = <ThrowOnError extends boolean = false>(options: Options<ReportResolveData, ThrowOnError>) => (options.client ?? client).patch<ReportResolveResponses, ReportResolveErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/reports/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**
@@ -250,6 +420,34 @@ export const platformAdminAssignChain = <ThrowOnError extends boolean = false>(o
 export const platformAdminSetOrganizationStatus = <ThrowOnError extends boolean = false>(options: Options<PlatformAdminSetOrganizationStatusData, ThrowOnError>) => (options.client ?? client).patch<PlatformAdminSetOrganizationStatusResponses, PlatformAdminSetOrganizationStatusErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/platform-admin/organizations/{organizationId}/status',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Tạo danh mục dùng chung toàn hệ thống
+ */
+export const platformAdminCreateCategory = <ThrowOnError extends boolean = false>(options?: Options<PlatformAdminCreateCategoryData, ThrowOnError>) => (options?.client ?? client).post<PlatformAdminCreateCategoryResponses, PlatformAdminCreateCategoryErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/platform-admin/categories',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+/**
+ * Đổi tên/icon/thứ tự, hoặc bật-tắt một danh mục
+ *
+ * Không có endpoint xoá: gỡ danh mục khỏi lưu thông bằng `isActive: false`, vì tin đã đăng vẫn tham chiếu tới nó.
+ */
+export const platformAdminUpdateCategory = <ThrowOnError extends boolean = false>(options: Options<PlatformAdminUpdateCategoryData, ThrowOnError>) => (options.client ?? client).patch<PlatformAdminUpdateCategoryResponses, PlatformAdminUpdateCategoryErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/platform-admin/categories/{id}',
     ...options,
     headers: {
         'Content-Type': 'application/json',

@@ -52,7 +52,7 @@ export function AdminListingSheet({
             <Text style={styles.desc}>{item.desc}</Text>
 
             <View style={styles.dl}>
-              <Row label="Người đăng" value={`${item.seller} · ${item.school}`} />
+              <Row label="Người đăng" value={item.seller} />
               <Row label="Danh mục" value={item.cat} />
               <Row label="Đăng lúc" value={`${item.at} trước`} />
               <Row label="Lượt xem" value={String(item.views)} mono />

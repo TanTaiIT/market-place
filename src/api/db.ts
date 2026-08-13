@@ -27,20 +27,21 @@ export type Listing = {
   mine: boolean;
 };
 
+/** `from` suy từ `senderId` so với người đang đăng nhập — UI chỉ cần biết bên nào. */
 export type Message = { id: string; from: 'me' | 'them'; text: string; time: string };
 
 export type Conversation = {
-  /** Chat còn là fixture in-memory (BE `/chats` trả 501) nên id vẫn là số tự tăng. */
-  id: number;
+  /** ObjectId 24 hex của BE, không phải số. */
+  id: string;
   listingId: string;
-  /** Snapshot lúc mở hội thoại — tránh phải fetch lại bảng tin chỉ để hiện dòng "Về: …". */
+  /** Snapshot BE chốt lúc mở hội thoại — tin bị gỡ thì vẫn còn tiêu đề để hiện. */
   listingTitle: string;
+  /** Người còn lại trong hội thoại. */
   name: string;
   avatar: string;
   lastMsg: string;
   time: string;
   unread: boolean;
-  messages: Message[];
 };
 
 export type Notif = {
@@ -79,15 +80,21 @@ export type Profile = {
   rating: string;
 };
 
-export const POST_CATEGORIES = ['Sách vở', 'Xe đạp', 'Điện tử', 'Đồ dùng'];
+/**
+ * Danh mục lấy từ BE (`GET /categories`) chứ không còn là hằng số trong app: nó là từ điển
+ * dùng chung toàn hệ thống, và `Listing.category` bên BE là ObjectId nên app phải giữ `id`
+ * mới lọc và đăng tin được.
+ */
+export type Category = {
+  id: string;
+  name: string;
+  icon: string;
+};
 
 /** State local — mất khi tắt app, đúng bản chất "chưa có BE" chứ không phải cache. */
 export const db = {
   /** ObjectId của tin đã lưu. Chưa có endpoint favorite nên không đồng bộ giữa hai thiết bị. */
   savedIds: [] as string[],
-
-  /** Rỗng lúc mở app: hội thoại chỉ sinh ra khi người dùng bấm "Nhắn tin" ở một tin thật. */
-  conversations: [] as Conversation[],
 };
 
 export const CHAT_COLORS = ['#3F6B4A', '#D9A566', '#8C6539', '#6B7F8C', '#B98851'];

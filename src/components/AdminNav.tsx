@@ -2,9 +2,8 @@ import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAdminReports, useModerationQueue } from '@/queries/admin';
+import { useAdminListings, useAdminReports } from '@/queries/admin';
 import { useProfile } from '@/queries/listings';
-import { useAdminSchool } from '@/stores/admin';
 import { Avatar } from './ui';
 import { C, F, shadow } from '@/theme';
 
@@ -49,8 +48,7 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
 export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const pathname = usePathname();
-  const school = useAdminSchool();
-  const { data: queue } = useModerationQueue(school);
+  const { data: queue } = useAdminListings('pending');
   const { data: reports } = useAdminReports();
   const { data: profile } = useProfile();
 

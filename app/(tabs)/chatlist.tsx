@@ -17,7 +17,7 @@ export default function ChatList() {
       <TabHeader title="Tin nhắn" />
       <FlatList
         data={data ?? []}
-        keyExtractor={(c) => String(c.id)}
+        keyExtractor={(c) => c.id}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, gap: 10 }}
         renderItem={({ item, index }) => (
           <Animated.View entering={FadeInDown.delay(index * 70).duration(340)}>
@@ -25,7 +25,7 @@ export default function ChatList() {
               onPress={() => router.push(`/chat/${item.id}`)}
               style={({ pressed }) => [styles.row, pressed && { transform: [{ scale: 0.98 }] }]}
             >
-              <Avatar text={item.avatar} size={46} color={chatColor(index)} />
+              <Avatar text={item.avatar} size={46} color={chatColor(item.name)} />
               <View style={{ flex: 1 }}>
                 <View style={styles.top}>
                   <Text style={[styles.name, item.unread && { color: C.pin }]}>{item.name}</Text>

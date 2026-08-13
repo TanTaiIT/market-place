@@ -23,14 +23,11 @@ export function AdminKpis({ data }: { data: AdminKpi[] }) {
           <View style={[styles.accent, { backgroundColor: ACCENT[kpi.key] }]} />
           <Text style={styles.label}>{kpi.label}</Text>
           <Text style={styles.value}>{group(kpi.value)}</Text>
+          {/* Không có mũi tên tăng/giảm: BE chưa lưu ảnh chụp theo ngày nên không tính được
+              chênh lệch so với hôm qua. Thà bỏ trống còn hơn hiện `+4` bịa như prototype. */}
           <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.delta, { color: kpi.direction === 'up' ? C.okText : C.badText }]}>
-                {kpi.delta}
-              </Text>
-              <Text style={styles.note}>{kpi.note}</Text>
-            </View>
-            <Sparkline points={kpi.trend} color={ACCENT[kpi.key]} />
+            <View style={{ flex: 1 }} />
+            {kpi.trend.length > 1 && <Sparkline points={kpi.trend} color={ACCENT[kpi.key]} />}
           </View>
         </View>
       ))}

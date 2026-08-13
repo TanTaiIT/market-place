@@ -22,8 +22,7 @@ import { Corkboard } from '@/components/Corkboard';
 import { PhotoPicker } from '@/components/PhotoPicker';
 import { CatTape, Field, ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
-import { POST_CATEGORIES } from '@/api/db';
-import { useCreateListing } from '@/queries/listings';
+import { useCategories, useCreateListing } from '@/queries/listings';
 import { useListingPhotos } from '@/queries/upload';
 import { C, F, shadow } from '@/theme';
 
@@ -34,10 +33,13 @@ export default function Post() {
   const { photos, addPhotos, removePhoto, retryPhoto, photoUrls, uploadingCount, hasFailed } =
     useListingPhotos();
 
+  const { data: categories } = useCategories();
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
   const [desc, setDesc] = useState('');
-  const [cat, setCat] = useState(POST_CATEGORIES[0]);
+  // Giữ id chứ không giữ tên: BE nhận `categoryId` là ObjectId. Rỗng cho tới khi danh mục
+  // tải xong hoặc người dùng chọn.
+  const [categoryId, setCategoryId] = useState('');
 
   /* @keyframes pinPress — nút lún xuống rồi bật nhẹ lên */
   const press = useSharedValue(0);
@@ -58,9 +60,13 @@ export default function Post() {
       toast('⚠️ Có ảnh tải lỗi — chạm vào ảnh đó để thử lại');
       return;
     }
+    if (!categoryId) {
+      toast('⚠️ Chọn danh mục cho tin trước đã');
+      return;
+    }
 
     create.mutate(
-      { title, price, desc, cat, photoUrls },
+      { title, price, desc, categoryId, photoUrls },
       {
         onSuccess: () => {
           toast('✓ Đã ghim tin lên bảng thành công!');
@@ -124,8 +130,13 @@ export default function Post() {
 
             <Text style={[styles.label, { marginTop: 18 }]}>Danh mục</Text>
             <View style={styles.catRow}>
-              {POST_CATEGORIES.map((c) => (
-                <CatTape key={c} label={c} active={cat === c} onPress={() => setCat(c)} />
+              {(categories ?? []).map((c) => (
+                <CatTape
+                  key={c.id}
+                  label={c.icon ? `${c.icon} ${c.name}` : c.name}
+                  active={categoryId === c.id}
+                  onPress={() => setCategoryId(c.id)}
+                />
               ))}
             </View>
 

@@ -59,7 +59,9 @@ export function connectSocket(token: string): Socket {
     // realtime chết im lặng cho tới khi người dùng kill app. Backoff mặc định đã chặn trên ở
     // 5s/lần nên không sợ spam. Token hỏng thì server từ chối handshake, và `withAuthRetry`
     // bên HTTP mới là chỗ phát hiện phiên chết — không phải vòng lặp reconnect này.
-    transports: ['websocket'],
+    // websocket trước, polling dự phòng. Chỉ khai mỗi websocket thì gặp proxy không upgrade
+    // được là hỏng hẳn thay vì chậm hơn một chút — đã kiểm cả hai đều thông tới bản deploy.
+    transports: ['websocket', 'polling'],
   });
 
   // `connect` bắn cả ở lần nối đầu tiên lẫn mọi lần nối lại, nên đây là chỗ DUY NHẤT cần biết

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   FlatList,
   Image,
+  Pressable,
   StyleSheet,
   View,
   useWindowDimensions,
@@ -9,10 +10,12 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { ListingPhoto } from './ListingPhoto';
+import { PhotoViewer } from './PhotoViewer';
 import { C, type Grad } from '@/theme';
 
 /**
  * Hero của màn chi tiết: vuốt ngang qua các ảnh đã upload, kèm chấm chỉ vị trí.
+ * Chạm vào ảnh thì mở `PhotoViewer` xem toàn màn — hero chỉ cao 260px, không đủ để soi món hàng.
  * Tin chưa có ảnh thật thì uỷ lại cho `ListingPhoto` dựng gradient.
  */
 export function ListingGallery({
@@ -28,6 +31,8 @@ export function ListingGallery({
 }) {
   const { width } = useWindowDimensions();
   const [index, setIndex] = useState(0);
+  /** Ảnh đang mở toàn màn; `null` là đang đóng. Không dùng cờ boolean vì còn cần biết mở từ ảnh nào. */
+  const [viewing, setViewing] = useState<number | null>(null);
   const urls = photoUrls ?? [];
 
   if (urls.length === 0) {
@@ -51,8 +56,17 @@ export function ListingGallery({
         onMomentumScrollEnd={(e) =>
           setIndex(Math.round(e.nativeEvent.contentOffset.x / width))
         }
-        renderItem={({ item }) => (
-          <Image source={{ uri: item }} style={{ width, height: '100%' }} resizeMode="cover" />
+        renderItem={({ item, index: i }) => (
+          <Pressable
+            onPress={() => setViewing(i)}
+            accessibilityRole="imagebutton"
+            accessibilityLabel={`Xem ảnh ${i + 1} toàn màn hình`}
+            // Kích thước phải đặt ở ĐÂY: `height: '100%'` của ảnh tính theo cha, mà Pressable
+            // để cao tự động thì cha không có chiều cao và ảnh xẹp còn 0.
+            style={{ width, height: '100%' }}
+          >
+            <Image source={{ uri: item }} style={styles.photo} resizeMode="cover" />
+          </Pressable>
         )}
       />
 
@@ -65,11 +79,16 @@ export function ListingGallery({
       )}
 
       {children}
+
+      {viewing !== null && (
+        <PhotoViewer urls={urls} index={viewing} onClose={() => setViewing(null)} />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  photo: { width: '100%', height: '100%' },
   dots: {
     position: 'absolute',
     bottom: 14,

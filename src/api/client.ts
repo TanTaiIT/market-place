@@ -9,8 +9,10 @@ import {
   chatMessages,
   chatOpen,
   chatSend,
+  listingCreate,
   listingGetById,
   listingList,
+  listingMine,
   listingRemove,
   userGetMe,
   userUpdateMe,
@@ -316,33 +318,51 @@ export const api = {
     return unwrap(res, 'Không tìm được tin nào').map((l) => toListing(l, names));
   },
 
+  /**
+   * Dùng `/listings/mine` chứ KHÔNG phải `/listings?seller=<id>`: cái sau lọc cứng về `active`
+   * nên tin vừa ghim (luôn ở `pending`) sẽ không xuất hiện, và người đăng tưởng là đăng hụt.
+   */
   async getMyListings(): Promise<Listing[]> {
-    const seller = getCurrentUserId();
-    if (!seller) throw new Error('Phiên đăng nhập đã hết, đăng nhập lại nhé');
     const [res, names] = await Promise.all([
-      withAuthRetry(() => listingList({ query: { seller, limit: 50 } })),
+      withAuthRetry(() => listingMine({ query: { limit: 50 } })),
       categoryNames(),
     ]);
     return unwrap(res, 'Không tải được tin của bạn').map((l) => toListing(l, names));
   },
 
   /**
-   * Vẫn chưa gọi được BE, nhưng chỉ còn **một** thứ thiếu: `POST /listings` bắt buộc
-   * `location.coordinates` mà app chưa xin quyền vị trí bao giờ. `categoryId` thì đã có thật
-   * từ `GET /categories` rồi.
+   * Tin mới vào BE ở trạng thái `pending` chờ duyệt, nên nó KHÔNG hiện ngay ngoài feed —
+   * `/listings` chỉ trả tin `active`. Người đăng thấy nó ở "Tin của tôi".
    *
-   * Mở lại khi app thu thập được toạ độ (expo-location) — lúc đó bỏ hàm này và gọi thẳng
-   * `listingCreate` của SDK.
+   * Không gửi `location`: app chưa có bản đồ, và BE đã bỏ bắt buộc toạ độ đúng vì lý do đó.
+   * Ngày nào app lấy được toạ độ thì thêm `location: { coordinates: [lng, lat] }` vào đây —
+   * thứ tự là kinh độ TRƯỚC (quy ước GeoJSON), đảo lại là ghi sai chỗ mà không ai báo lỗi.
    */
-  async createListing(_input: {
+  async createListing(input: {
     title: string;
     price: string;
     desc: string;
     categoryId: string;
     photoUrls?: string[];
   }): Promise<Listing> {
-    await delay(150);
-    throw new Error('Đăng tin cần vị trí của bạn, tính năng này chưa mở');
+    // Ô giá là `number-pad` nhưng vẫn lọt dấu phân cách người dùng tự gõ; BE nhận `number`.
+    const price = Number(input.price.replace(/\D/g, ''));
+
+    const [res, names] = await Promise.all([
+      withAuthRetry(() =>
+        listingCreate({
+          body: {
+            title: input.title.trim(),
+            description: input.desc.trim(),
+            price,
+            categoryId: input.categoryId,
+            images: input.photoUrls ?? [],
+          },
+        }),
+      ),
+      categoryNames(),
+    ]);
+    return toListing(unwrap(res, 'Không ghim được tin lên bảng'), names);
   },
 
   async deleteListing(id: string) {

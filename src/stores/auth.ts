@@ -62,3 +62,5 @@ export const useAuthStore = create<AuthState>()(
 export const useIsAuthenticated = () => useAuthStore((s) => s.session !== null);
 export const useAuthHydrated = () => useAuthStore((s) => s.hydrated);
 export const useSignIn = () => useAuthStore((s) => s.signIn);
+/** Mã trường của phiên — splash in lên mẩu băng dính, chưa đăng nhập thì `undefined`. */
+export const useOrgSlug = () => useAuthStore((s) => s.session?.orgSlug);

@@ -88,7 +88,7 @@ export type CreateListing = {
     condition?: 'new' | 'like_new' | 'used';
     categoryId: string;
     images: Array<string>;
-    location: {
+    location?: {
         /**
          * [longitude, latitude]
          */
@@ -150,7 +150,7 @@ export type Listing = {
      * Snapshot liên hệ công khai lúc tạo tin
      */
     posterContact: string;
-    location: {
+    location?: {
         /**
          * [longitude, latitude]
          */
@@ -662,6 +662,53 @@ export type ListingCreateResponses = {
 };
 
 export type ListingCreateResponse = ListingCreateResponses[keyof ListingCreateResponses];
+
+export type ListingMineData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        limit?: number;
+        q?: string;
+        category?: string;
+        seller?: string;
+        province?: string;
+        condition?: 'new' | 'like_new' | 'used';
+        minPrice?: number | null;
+        maxPrice?: number | null;
+    };
+    url: '/listings/mine';
+};
+
+export type ListingMineErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+};
+
+export type ListingMineError = ListingMineErrors[keyof ListingMineErrors];
+
+export type ListingMineResponses = {
+    /**
+     * Danh sách tin của bạn
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<Listing>;
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNextPage: boolean;
+            hasPrevPage: boolean;
+        };
+    };
+};
+
+export type ListingMineResponse = ListingMineResponses[keyof ListingMineResponses];
 
 export type ListingNearbyData = {
     body?: never;

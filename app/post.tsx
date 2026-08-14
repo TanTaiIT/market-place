@@ -26,6 +26,13 @@ import { useCategories, useCreateListing } from '@/queries/listings';
 import { useListingPhotos } from '@/queries/upload';
 import { C, F, shadow } from '@/theme';
 
+/*
+ * Khớp `createListingSchema` của BE. Chặn ở đây để người dùng biết ngay lúc bấm, thay vì gõ
+ * xong cả form rồi mới ăn 400 từ server.
+ */
+const MIN_TITLE = 5;
+const MIN_DESC = 10;
+
 export default function Post() {
   const router = useRouter();
   const toast = useToast();
@@ -60,6 +67,23 @@ export default function Post() {
       toast('⚠️ Có ảnh tải lỗi — chạm vào ảnh đó để thử lại');
       return;
     }
+    // Theo thứ tự người dùng đọc form, để toast trỏ đúng ô họ vừa bỏ qua.
+    if (photoUrls.length === 0) {
+      toast('⚠️ Tin cần ít nhất 1 ảnh');
+      return;
+    }
+    if (title.trim().length < MIN_TITLE) {
+      toast(`⚠️ Tên món đồ cần ít nhất ${MIN_TITLE} ký tự`);
+      return;
+    }
+    if (!price.trim()) {
+      toast('⚠️ Nhập giá bán — cho tặng thì ghi 0');
+      return;
+    }
+    if (desc.trim().length < MIN_DESC) {
+      toast(`⚠️ Mô tả cần ít nhất ${MIN_DESC} ký tự`);
+      return;
+    }
     if (!categoryId) {
       toast('⚠️ Chọn danh mục cho tin trước đã');
       return;
@@ -69,8 +93,10 @@ export default function Post() {
       { title, price, desc, categoryId, photoUrls },
       {
         onSuccess: () => {
-          toast('✓ Đã ghim tin lên bảng thành công!');
-          router.replace('/(tabs)/feed');
+          // Tin vào BE ở trạng thái `pending`, feed chỉ hiện tin `active` — về feed là không
+          // thấy tin đâu và tưởng đăng hụt. Đưa thẳng sang "Tin đã đăng", nơi có tin chờ duyệt.
+          toast('📌 Đã ghim tin — chờ duyệt rồi sẽ lên bảng');
+          router.replace('/mylistings');
         },
         onError: (e: Error) => toast(`⚠️ ${e.message}`),
       },

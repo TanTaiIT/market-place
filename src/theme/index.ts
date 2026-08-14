@@ -28,6 +28,8 @@ export const C = {
   scrim: 'rgba(24,36,18,0.32)',
   /** Lớp phủ báo lỗi trên ảnh — `pinDark` pha alpha */
   scrimError: 'rgba(185,46,29,0.72)',
+  /** Nền màn xem ảnh phóng to. Đậm hơn hẳn `scrim` vì lúc này ảnh là nội dung, không phải nền */
+  scrimPhoto: 'rgba(9,13,7,0.97)',
 
   /*
    * Bàn quản trị dùng nền tối — không phải đổi theme, mà là phân vai: màn người dùng là tờ

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -18,10 +18,11 @@ import {
   JetBrainsMono_400Regular,
   JetBrainsMono_600SemiBold,
 } from '@expo-google-fonts/jetbrains-mono';
+import { BootSplash } from '@/components/BootSplash';
 import { ToastProvider } from '@/components/Toast';
 import { useSyncAccessToken, useValidateSession } from '@/queries/auth';
 import { useChatSocket } from '@/queries/chat';
-import { useAuthHydrated, useIsAuthenticated } from '@/stores/auth';
+import { useAuthHydrated, useIsAuthenticated, useOrgSlug } from '@/stores/auth';
 import { C } from '@/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -50,6 +51,7 @@ export default function RootLayout() {
 
   const isAuthenticated = useIsAuthenticated();
   const authHydrated = useAuthHydrated();
+  const orgSlug = useOrgSlug();
   // Đẩy token của phiên xuống tầng HTTP trước khi bất kỳ màn con nào mount và gọi query.
   // Truyền thẳng `queryClient` vì ở đây còn ở NGOÀI `<QueryClientProvider>` bên dưới.
   useSyncAccessToken(queryClient);
@@ -58,49 +60,66 @@ export default function RootLayout() {
   useValidateSession(queryClient);
   // Mở kết nối realtime theo phiên. Effect nên nó chạy sau khi token đã được đẩy xuống ở trên.
   useChatSocket();
-  // Font lỗi vẫn cho chạy tiếp, chỉ rơi về font hệ thống. Nhưng phiên đăng nhập thì phải
-  // đọc xong mới render: guard chạy sớm sẽ nháy qua màn login rồi mới nhảy vào feed.
-  const ready = (loaded || error) && authHydrated;
+
+  const [splashDone, setSplashDone] = useState(false);
+  const finishSplash = useCallback(() => setSplashDone(true), []);
+
+  // Font lỗi vẫn cho chạy tiếp, chỉ rơi về font hệ thống. Nhưng phải đợi tới mốc này mới
+  // nhường chỗ cho `BootSplash`: chữ ký "Ghim" của nó vẽ bằng Kalam.
+  const fontsReady = loaded || error !== null;
+  // Phiên đăng nhập phải đọc xong mới dựng Stack — guard chạy sớm sẽ nháy qua màn login rồi
+  // mới nhảy vào feed. Đọc đĩa chạy song song với animation splash, không cộng dồn thời gian.
+  const ready = fontsReady && authHydrated;
 
   useEffect(() => {
-    if (ready) SplashScreen.hideAsync().catch(() => {});
-  }, [ready]);
+    if (fontsReady) SplashScreen.hideAsync().catch(() => {});
+  }, [fontsReady]);
 
-  if (!ready) return <View style={styles.boot} />;
+  if (!fontsReady) return <View style={styles.boot} />;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
           <ToastProvider>
-            <StatusBar style="dark" />
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: C.paper },
-                animation: 'slide_from_right',
-              }}
-            >
-              <Stack.Protected guard={!isAuthenticated}>
-                <Stack.Screen name="login" options={{ animation: 'fade' }} />
-                <Stack.Screen name="register" options={{ animation: 'fade' }} />
-              </Stack.Protected>
+            {/* Splash là mặt bàn tối, app là giấy sáng — thanh trạng thái phải đổi theo. */}
+            <StatusBar style={splashDone ? 'dark' : 'light'} />
 
-              {/* Mọi route cần đăng nhập phải khai ở đây, kể cả route không cần option
-                  riêng — screen không nằm trong khối này vẫn mở được bằng deep link. */}
-              <Stack.Protected guard={isAuthenticated}>
-                <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
-                <Stack.Screen name="post" options={{ animation: 'slide_from_bottom' }} />
-                <Stack.Screen name="search" />
-                <Stack.Screen name="mylistings" />
-                <Stack.Screen name="saved" />
-                <Stack.Screen name="settings" />
-                <Stack.Screen name="listing/[id]" />
-                <Stack.Screen name="chat/[id]" />
-                {/* Khai cả cụm `admin` một lần: `app/admin/_layout.tsx` giữ Stack riêng bên trong */}
-                <Stack.Screen name="admin" />
-              </Stack.Protected>
-            </Stack>
+            {ready && (
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: C.paper },
+                  animation: 'slide_from_right',
+                }}
+              >
+                <Stack.Protected guard={!isAuthenticated}>
+                  <Stack.Screen name="login" options={{ animation: 'fade' }} />
+                  <Stack.Screen name="register" options={{ animation: 'fade' }} />
+                </Stack.Protected>
+
+                {/* Mọi route cần đăng nhập phải khai ở đây, kể cả route không cần option
+                    riêng — screen không nằm trong khối này vẫn mở được bằng deep link. */}
+                <Stack.Protected guard={isAuthenticated}>
+                  <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+                  <Stack.Screen name="post" options={{ animation: 'slide_from_bottom' }} />
+                  <Stack.Screen name="search" />
+                  <Stack.Screen name="mylistings" />
+                  <Stack.Screen name="saved" />
+                  <Stack.Screen name="settings" />
+                  <Stack.Screen name="listing/[id]" />
+                  <Stack.Screen name="chat/[id]" />
+                  {/* Khai cả cụm `admin` một lần: `app/admin/_layout.tsx` giữ Stack riêng bên trong */}
+                  <Stack.Screen name="admin" />
+                </Stack.Protected>
+              </Stack>
+            )}
+
+            {/* Nằm SAU Stack nên phủ lên trên: lúc splash nở ra là thấy luôn app đã dựng sẵn
+                phía dưới, không phải chờ mount thêm một nhịp nữa. */}
+            {!splashDone && (
+              <BootSplash ready={ready} boardLabel={orgSlug} onFinish={finishSplash} />
+            )}
           </ToastProvider>
         </SafeAreaProvider>
       </QueryClientProvider>
@@ -109,5 +128,7 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  boot: { flex: 1, backgroundColor: C.cork },
+  // Cùng nền với `splash.backgroundColor` trong app.json và với `BootSplash` — ba lớp nối
+  // tiếp nhau lúc khởi động, lệch màu một lớp là thấy nháy.
+  boot: { flex: 1, backgroundColor: C.desk },
 });

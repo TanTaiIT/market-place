@@ -4,6 +4,8 @@ import { useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ListingPhoto } from '@/components/ListingPhoto';
+import type { ProvinceName } from '@/components/LocationPicker';
+import { ProvinceField } from '@/components/LocationPicker';
 import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
 import { useSearch } from '@/queries/listings';
 import { C, F, shadow } from '@/theme';
@@ -12,6 +14,8 @@ export default function Search() {
   const router = useRouter();
   const [text, setText] = useState('');
   const [debounced, setDebounced] = useState('');
+  // null = toàn quốc. Không debounce vì đổi tỉnh là một thao tác dứt khoát, không phải gõ phím.
+  const [province, setProvince] = useState<ProvinceName | null>(null);
 
   // Chờ 300ms rồi mới gọi query — tránh gọi API mỗi lần gõ phím
   useEffect(() => {
@@ -19,8 +23,8 @@ export default function Search() {
     return () => clearTimeout(t);
   }, [text]);
 
-  const { data, error, isFetching } = useSearch(debounced);
-  const idle = debounced.trim().length === 0;
+  const { data, error, isFetching } = useSearch(debounced, province);
+  const idle = debounced.trim().length === 0 && !province;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -37,6 +41,10 @@ export default function Search() {
           style={styles.input}
           returnKeyType="search"
         />
+      </View>
+
+      <View style={styles.filterRow}>
+        <ProvinceField label="Khu vực" value={province} onChange={setProvince} allowAll />
       </View>
 
       <FlatList
@@ -74,7 +82,7 @@ export default function Search() {
           ) : (
             <EmptyState
               icon="🔍"
-              text={idle ? 'Nhập từ khoá để tìm tin' : 'Không tìm thấy tin phù hợp'}
+              text={idle ? 'Nhập từ khoá hoặc chọn khu vực' : 'Không tìm thấy tin phù hợp'}
             />
           )
         }
@@ -97,8 +105,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     marginHorizontal: 18,
     marginTop: 10,
-    marginBottom: 18,
+    marginBottom: 14,
   },
+  filterRow: { paddingHorizontal: 18 },
   input: { flex: 1, fontFamily: F.ui, fontSize: 14, color: C.ink, paddingVertical: 9 },
   row: {
     flexDirection: 'row',

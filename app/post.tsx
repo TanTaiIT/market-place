@@ -20,6 +20,7 @@ import Animated, {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Corkboard } from '@/components/Corkboard';
 import { PhotoPicker } from '@/components/PhotoPicker';
+import { EMPTY_LOCATION, LocationFields, validateLocation, type ListingLocation } from '@/components/LocationFields';
 import { CatTape, Field, ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useCategories, useCreateListing } from '@/queries/listings';
@@ -47,6 +48,8 @@ export default function Post() {
   // Giữ id chứ không giữ tên: BE nhận `categoryId` là ObjectId. Rỗng cho tới khi danh mục
   // tải xong hoặc người dùng chọn.
   const [categoryId, setCategoryId] = useState('');
+  // Tên tỉnh/xã, không phải mã — BE lưu và lọc bằng chính chuỗi này.
+  const [location, setLocation] = useState<ListingLocation>(EMPTY_LOCATION);
 
   /* @keyframes pinPress — nút lún xuống rồi bật nhẹ lên */
   const press = useSharedValue(0);
@@ -88,9 +91,14 @@ export default function Post() {
       toast('⚠️ Chọn danh mục cho tin trước đã');
       return;
     }
+    const locationError = validateLocation(location);
+    if (locationError) {
+      toast(locationError);
+      return;
+    }
 
     create.mutate(
-      { title, price, desc, categoryId, photoUrls },
+      { title, price, desc, categoryId, photoUrls, ...location },
       {
         onSuccess: () => {
           // Tin vào BE ở trạng thái `pending`, feed chỉ hiện tin `active` — về feed là không
@@ -165,6 +173,8 @@ export default function Post() {
                 />
               ))}
             </View>
+
+            <LocationFields value={location} onChange={setLocation} />
 
             <Animated.View style={[{ marginTop: 18 }, pressStyle]}>
               <View style={styles.submitShadow} />

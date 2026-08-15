@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import type { Listing, Profile } from '@/api/db';
+import type { ProvinceName } from '@/api/location';
 import { qk } from './keys';
 
 /**
@@ -39,11 +40,13 @@ export function useListing(id: string) {
   });
 }
 
-export function useSearch(q: string) {
+/** Lọc theo tỉnh chạy ở BE. Chỉ chọn tỉnh mà không gõ từ khoá cũng là một tìm kiếm hợp lệ. */
+export function useSearch(q: string, province: ProvinceName | null = null) {
+  const term = q.trim();
   return useQuery({
-    queryKey: qk.search(q.trim()),
-    queryFn: () => api.searchListings(q),
-    enabled: q.trim().length > 0,
+    queryKey: qk.search(term, province),
+    queryFn: () => api.searchListings(term, province),
+    enabled: term.length > 0 || !!province,
     placeholderData: keepPreviousData,
   });
 }

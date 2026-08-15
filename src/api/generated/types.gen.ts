@@ -89,16 +89,9 @@ export type CreateListing = {
     categoryId: string;
     images: Array<string>;
     location?: {
-        /**
-         * [longitude, latitude]
-         */
-        coordinates: [
-            number | number,
-            number | number
-        ];
         address?: string;
-        province?: string;
-        district?: string;
+        province?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
+        ward?: string;
     };
     attributes?: {
         [key: string]: string;
@@ -114,16 +107,9 @@ export type UpdateListing = {
     categoryId?: string;
     images?: Array<string>;
     location?: {
-        /**
-         * [longitude, latitude]
-         */
-        coordinates: [
-            number | number,
-            number | number
-        ];
         address?: string;
-        province?: string;
-        district?: string;
+        province?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
+        ward?: string;
     };
     attributes?: {
         [key: string]: string;
@@ -151,17 +137,9 @@ export type Listing = {
      */
     posterContact: string;
     location?: {
-        /**
-         * [longitude, latitude]
-         */
-        coordinates: [
-            number | number,
-            number | number
-        ];
         address?: string;
-        province?: string;
-        district?: string;
-        type: 'Point';
+        province?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
+        ward?: string;
     };
     status: 'draft' | 'pending' | 'active' | 'sold' | 'expired' | 'rejected' | 'hidden';
     viewCount: number;
@@ -329,6 +307,30 @@ export type Report = {
     status: 'open' | 'resolved' | 'dismissed';
     count: number;
     createdAt: string;
+};
+
+export type Province = {
+    /**
+     * Giá trị lưu vào location.province
+     */
+    name: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
+    /**
+     * Tên đầy đủ theo văn bản hành chính
+     */
+    fullName: string;
+    /**
+     * Tỉnh cũ đã nhập vào đơn vị này từ 01/07/2025 — hợp lệ để hiển thị
+     */
+    formerNames: Array<string>;
+    /**
+     * Gọi tắt / tên thành phố quen thuộc — chỉ dùng để dò tìm
+     */
+    aliases: Array<string>;
+};
+
+export type WardList = {
+    province: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
+    wards: Array<string>;
 };
 
 export type PlatformAdminLogin = {
@@ -588,7 +590,7 @@ export type ListingListData = {
         q?: string;
         category?: string;
         seller?: string;
-        province?: string;
+        province?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
         condition?: 'new' | 'like_new' | 'used';
         minPrice?: number | null;
         maxPrice?: number | null;
@@ -672,7 +674,7 @@ export type ListingMineData = {
         q?: string;
         category?: string;
         seller?: string;
-        province?: string;
+        province?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
         condition?: 'new' | 'like_new' | 'used';
         minPrice?: number | null;
         maxPrice?: number | null;
@@ -713,10 +715,10 @@ export type ListingMineResponse = ListingMineResponses[keyof ListingMineResponse
 export type ListingNearbyData = {
     body?: never;
     path?: never;
-    query?: {
-        lng?: number | null;
-        lat?: number | null;
-        maxDistance?: number;
+    query: {
+        province: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
+        ward?: string;
+        exclude?: string;
         page?: number;
         limit?: number;
     };
@@ -1707,6 +1709,57 @@ export type ReportResolveResponses = {
 };
 
 export type ReportResolveResponse = ReportResolveResponses[keyof ReportResolveResponses];
+
+export type LocationProvincesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/locations/provinces';
+};
+
+export type LocationProvincesResponses = {
+    /**
+     * Danh sách tỉnh/thành
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<Province>;
+    };
+};
+
+export type LocationProvincesResponse = LocationProvincesResponses[keyof LocationProvincesResponses];
+
+export type LocationWardsData = {
+    body?: never;
+    path?: never;
+    query: {
+        province: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
+    };
+    url: '/locations/wards';
+};
+
+export type LocationWardsErrors = {
+    /**
+     * Tên tỉnh không nằm trong danh sách 34 đơn vị
+     */
+    400: ErrorResponse;
+};
+
+export type LocationWardsError = LocationWardsErrors[keyof LocationWardsErrors];
+
+export type LocationWardsResponses = {
+    /**
+     * Danh sách phường/xã
+     */
+    200: {
+        success: true;
+        message: string;
+        data: WardList;
+    };
+};
+
+export type LocationWardsResponse = LocationWardsResponses[keyof LocationWardsResponses];
 
 export type PlatformAdminLoginData = {
     body?: PlatformAdminLogin;

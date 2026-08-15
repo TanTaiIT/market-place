@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AuthLoginData, AuthLoginErrors, AuthLoginResponses, AuthRefreshData, AuthRefreshErrors, AuthRefreshResponses, AuthRegisterData, AuthRegisterErrors, AuthRegisterResponses, CategoryGetByIdData, CategoryGetByIdErrors, CategoryGetByIdResponses, CategoryListData, CategoryListErrors, CategoryListResponses, ChainBroadcastData, ChainBroadcastErrors, ChainBroadcastResponses, ChainOrganizationsData, ChainOrganizationsErrors, ChainOrganizationsResponses, ChainStatsData, ChainStatsErrors, ChainStatsResponses, ChatGetByIdData, ChatGetByIdErrors, ChatGetByIdResponses, ChatListData, ChatListErrors, ChatListResponses, ChatMarkReadData, ChatMarkReadErrors, ChatMarkReadResponses, ChatMessagesData, ChatMessagesErrors, ChatMessagesResponses, ChatOpenData, ChatOpenErrors, ChatOpenResponses, ChatSendData, ChatSendErrors, ChatSendResponses, ListingCreateData, ListingCreateErrors, ListingCreateResponses, ListingGetByIdData, ListingGetByIdErrors, ListingGetByIdResponses, ListingListData, ListingListErrors, ListingListResponses, ListingMineData, ListingMineErrors, ListingMineResponses, ListingNearbyData, ListingNearbyErrors, ListingNearbyResponses, ListingRemoveData, ListingRemoveErrors, ListingRemoveResponses, ListingUpdateData, ListingUpdateErrors, ListingUpdateResponses, ModerationActivityData, ModerationActivityErrors, ModerationActivityResponses, ModerationListingsData, ModerationListingsErrors, ModerationListingsResponses, ModerationOverviewData, ModerationOverviewErrors, ModerationOverviewResponses, ModerationRemoveListingData, ModerationRemoveListingErrors, ModerationRemoveListingResponses, ModerationSetListingStatusData, ModerationSetListingStatusErrors, ModerationSetListingStatusResponses, NotificationCreateData, NotificationCreateErrors, NotificationCreateResponses, NotificationListData, NotificationListErrors, NotificationListResponses, NotificationMarkReadData, NotificationMarkReadErrors, NotificationMarkReadResponses, PlatformAdminAssignChainData, PlatformAdminAssignChainErrors, PlatformAdminAssignChainResponses, PlatformAdminCreateCategoryData, PlatformAdminCreateCategoryErrors, PlatformAdminCreateCategoryResponses, PlatformAdminCreateChainData, PlatformAdminCreateChainErrors, PlatformAdminCreateChainResponses, PlatformAdminLoginData, PlatformAdminLoginErrors, PlatformAdminLoginResponses, PlatformAdminSetOrganizationStatusData, PlatformAdminSetOrganizationStatusErrors, PlatformAdminSetOrganizationStatusResponses, PlatformAdminUpdateCategoryData, PlatformAdminUpdateCategoryErrors, PlatformAdminUpdateCategoryResponses, ReportCreateData, ReportCreateErrors, ReportCreateResponses, ReportListData, ReportListErrors, ReportListResponses, ReportResolveData, ReportResolveErrors, ReportResolveResponses, UserDeleteMeData, UserDeleteMeErrors, UserDeleteMeResponses, UserGetByIdData, UserGetByIdErrors, UserGetByIdResponses, UserGetMeData, UserGetMeErrors, UserGetMeResponses, UserUpdateMeData, UserUpdateMeErrors, UserUpdateMeResponses } from './types.gen';
+import type { AuthLoginData, AuthLoginErrors, AuthLoginResponses, AuthRefreshData, AuthRefreshErrors, AuthRefreshResponses, AuthRegisterData, AuthRegisterErrors, AuthRegisterResponses, CategoryGetByIdData, CategoryGetByIdErrors, CategoryGetByIdResponses, CategoryListData, CategoryListErrors, CategoryListResponses, ChainBroadcastData, ChainBroadcastErrors, ChainBroadcastResponses, ChainOrganizationsData, ChainOrganizationsErrors, ChainOrganizationsResponses, ChainStatsData, ChainStatsErrors, ChainStatsResponses, ChatGetByIdData, ChatGetByIdErrors, ChatGetByIdResponses, ChatListData, ChatListErrors, ChatListResponses, ChatMarkReadData, ChatMarkReadErrors, ChatMarkReadResponses, ChatMessagesData, ChatMessagesErrors, ChatMessagesResponses, ChatOpenData, ChatOpenErrors, ChatOpenResponses, ChatSendData, ChatSendErrors, ChatSendResponses, ListingCreateData, ListingCreateErrors, ListingCreateResponses, ListingGetByIdData, ListingGetByIdErrors, ListingGetByIdResponses, ListingListData, ListingListErrors, ListingListResponses, ListingMineData, ListingMineErrors, ListingMineResponses, ListingNearbyData, ListingNearbyErrors, ListingNearbyResponses, ListingRemoveData, ListingRemoveErrors, ListingRemoveResponses, ListingUpdateData, ListingUpdateErrors, ListingUpdateResponses, LocationProvincesData, LocationProvincesResponses, LocationWardsData, LocationWardsErrors, LocationWardsResponses, ModerationActivityData, ModerationActivityErrors, ModerationActivityResponses, ModerationListingsData, ModerationListingsErrors, ModerationListingsResponses, ModerationOverviewData, ModerationOverviewErrors, ModerationOverviewResponses, ModerationRemoveListingData, ModerationRemoveListingErrors, ModerationRemoveListingResponses, ModerationSetListingStatusData, ModerationSetListingStatusErrors, ModerationSetListingStatusResponses, NotificationCreateData, NotificationCreateErrors, NotificationCreateResponses, NotificationListData, NotificationListErrors, NotificationListResponses, NotificationMarkReadData, NotificationMarkReadErrors, NotificationMarkReadResponses, PlatformAdminAssignChainData, PlatformAdminAssignChainErrors, PlatformAdminAssignChainResponses, PlatformAdminCreateCategoryData, PlatformAdminCreateCategoryErrors, PlatformAdminCreateCategoryResponses, PlatformAdminCreateChainData, PlatformAdminCreateChainErrors, PlatformAdminCreateChainResponses, PlatformAdminLoginData, PlatformAdminLoginErrors, PlatformAdminLoginResponses, PlatformAdminSetOrganizationStatusData, PlatformAdminSetOrganizationStatusErrors, PlatformAdminSetOrganizationStatusResponses, PlatformAdminUpdateCategoryData, PlatformAdminUpdateCategoryErrors, PlatformAdminUpdateCategoryResponses, ReportCreateData, ReportCreateErrors, ReportCreateResponses, ReportListData, ReportListErrors, ReportListResponses, ReportResolveData, ReportResolveErrors, ReportResolveResponses, UserDeleteMeData, UserDeleteMeErrors, UserDeleteMeResponses, UserGetByIdData, UserGetByIdErrors, UserGetByIdResponses, UserGetMeData, UserGetMeErrors, UserGetMeResponses, UserUpdateMeData, UserUpdateMeErrors, UserUpdateMeResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -122,9 +122,11 @@ export const listingMine = <ThrowOnError extends boolean = false>(options?: Opti
 });
 
 /**
- * Tin gần một toạ độ (sắp xếp theo khoảng cách)
+ * Tin cùng khu vực (xã trước, rồi tới tỉnh)
+ *
+ * Không dùng toạ độ: "gần" ở đây là cùng địa giới hành chính. Lọc trong `province`, tin cùng `ward` được xếp lên trước — không lọc cứng theo xã vì xã thưa tin sẽ ra màn rỗng. Truyền `exclude` là id tin đang xem để nó không tự hiện trong danh sách của chính mình.
  */
-export const listingNearby = <ThrowOnError extends boolean = false>(options?: Options<ListingNearbyData, ThrowOnError>) => (options?.client ?? client).get<ListingNearbyResponses, ListingNearbyErrors, ThrowOnError>({ url: '/listings/nearby', ...options });
+export const listingNearby = <ThrowOnError extends boolean = false>(options: Options<ListingNearbyData, ThrowOnError>) => (options.client ?? client).get<ListingNearbyResponses, ListingNearbyErrors, ThrowOnError>({ url: '/listings/nearby', ...options });
 
 /**
  * Xoá tin của chính mình (soft delete)
@@ -386,6 +388,20 @@ export const reportResolve = <ThrowOnError extends boolean = false>(options: Opt
         ...options.headers
     }
 });
+
+/**
+ * 34 tỉnh/thành sau sáp nhập 01/07/2025
+ *
+ * Danh sách đóng dùng cho ô chọn khu vực. `name` chính là giá trị hợp lệ của `location.province` khi đăng tin và của `?province=` khi lọc — client không được tự chế biến thể có tiền tố "TP." hay "Tỉnh".
+ */
+export const locationProvinces = <ThrowOnError extends boolean = false>(options?: Options<LocationProvincesData, ThrowOnError>) => (options?.client ?? client).get<LocationProvincesResponses, unknown, ThrowOnError>({ url: '/locations/provinces', ...options });
+
+/**
+ * Phường/xã của một tỉnh
+ *
+ * Mô hình 2 cấp: không còn quận/huyện ở giữa. Trả kèm `province` để client cache theo tỉnh mà không phải tự ghép lại khoá.
+ */
+export const locationWards = <ThrowOnError extends boolean = false>(options: Options<LocationWardsData, ThrowOnError>) => (options.client ?? client).get<LocationWardsResponses, LocationWardsErrors, ThrowOnError>({ url: '/locations/wards', ...options });
 
 /**
  * Đăng nhập bên bán phần mềm (JWT type riêng, không thuộc organization nào)

@@ -14,6 +14,8 @@ import {
   listingList,
   listingMine,
   listingRemove,
+  locationProvinces,
+  locationWards,
   userGetMe,
   userUpdateMe,
 } from './generated';
@@ -24,6 +26,7 @@ import type {
   MeProfile,
   Message as MessageDto,
 } from './generated';
+import type { Province, ProvinceName } from './location';
 import { CHAT_COLORS, db, NEW_PHOTOS } from './db';
 import type { AuthSession, Category, Conversation, Listing, Message, Notif, Profile } from './db';
 import { getCurrentUserId, withAuthRetry } from './http';
@@ -312,11 +315,23 @@ export const api = {
     return toListing(unwrap(res, 'Không tìm thấy tin này'), names);
   },
 
-  async searchListings(q: string): Promise<Listing[]> {
+  /**
+   * `province` phải là đúng chuỗi trong danh sách của `/locations/provinces` — BE so khớp chính
+   * xác, gửi "TP. Hồ Chí Minh" thay vì "Hồ Chí Minh" giờ là 400 chứ không còn im lặng trả rỗng.
+   */
+  async searchListings(q: string, province?: ProvinceName | null): Promise<Listing[]> {
     const term = q.trim();
-    if (!term) return [];
+    if (!term && !province) return [];
     const [res, names] = await Promise.all([
-      withAuthRetry(() => listingList({ query: { q: term, limit: 50 } })),
+      withAuthRetry(() =>
+        listingList({
+          query: {
+            limit: 50,
+            ...(term ? { q: term } : {}),
+            ...(province ? { province } : {}),
+          },
+        }),
+      ),
       categoryNames(),
     ]);
     return unwrap(res, 'Không tìm được tin nào').map((l) => toListing(l, names));
@@ -338,9 +353,11 @@ export const api = {
    * Tin mới vào BE ở trạng thái `pending` chờ duyệt, nên nó KHÔNG hiện ngay ngoài feed —
    * `/listings` chỉ trả tin `active`. Người đăng thấy nó ở "Tin của tôi".
    *
-   * Không gửi `location`: app chưa có bản đồ, và BE đã bỏ bắt buộc toạ độ đúng vì lý do đó.
-   * Ngày nào app lấy được toạ độ thì thêm `location: { coordinates: [lng, lat] }` vào đây —
-   * thứ tự là kinh độ TRƯỚC (quy ước GeoJSON), đảo lại là ghi sai chỗ mà không ai báo lỗi.
+   * `location` chỉ gửi khi người đăng đã chọn khu vực, và KHÔNG có toạ độ — BE đã bỏ hẳn geo,
+   * gửi kèm `coordinates` giờ là 400. "Tin gần đây" chạy theo xã/tỉnh chứ không theo bán kính.
+   *
+   * `address` là số nhà / tên đường tự gõ, nằm dưới xã trong mô hình 2 cấp — không phải cấp
+   * quận/huyện đã bỏ từ 01/07/2025.
    */
   async createListing(input: {
     title: string;
@@ -348,9 +365,21 @@ export const api = {
     desc: string;
     categoryId: string;
     photoUrls?: string[];
+    address?: string | null;
+    province?: ProvinceName | null;
+    ward?: string | null;
   }): Promise<Listing> {
     // Ô giá là `number-pad` nhưng vẫn lọt dấu phân cách người dùng tự gõ; BE nhận `number`.
     const price = Number(input.price.replace(/\D/g, ''));
+
+    // Gom từng mảnh có thật rồi mới quyết định gửi hay không: gắn `address` vào nhánh
+    // `if (province)` cũ sẽ nuốt mất địa chỉ của người chỉ gõ đường mà chưa chọn tỉnh.
+    const address = input.address?.trim();
+    const location = {
+      ...(address ? { address } : {}),
+      ...(input.province ? { province: input.province } : {}),
+      ...(input.ward ? { ward: input.ward } : {}),
+    };
 
     const [res, names] = await Promise.all([
       withAuthRetry(() =>
@@ -361,12 +390,36 @@ export const api = {
             price,
             categoryId: input.categoryId,
             images: input.photoUrls ?? [],
+            // `location: {}` rỗng qua được `.strict()` của BE nhưng tạo ra bản ghi không lọc
+            // được theo gì — thà vắng hẳn field.
+            ...(Object.keys(location).length ? { location } : {}),
           },
         }),
       ),
       categoryNames(),
     ]);
     return toListing(unwrap(res, 'Không ghim được tin lên bảng'), names);
+  },
+
+  /* ---------------- địa giới hành chính ---------------- */
+
+  /**
+   * `withAuthRetry` như mọi call khác, dù BE khai hai route này là công khai: `createClientConfig`
+   * gắn Bearer cho MỌI request, nên token hết hạn vẫn làm chúng 401 — mà `post.tsx` bắt buộc chọn
+   * tỉnh/xã, nên picker rỗng là người dùng kẹt hẳn, phải khởi động lại app.
+   *
+   * Không sợ lỗi mạng thường bị kéo vào vòng refresh: `withAuthRetry` trả thẳng kết quả khi chưa
+   * có phiên, còn `isDeadSession` đọc `response?.status` — lỗi transport không có status nên
+   * không bao giờ khớp.
+   */
+  async getProvinces(): Promise<Province[]> {
+    const res = await withAuthRetry(() => locationProvinces());
+    return unwrap(res, 'Không tải được danh sách tỉnh/thành');
+  },
+
+  async getWards(province: ProvinceName): Promise<string[]> {
+    const res = await withAuthRetry(() => locationWards({ query: { province } }));
+    return unwrap(res, 'Không tải được danh sách phường/xã').wards;
   },
 
   async deleteListing(id: string) {

@@ -13,17 +13,7 @@ export type ErrorResponse = {
     }>;
 };
 
-export type Organization = {
-    id: string;
-    name: string;
-    slug: string;
-    chainId: string | null;
-    status: string;
-};
-
 export type RegisterInput = {
-    organizationName: string;
-    organizationSlug?: string;
     name: string;
     email: string;
     phone?: string;
@@ -31,7 +21,6 @@ export type RegisterInput = {
 };
 
 export type LoginInput = {
-    orgSlug?: string;
     email: string;
     password: string;
 };
@@ -43,12 +32,10 @@ export type RefreshInput = {
 export type AuthResponse = {
     user: {
         id: string;
-        organizationId: string;
         name: string;
         email: string;
         phone?: string;
         avatar: string;
-        role: string;
         isEmailVerified: boolean;
     };
     tokens: {
@@ -75,9 +62,60 @@ export type PublicProfile = {
 export type MeProfile = PublicProfile & {
     email: string;
     phone?: string;
-    role: string;
     isEmailVerified: boolean;
     isActive: boolean;
+};
+
+export type Organization = {
+    id: string;
+    name: string;
+    slug: string;
+    orgType: 'school' | 'company' | 'community' | 'generic';
+    verificationTier: 'unverified' | 'claimed' | 'verified';
+    provinceCode: string | null;
+    status: string;
+};
+
+export type OrganizationLookup = {
+    name: string;
+    slug: string;
+    district: string | null;
+    provinceCode: string | null;
+    allowJoinRequests: boolean;
+    allowOutsiderPosts: boolean;
+};
+
+export type MyOrganization = {
+    id: string;
+    name: string;
+    slug: string;
+    provinceCode: string | null;
+    role: string;
+    unitId: string | null;
+};
+
+export type SlugAvailability = {
+    slug: string;
+    available: boolean;
+    reason?: 'invalid' | 'reserved' | 'taken';
+    suggestions?: Array<string>;
+};
+
+export type CreateOrganization = {
+    name: string;
+    slug?: string;
+    orgType?: 'school' | 'company' | 'community' | 'generic';
+    ownerEmail: string;
+    provinceCode?: string;
+    district?: string;
+};
+
+export type SetOrganizationStatus = {
+    status: 'active' | 'suspended';
+};
+
+export type ChangeOrganizationSlug = {
+    slug: string;
 };
 
 export type CreateListing = {
@@ -96,6 +134,17 @@ export type CreateListing = {
     attributes?: {
         [key: string]: string;
     };
+    visibility?: 'org_internal' | 'public';
+    provinceCode?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
+    orgSlug?: string;
+};
+
+export type QuotaStatus = {
+    allowed: boolean;
+    limit: number;
+    pending: number;
+    remaining: number;
+    reason?: 'blocked_by_rejections' | 'quota_full';
 };
 
 export type UpdateListing = {
@@ -114,11 +163,16 @@ export type UpdateListing = {
     attributes?: {
         [key: string]: string;
     };
+    visibility?: 'org_internal' | 'public';
+    provinceCode?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
+    orgSlug?: string;
 };
 
 export type Listing = {
     _id: string;
-    organizationId: string;
+    organizationId: string | null;
+    visibility: 'org_internal' | 'public';
+    provinceCode: string;
     title: string;
     slug: string;
     description: string;
@@ -141,7 +195,7 @@ export type Listing = {
         province?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
         ward?: string;
     };
-    status: 'draft' | 'pending' | 'active' | 'sold' | 'expired' | 'rejected' | 'hidden';
+    status: 'draft' | 'pending' | 'pending_unverified' | 'active' | 'sold' | 'expired' | 'rejected' | 'hidden';
     viewCount: number;
     favoriteCount: number;
     expiresAt?: string;
@@ -149,52 +203,91 @@ export type Listing = {
     updatedAt: string;
 };
 
-export type CreateChain = {
+export type CreateOrgUnit = {
     name: string;
-    slug?: string;
-    /**
-     * User được chỉ định làm chain owner
-     */
-    ownerId: string;
+    moderatorId?: string | null;
+    parentUnitId?: string | null;
 };
 
-export type Chain = {
-    _id: string;
-    name: string;
-    slug: string;
-    ownerId: string;
-    status: string;
-    createdAt: string;
+export type UpdateOrgUnit = {
+    name?: string;
+    moderatorId?: string | null;
+    parentUnitId?: string | null;
 };
 
-export type ChainStats = {
-    chainId: string;
-    totals: {
-        organizations: number;
-        listings: number;
-        users: number;
-    };
-    breakdown: Array<{
-        organization: Organization;
-        listings: number;
-        users: number;
+export type OrgUnit = {
+    id: string;
+    name: string;
+    moderatorId: string | null;
+    parentUnitId: string | null;
+};
+
+export type CreateJoinRequest = {
+    orgSlug: string;
+    claimedName: string;
+    claimedUnit?: string;
+    note?: string;
+};
+
+export type ApproveJoinRequest = {
+    unitId?: string | null;
+};
+
+export type RejectJoinRequest = {
+    reason?: string;
+};
+
+export type BulkApproveJoinRequests = {
+    items: Array<{
+        id: string;
+        unitId?: string | null;
     }>;
 };
 
-export type CreateNotification = {
-    title: string;
-    body: string;
+export type JoinRequest = {
+    id: string;
+    userId: string;
+    organizationId: string;
+    claimedName: string;
+    claimedUnit: string | null;
+    note: string | null;
+    status: 'pending' | 'approved' | 'rejected' | 'expired' | 'cancelled';
+    createdAt: string;
+    expiresAt: string;
 };
 
-export type Notification = {
-    _id: string;
+export type MyJoinRequest = {
+    id: string;
     organizationId: string;
-    sourceType: 'organization' | 'chain';
-    sourceChainId: string | null;
-    title: string;
-    body: string;
-    readBy: Array<string>;
+    claimedName: string;
+    claimedUnit: string | null;
+    status: 'pending' | 'approved' | 'rejected' | 'expired' | 'cancelled';
+    rejectReason: string | null;
     createdAt: string;
+    expiresAt: string;
+};
+
+export type CreateRoleGrant = {
+    userId: string;
+    role: 'master' | 'manager' | 'staff';
+    scopeType: 'system' | 'org' | 'org_unit' | 'category_province';
+    orgId?: string;
+    unitId?: string;
+    categoryId?: string;
+    provinceCodes?: Array<string>;
+};
+
+export type RoleGrant = {
+    id: string;
+    userId: string;
+    role: 'master' | 'manager' | 'staff';
+    scopeType: 'system' | 'org' | 'org_unit' | 'category_province';
+    orgId: string | null;
+    unitId: string | null;
+    categoryId: string | null;
+    provinceCodes: Array<string>;
+    grantedBy: string | null;
+    grantedAt: string;
 };
 
 export type CreateCategory = {
@@ -253,15 +346,50 @@ export type Message = {
     createdAt: string;
 };
 
+export type CreateNotification = {
+    title: string;
+    body: string;
+    unitId?: string | null;
+};
+
+export type Notification = {
+    id: string;
+    organizationId: string;
+    unitId: string | null;
+    title: string;
+    body: string;
+    isRead: boolean;
+    readCount: number;
+    createdAt: string;
+};
+
 export type SetListingStatus = {
     status: 'active' | 'rejected' | 'hidden';
     reason?: string;
 };
 
+export type RerouteListing = {
+    categoryId?: string;
+    provinceCode?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
+};
+
+export type CoverageMatrix = {
+    totalCells: number;
+    uncovered: number;
+    backlog: number;
+    cells: Array<{
+        categoryId: string;
+        categoryName: string;
+        provinceCode: string;
+        hasModerator: boolean;
+        pending: number;
+    }>;
+};
+
 export type AuditEvent = {
     id: string;
     actorName: string;
-    action: 'listing.approve' | 'listing.reject' | 'listing.hide' | 'listing.unhide' | 'listing.remove' | 'report.resolve' | 'report.dismiss';
+    action: 'listing.approve' | 'listing.reject' | 'listing.hide' | 'listing.unhide' | 'listing.remove' | 'report.resolve' | 'report.dismiss' | 'listing.reassign';
     summary: string;
     createdAt: string;
 };
@@ -331,29 +459,6 @@ export type Province = {
 export type WardList = {
     province: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
     wards: Array<string>;
-};
-
-export type PlatformAdminLogin = {
-    email: string;
-    password: string;
-};
-
-export type PlatformAdminAuth = {
-    admin: {
-        id: string;
-        email: string;
-        name: string;
-        role: string;
-    };
-    accessToken: string;
-};
-
-export type AssignChain = {
-    chainId: string | null;
-};
-
-export type SetOrganizationStatus = {
-    status: 'active' | 'suspended';
 };
 
 export type AuthRegisterData = {
@@ -860,112 +965,642 @@ export type ListingUpdateResponses = {
 
 export type ListingUpdateResponse = ListingUpdateResponses[keyof ListingUpdateResponses];
 
-export type ChainStatsData = {
+export type ListingQuotaData = {
     body?: never;
-    path: {
-        chainId: string;
-    };
+    path?: never;
     query?: never;
-    url: '/chains/{chainId}/stats';
+    url: '/listings/quota';
 };
 
-export type ChainStatsErrors = {
+export type ListingQuotaResponses = {
     /**
-     * Thiếu hoặc sai access token
-     */
-    401: ErrorResponse;
-    /**
-     * Không phải chủ chain
-     */
-    403: ErrorResponse;
-};
-
-export type ChainStatsError = ChainStatsErrors[keyof ChainStatsErrors];
-
-export type ChainStatsResponses = {
-    /**
-     * Thống kê chain
+     * Trạng thái quota
      */
     200: {
         success: true;
         message: string;
-        data: ChainStats;
+        data: QuotaStatus;
     };
 };
 
-export type ChainStatsResponse = ChainStatsResponses[keyof ChainStatsResponses];
+export type ListingQuotaResponse = ListingQuotaResponses[keyof ListingQuotaResponses];
 
-export type ChainOrganizationsData = {
+export type MyOrganizationsData = {
     body?: never;
-    path: {
-        chainId: string;
-    };
+    path?: never;
     query?: never;
-    url: '/chains/{chainId}/organizations';
+    url: '/organizations/mine';
 };
 
-export type ChainOrganizationsErrors = {
+export type MyOrganizationsErrors = {
     /**
      * Thiếu hoặc sai access token
      */
     401: ErrorResponse;
-    /**
-     * Không phải chủ chain
-     */
-    403: ErrorResponse;
 };
 
-export type ChainOrganizationsError = ChainOrganizationsErrors[keyof ChainOrganizationsErrors];
+export type MyOrganizationsError = MyOrganizationsErrors[keyof MyOrganizationsErrors];
 
-export type ChainOrganizationsResponses = {
+export type MyOrganizationsResponses = {
     /**
-     * Danh sách org
+     * Danh sách tổ chức
      */
     200: {
         success: true;
         message: string;
-        data: Array<Organization>;
+        data: Array<MyOrganization>;
     };
 };
 
-export type ChainOrganizationsResponse = ChainOrganizationsResponses[keyof ChainOrganizationsResponses];
+export type MyOrganizationsResponse = MyOrganizationsResponses[keyof MyOrganizationsResponses];
 
-export type ChainBroadcastData = {
-    body?: CreateNotification;
-    path: {
-        chainId: string;
-    };
+export type CreateOrganizationData = {
+    body?: CreateOrganization;
+    path?: never;
     query?: never;
-    url: '/chains/{chainId}/notifications';
+    url: '/organizations';
 };
 
-export type ChainBroadcastErrors = {
+export type CreateOrganizationErrors = {
     /**
-     * Thiếu hoặc sai access token
-     */
-    401: ErrorResponse;
-    /**
-     * Không phải chủ chain
+     * Cần quyền master
      */
     403: ErrorResponse;
+    /**
+     * Không tìm thấy tài khoản của người chủ
+     */
+    404: ErrorResponse;
+    /**
+     * Slug đã tồn tại hoặc bị cấm
+     */
+    409: ErrorResponse;
 };
 
-export type ChainBroadcastError = ChainBroadcastErrors[keyof ChainBroadcastErrors];
+export type CreateOrganizationError = CreateOrganizationErrors[keyof CreateOrganizationErrors];
 
-export type ChainBroadcastResponses = {
+export type CreateOrganizationResponses = {
     /**
-     * Đã fan-out
+     * Đã tạo tổ chức
      */
     201: {
         success: true;
         message: string;
+        data: Organization;
+    };
+};
+
+export type CreateOrganizationResponse = CreateOrganizationResponses[keyof CreateOrganizationResponses];
+
+export type SetOrganizationStatusData = {
+    body?: SetOrganizationStatus;
+    path: {
+        organizationId: string;
+    };
+    query?: never;
+    url: '/organizations/{organizationId}/status';
+};
+
+export type SetOrganizationStatusErrors = {
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+};
+
+export type SetOrganizationStatusError = SetOrganizationStatusErrors[keyof SetOrganizationStatusErrors];
+
+export type SetOrganizationStatusResponses = {
+    /**
+     * Đã cập nhật
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Organization;
+    };
+};
+
+export type SetOrganizationStatusResponse = SetOrganizationStatusResponses[keyof SetOrganizationStatusResponses];
+
+export type ChangeOrganizationSlugData = {
+    body?: ChangeOrganizationSlug;
+    path: {
+        organizationId: string;
+    };
+    query?: never;
+    url: '/organizations/{organizationId}/slug';
+};
+
+export type ChangeOrganizationSlugErrors = {
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Slug mới đã tồn tại hoặc bị cấm
+     */
+    409: ErrorResponse;
+};
+
+export type ChangeOrganizationSlugError = ChangeOrganizationSlugErrors[keyof ChangeOrganizationSlugErrors];
+
+export type ChangeOrganizationSlugResponses = {
+    /**
+     * Đã đổi slug
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Organization;
+    };
+};
+
+export type ChangeOrganizationSlugResponse = ChangeOrganizationSlugResponses[keyof ChangeOrganizationSlugResponses];
+
+export type OrganizationLookupData = {
+    body?: never;
+    path?: never;
+    query: {
+        q: string;
+    };
+    url: '/organizations/lookup';
+};
+
+export type OrganizationLookupErrors = {
+    /**
+     * Tra cứu quá nhiều lần
+     */
+    429: ErrorResponse;
+};
+
+export type OrganizationLookupError = OrganizationLookupErrors[keyof OrganizationLookupErrors];
+
+export type OrganizationLookupResponses = {
+    /**
+     * Danh sách tổ chức khớp
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<OrganizationLookup>;
+    };
+};
+
+export type OrganizationLookupResponse = OrganizationLookupResponses[keyof OrganizationLookupResponses];
+
+export type OrganizationSlugAvailabilityData = {
+    body?: never;
+    path?: never;
+    query: {
+        slug: string;
+        district?: string;
+        provinceCode?: string;
+    };
+    url: '/organizations/slug-availability';
+};
+
+export type OrganizationSlugAvailabilityErrors = {
+    /**
+     * Tra cứu quá nhiều lần
+     */
+    429: ErrorResponse;
+};
+
+export type OrganizationSlugAvailabilityError = OrganizationSlugAvailabilityErrors[keyof OrganizationSlugAvailabilityErrors];
+
+export type OrganizationSlugAvailabilityResponses = {
+    /**
+     * Kết quả kiểm tra
+     */
+    200: {
+        success: true;
+        message: string;
+        data: SlugAvailability;
+    };
+};
+
+export type OrganizationSlugAvailabilityResponse = OrganizationSlugAvailabilityResponses[keyof OrganizationSlugAvailabilityResponses];
+
+export type ListOrgUnitsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/org-units';
+};
+
+export type ListOrgUnitsResponses = {
+    /**
+     * Danh sách nhóm
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<OrgUnit>;
+    };
+};
+
+export type ListOrgUnitsResponse = ListOrgUnitsResponses[keyof ListOrgUnitsResponses];
+
+export type CreateOrgUnitData = {
+    body?: CreateOrgUnit;
+    path?: never;
+    query?: never;
+    url: '/org-units';
+};
+
+export type CreateOrgUnitErrors = {
+    /**
+     * Cần quyền quản lý tổ chức
+     */
+    403: ErrorResponse;
+    /**
+     * Trùng tên nhóm trong tổ chức
+     */
+    409: ErrorResponse;
+};
+
+export type CreateOrgUnitError = CreateOrgUnitErrors[keyof CreateOrgUnitErrors];
+
+export type CreateOrgUnitResponses = {
+    /**
+     * Đã tạo
+     */
+    201: {
+        success: true;
+        message: string;
+        data: OrgUnit;
+    };
+};
+
+export type CreateOrgUnitResponse = CreateOrgUnitResponses[keyof CreateOrgUnitResponses];
+
+export type DeleteOrgUnitData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/org-units/{id}';
+};
+
+export type DeleteOrgUnitErrors = {
+    /**
+     * Cần quyền quản lý tổ chức
+     */
+    403: ErrorResponse;
+};
+
+export type DeleteOrgUnitError = DeleteOrgUnitErrors[keyof DeleteOrgUnitErrors];
+
+export type DeleteOrgUnitResponses = {
+    /**
+     * Đã xoá
+     */
+    200: {
+        success: true;
+        message: string;
+        data: OrgUnit;
+    };
+};
+
+export type DeleteOrgUnitResponse = DeleteOrgUnitResponses[keyof DeleteOrgUnitResponses];
+
+export type UpdateOrgUnitData = {
+    body?: UpdateOrgUnit;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/org-units/{id}';
+};
+
+export type UpdateOrgUnitErrors = {
+    /**
+     * Cần quyền quản lý tổ chức
+     */
+    403: ErrorResponse;
+};
+
+export type UpdateOrgUnitError = UpdateOrgUnitErrors[keyof UpdateOrgUnitErrors];
+
+export type UpdateOrgUnitResponses = {
+    /**
+     * Đã cập nhật
+     */
+    200: {
+        success: true;
+        message: string;
+        data: OrgUnit;
+    };
+};
+
+export type UpdateOrgUnitResponse = UpdateOrgUnitResponses[keyof UpdateOrgUnitResponses];
+
+export type ListJoinRequestsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: 'pending' | 'approved' | 'rejected' | 'expired' | 'cancelled';
+    };
+    url: '/join-requests';
+};
+
+export type ListJoinRequestsErrors = {
+    /**
+     * Không có quyền duyệt trong tổ chức này
+     */
+    403: ErrorResponse;
+};
+
+export type ListJoinRequestsError = ListJoinRequestsErrors[keyof ListJoinRequestsErrors];
+
+export type ListJoinRequestsResponses = {
+    /**
+     * Hàng đợi
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<JoinRequest>;
+    };
+};
+
+export type ListJoinRequestsResponse = ListJoinRequestsResponses[keyof ListJoinRequestsResponses];
+
+export type CreateJoinRequestData = {
+    body?: CreateJoinRequest;
+    path?: never;
+    query?: never;
+    url: '/join-requests';
+};
+
+export type CreateJoinRequestErrors = {
+    /**
+     * Tổ chức đang không nhận đơn
+     */
+    403: ErrorResponse;
+    /**
+     * Đã là thành viên, đang có đơn chờ, hoặc chưa hết cooldown
+     */
+    409: ErrorResponse;
+};
+
+export type CreateJoinRequestError = CreateJoinRequestErrors[keyof CreateJoinRequestErrors];
+
+export type CreateJoinRequestResponses = {
+    /**
+     * Đã gửi đơn
+     */
+    201: {
+        success: true;
+        message: string;
+        data: MyJoinRequest;
+    };
+};
+
+export type CreateJoinRequestResponse = CreateJoinRequestResponses[keyof CreateJoinRequestResponses];
+
+export type MyJoinRequestsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/join-requests/mine';
+};
+
+export type MyJoinRequestsResponses = {
+    /**
+     * Danh sách đơn
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<MyJoinRequest>;
+    };
+};
+
+export type MyJoinRequestsResponse = MyJoinRequestsResponses[keyof MyJoinRequestsResponses];
+
+export type CancelJoinRequestData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/join-requests/{id}';
+};
+
+export type CancelJoinRequestErrors = {
+    /**
+     * Không phải đơn của bạn
+     */
+    403: ErrorResponse;
+};
+
+export type CancelJoinRequestError = CancelJoinRequestErrors[keyof CancelJoinRequestErrors];
+
+export type CancelJoinRequestResponses = {
+    /**
+     * Đã rút đơn
+     */
+    200: {
+        success: true;
+        message: string;
+        data: MyJoinRequest;
+    };
+};
+
+export type CancelJoinRequestResponse = CancelJoinRequestResponses[keyof CancelJoinRequestResponses];
+
+export type ApproveJoinRequestData = {
+    body?: ApproveJoinRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/join-requests/{id}/approve';
+};
+
+export type ApproveJoinRequestErrors = {
+    /**
+     * Không có quyền duyệt trong tổ chức này
+     */
+    403: ErrorResponse;
+    /**
+     * Đơn đã được xử lý hoặc đã hết hiệu lực
+     */
+    409: ErrorResponse;
+};
+
+export type ApproveJoinRequestError = ApproveJoinRequestErrors[keyof ApproveJoinRequestErrors];
+
+export type ApproveJoinRequestResponses = {
+    /**
+     * Đã duyệt
+     */
+    200: {
+        success: true;
+        message: string;
+        data: JoinRequest;
+    };
+};
+
+export type ApproveJoinRequestResponse = ApproveJoinRequestResponses[keyof ApproveJoinRequestResponses];
+
+export type RejectJoinRequestData = {
+    body?: RejectJoinRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/join-requests/{id}/reject';
+};
+
+export type RejectJoinRequestErrors = {
+    /**
+     * Không có quyền duyệt trong tổ chức này
+     */
+    403: ErrorResponse;
+};
+
+export type RejectJoinRequestError = RejectJoinRequestErrors[keyof RejectJoinRequestErrors];
+
+export type RejectJoinRequestResponses = {
+    /**
+     * Đã từ chối
+     */
+    200: {
+        success: true;
+        message: string;
+        data: JoinRequest;
+    };
+};
+
+export type RejectJoinRequestResponse = RejectJoinRequestResponses[keyof RejectJoinRequestResponses];
+
+export type BulkApproveJoinRequestsData = {
+    body?: BulkApproveJoinRequests;
+    path?: never;
+    query?: never;
+    url: '/join-requests/bulk-approve';
+};
+
+export type BulkApproveJoinRequestsErrors = {
+    /**
+     * Không có quyền duyệt trong tổ chức này
+     */
+    403: ErrorResponse;
+};
+
+export type BulkApproveJoinRequestsError = BulkApproveJoinRequestsErrors[keyof BulkApproveJoinRequestsErrors];
+
+export type BulkApproveJoinRequestsResponses = {
+    /**
+     * Kết quả từng đơn
+     */
+    200: {
+        success: true;
+        message: string;
         data: {
-            organizations: number;
+            approved: number;
+            failed: number;
+            results: Array<{
+                id: string;
+                ok: boolean;
+                error?: string;
+            }>;
         };
     };
 };
 
-export type ChainBroadcastResponse = ChainBroadcastResponses[keyof ChainBroadcastResponses];
+export type BulkApproveJoinRequestsResponse = BulkApproveJoinRequestsResponses[keyof BulkApproveJoinRequestsResponses];
+
+export type CreateRoleGrantData = {
+    body?: CreateRoleGrant;
+    path?: never;
+    query?: never;
+    url: '/role-grants';
+};
+
+export type CreateRoleGrantErrors = {
+    /**
+     * Không đủ thẩm quyền để cấp quyền này
+     */
+    403: ErrorResponse;
+    /**
+     * Người này đã có đúng quyền đó
+     */
+    409: ErrorResponse;
+};
+
+export type CreateRoleGrantError = CreateRoleGrantErrors[keyof CreateRoleGrantErrors];
+
+export type CreateRoleGrantResponses = {
+    /**
+     * Đã cấp quyền
+     */
+    201: {
+        success: true;
+        message: string;
+        data: RoleGrant;
+    };
+};
+
+export type CreateRoleGrantResponse = CreateRoleGrantResponses[keyof CreateRoleGrantResponses];
+
+export type MyRoleGrantsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/role-grants/mine';
+};
+
+export type MyRoleGrantsResponses = {
+    /**
+     * Danh sách quyền
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<RoleGrant>;
+    };
+};
+
+export type MyRoleGrantsResponse = MyRoleGrantsResponses[keyof MyRoleGrantsResponses];
+
+export type RevokeRoleGrantData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/role-grants/{id}';
+};
+
+export type RevokeRoleGrantErrors = {
+    /**
+     * Không đủ thẩm quyền
+     */
+    403: ErrorResponse;
+    /**
+     * Phải luôn còn ít nhất một master
+     */
+    409: ErrorResponse;
+};
+
+export type RevokeRoleGrantError = RevokeRoleGrantErrors[keyof RevokeRoleGrantErrors];
+
+export type RevokeRoleGrantResponses = {
+    /**
+     * Đã thu hồi
+     */
+    200: {
+        success: true;
+        message: string;
+        data: RoleGrant;
+    };
+};
+
+export type RevokeRoleGrantResponse = RevokeRoleGrantResponses[keyof RevokeRoleGrantResponses];
 
 export type CategoryListData = {
     body?: never;
@@ -998,6 +1633,39 @@ export type CategoryListResponses = {
 
 export type CategoryListResponse = CategoryListResponses[keyof CategoryListResponses];
 
+export type CreateCategoryData = {
+    body?: CreateCategory;
+    path?: never;
+    query?: never;
+    url: '/categories';
+};
+
+export type CreateCategoryErrors = {
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Slug danh mục đã tồn tại
+     */
+    409: ErrorResponse;
+};
+
+export type CreateCategoryError = CreateCategoryErrors[keyof CreateCategoryErrors];
+
+export type CreateCategoryResponses = {
+    /**
+     * Đã tạo danh mục
+     */
+    201: {
+        success: true;
+        message: string;
+        data: Category;
+    };
+};
+
+export type CreateCategoryResponse = CreateCategoryResponses[keyof CreateCategoryResponses];
+
 export type CategoryGetByIdData = {
     body?: never;
     path: {
@@ -1028,6 +1696,41 @@ export type CategoryGetByIdResponses = {
 };
 
 export type CategoryGetByIdResponse = CategoryGetByIdResponses[keyof CategoryGetByIdResponses];
+
+export type UpdateCategoryData = {
+    body?: UpdateCategory;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/categories/{id}';
+};
+
+export type UpdateCategoryErrors = {
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy danh mục
+     */
+    404: ErrorResponse;
+};
+
+export type UpdateCategoryError = UpdateCategoryErrors[keyof UpdateCategoryErrors];
+
+export type UpdateCategoryResponses = {
+    /**
+     * Đã cập nhật
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Category;
+    };
+};
+
+export type UpdateCategoryResponse = UpdateCategoryResponses[keyof UpdateCategoryResponses];
 
 export type ChatListData = {
     body?: never;
@@ -1275,6 +1978,7 @@ export type NotificationListData = {
     query?: {
         page?: number;
         limit?: number;
+        scope?: 'inbox' | 'managed';
     };
     url: '/notifications';
 };
@@ -1318,11 +2022,15 @@ export type NotificationCreateData = {
 
 export type NotificationCreateErrors = {
     /**
+     * Nhóm con không tồn tại trong tổ chức này
+     */
+    400: ErrorResponse;
+    /**
      * Thiếu hoặc sai access token
      */
     401: ErrorResponse;
     /**
-     * Chỉ owner/moderator được gửi
+     * Ngoài phạm vi được cấp
      */
     403: ErrorResponse;
 };
@@ -1458,7 +2166,7 @@ export type ModerationListingsData = {
     body?: never;
     path?: never;
     query?: {
-        status?: 'pending' | 'active' | 'rejected' | 'hidden';
+        status?: 'pending' | 'pending_unverified' | 'active' | 'rejected' | 'hidden';
         page?: number;
         limit?: number;
     };
@@ -1580,6 +2288,99 @@ export type ModerationSetListingStatusResponses = {
 };
 
 export type ModerationSetListingStatusResponse = ModerationSetListingStatusResponses[keyof ModerationSetListingStatusResponses];
+
+export type ModerationPublicQueueData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: 'pending' | 'pending_unverified' | 'active' | 'rejected' | 'hidden';
+        page?: number;
+        limit?: number;
+    };
+    url: '/moderation/public-queue';
+};
+
+export type ModerationPublicQueueErrors = {
+    /**
+     * Không phụ trách danh mục nào
+     */
+    403: ErrorResponse;
+};
+
+export type ModerationPublicQueueError = ModerationPublicQueueErrors[keyof ModerationPublicQueueErrors];
+
+export type ModerationPublicQueueResponses = {
+    /**
+     * Hàng đợi
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<Listing>;
+    };
+};
+
+export type ModerationPublicQueueResponse = ModerationPublicQueueResponses[keyof ModerationPublicQueueResponses];
+
+export type ModerationCoverageData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/moderation/coverage';
+};
+
+export type ModerationCoverageErrors = {
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+};
+
+export type ModerationCoverageError = ModerationCoverageErrors[keyof ModerationCoverageErrors];
+
+export type ModerationCoverageResponses = {
+    /**
+     * Ma trận phủ sóng
+     */
+    200: {
+        success: true;
+        message: string;
+        data: CoverageMatrix;
+    };
+};
+
+export type ModerationCoverageResponse = ModerationCoverageResponses[keyof ModerationCoverageResponses];
+
+export type ModerationRerouteListingData = {
+    body?: RerouteListing;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/moderation/listings/{id}/route';
+};
+
+export type ModerationRerouteListingErrors = {
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+};
+
+export type ModerationRerouteListingError = ModerationRerouteListingErrors[keyof ModerationRerouteListingErrors];
+
+export type ModerationRerouteListingResponses = {
+    /**
+     * Đã chuyển ô
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Listing;
+    };
+};
+
+export type ModerationRerouteListingResponse = ModerationRerouteListingResponses[keyof ModerationRerouteListingResponses];
 
 export type ReportListData = {
     body?: never;
@@ -1760,223 +2561,3 @@ export type LocationWardsResponses = {
 };
 
 export type LocationWardsResponse = LocationWardsResponses[keyof LocationWardsResponses];
-
-export type PlatformAdminLoginData = {
-    body?: PlatformAdminLogin;
-    path?: never;
-    query?: never;
-    url: '/platform-admin/auth/login';
-};
-
-export type PlatformAdminLoginErrors = {
-    /**
-     * Sai thông tin đăng nhập
-     */
-    401: ErrorResponse;
-};
-
-export type PlatformAdminLoginError = PlatformAdminLoginErrors[keyof PlatformAdminLoginErrors];
-
-export type PlatformAdminLoginResponses = {
-    /**
-     * Đăng nhập thành công
-     */
-    200: {
-        success: true;
-        message: string;
-        data: PlatformAdminAuth;
-    };
-};
-
-export type PlatformAdminLoginResponse = PlatformAdminLoginResponses[keyof PlatformAdminLoginResponses];
-
-export type PlatformAdminCreateChainData = {
-    body?: CreateChain;
-    path?: never;
-    query?: never;
-    url: '/platform-admin/chains';
-};
-
-export type PlatformAdminCreateChainErrors = {
-    /**
-     * Thiếu hoặc sai access token
-     */
-    401: ErrorResponse;
-    /**
-     * Cần quyền super_admin
-     */
-    403: ErrorResponse;
-    /**
-     * Chain slug đã tồn tại
-     */
-    409: ErrorResponse;
-};
-
-export type PlatformAdminCreateChainError = PlatformAdminCreateChainErrors[keyof PlatformAdminCreateChainErrors];
-
-export type PlatformAdminCreateChainResponses = {
-    /**
-     * Đã tạo chain
-     */
-    201: {
-        success: true;
-        message: string;
-        data: Chain;
-    };
-};
-
-export type PlatformAdminCreateChainResponse = PlatformAdminCreateChainResponses[keyof PlatformAdminCreateChainResponses];
-
-export type PlatformAdminAssignChainData = {
-    body?: AssignChain;
-    path: {
-        organizationId: string;
-    };
-    query?: never;
-    url: '/platform-admin/organizations/{organizationId}/chain';
-};
-
-export type PlatformAdminAssignChainErrors = {
-    /**
-     * Thiếu hoặc sai access token
-     */
-    401: ErrorResponse;
-    /**
-     * Cần quyền super_admin
-     */
-    403: ErrorResponse;
-    /**
-     * Không tìm thấy organization hoặc chain
-     */
-    404: ErrorResponse;
-};
-
-export type PlatformAdminAssignChainError = PlatformAdminAssignChainErrors[keyof PlatformAdminAssignChainErrors];
-
-export type PlatformAdminAssignChainResponses = {
-    /**
-     * Đã cập nhật
-     */
-    200: {
-        success: true;
-        message: string;
-        data: Organization;
-    };
-};
-
-export type PlatformAdminAssignChainResponse = PlatformAdminAssignChainResponses[keyof PlatformAdminAssignChainResponses];
-
-export type PlatformAdminSetOrganizationStatusData = {
-    body?: SetOrganizationStatus;
-    path: {
-        organizationId: string;
-    };
-    query?: never;
-    url: '/platform-admin/organizations/{organizationId}/status';
-};
-
-export type PlatformAdminSetOrganizationStatusErrors = {
-    /**
-     * Thiếu hoặc sai access token
-     */
-    401: ErrorResponse;
-    /**
-     * Cần quyền super_admin
-     */
-    403: ErrorResponse;
-    /**
-     * Không tìm thấy organization
-     */
-    404: ErrorResponse;
-};
-
-export type PlatformAdminSetOrganizationStatusError = PlatformAdminSetOrganizationStatusErrors[keyof PlatformAdminSetOrganizationStatusErrors];
-
-export type PlatformAdminSetOrganizationStatusResponses = {
-    /**
-     * Đã cập nhật
-     */
-    200: {
-        success: true;
-        message: string;
-        data: Organization;
-    };
-};
-
-export type PlatformAdminSetOrganizationStatusResponse = PlatformAdminSetOrganizationStatusResponses[keyof PlatformAdminSetOrganizationStatusResponses];
-
-export type PlatformAdminCreateCategoryData = {
-    body?: CreateCategory;
-    path?: never;
-    query?: never;
-    url: '/platform-admin/categories';
-};
-
-export type PlatformAdminCreateCategoryErrors = {
-    /**
-     * Thiếu hoặc sai access token
-     */
-    401: ErrorResponse;
-    /**
-     * Cần quyền super_admin
-     */
-    403: ErrorResponse;
-    /**
-     * Slug danh mục đã tồn tại
-     */
-    409: ErrorResponse;
-};
-
-export type PlatformAdminCreateCategoryError = PlatformAdminCreateCategoryErrors[keyof PlatformAdminCreateCategoryErrors];
-
-export type PlatformAdminCreateCategoryResponses = {
-    /**
-     * Đã tạo danh mục
-     */
-    201: {
-        success: true;
-        message: string;
-        data: Category;
-    };
-};
-
-export type PlatformAdminCreateCategoryResponse = PlatformAdminCreateCategoryResponses[keyof PlatformAdminCreateCategoryResponses];
-
-export type PlatformAdminUpdateCategoryData = {
-    body?: UpdateCategory;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/platform-admin/categories/{id}';
-};
-
-export type PlatformAdminUpdateCategoryErrors = {
-    /**
-     * Thiếu hoặc sai access token
-     */
-    401: ErrorResponse;
-    /**
-     * Cần quyền super_admin
-     */
-    403: ErrorResponse;
-    /**
-     * Không tìm thấy danh mục
-     */
-    404: ErrorResponse;
-};
-
-export type PlatformAdminUpdateCategoryError = PlatformAdminUpdateCategoryErrors[keyof PlatformAdminUpdateCategoryErrors];
-
-export type PlatformAdminUpdateCategoryResponses = {
-    /**
-     * Đã cập nhật
-     */
-    200: {
-        success: true;
-        message: string;
-        data: Category;
-    };
-};
-
-export type PlatformAdminUpdateCategoryResponse = PlatformAdminUpdateCategoryResponses[keyof PlatformAdminUpdateCategoryResponses];

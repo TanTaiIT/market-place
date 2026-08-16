@@ -12,6 +12,7 @@ import { C, F } from '@/theme';
 
 const TABS: { value: ModStatus; label: string }[] = [
   { value: 'pending', label: 'Chờ duyệt' },
+  { value: 'pending_unverified', label: 'Người ngoài' },
   { value: 'rejected', label: 'Đã từ chối' },
   { value: 'active', label: 'Đã ghim' },
 ];

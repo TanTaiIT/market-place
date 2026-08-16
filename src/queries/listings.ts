@@ -5,8 +5,8 @@ import {
   keepPreviousData,
 } from '@tanstack/react-query';
 import { api } from '@/api/client';
-import type { Listing, Profile } from '@/api/db';
-import type { ProvinceName } from '@/api/location';
+import { hasSearchCriteria } from '@/api/db';
+import type { Listing, Notif, Profile, SearchFilter } from '@/api/db';
 import { qk } from './keys';
 
 /**
@@ -40,13 +40,37 @@ export function useListing(id: string) {
   });
 }
 
-/** Lọc theo tỉnh chạy ở BE. Chỉ chọn tỉnh mà không gõ từ khoá cũng là một tìm kiếm hợp lệ. */
-export function useSearch(q: string, province: ProvinceName | null = null) {
-  const term = q.trim();
+/** Số tin gợi ý hiển thị — một hàng ngang cuộn được, không phải một bảng tin thứ hai. */
+const SUGGESTION_COUNT = 8;
+
+/**
+ * Tin gợi ý cho tin đang xem.
+ *
+ * Nhận cả `Listing` chứ không nhận id: tiêu chí gợi ý (danh mục, tỉnh) nằm trong chính tin đó,
+ * truyền id thì hook phải đọc lại tin một lần nữa từ cache — vòng phụ thuộc không cần có.
+ * `enabled` chờ tin về, nên lần mở màn đầu tiên không bắn một request thiếu tiêu chí.
+ */
+export function useListingSuggestions(current: Listing | undefined) {
   return useQuery({
-    queryKey: qk.search(term, province),
-    queryFn: () => api.searchListings(term, province),
-    enabled: term.length > 0 || !!province,
+    queryKey: qk.listingSuggestions(current?.id ?? ''),
+    queryFn: () => api.getSuggestions(current!, SUGGESTION_COUNT),
+    enabled: Boolean(current?.categoryId),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/**
+ * Tìm kiếm. Mọi ràng buộc (từ khoá, tỉnh, danh mục, khoảng giá) chạy ở BE — app không tải về
+ * rồi tự cắt mảng, vì như thế trần `limit: 50` sẽ cắt trước khi bộ lọc kịp chạy.
+ *
+ * Chỉ chọn danh mục mà không gõ từ khoá cũng là một lượt tìm hợp lệ; `hasSearchCriteria` là
+ * nơi duy nhất định nghĩa "đã có ràng buộc chưa", dùng chung với màn hình.
+ */
+export function useSearch(filter: SearchFilter) {
+  return useQuery({
+    queryKey: qk.search(filter),
+    queryFn: () => api.searchListings(filter),
+    enabled: hasSearchCriteria(filter),
     placeholderData: keepPreviousData,
   });
 }
@@ -67,11 +91,47 @@ export function useNotifications() {
   return useQuery({ queryKey: qk.notifications(), queryFn: api.getNotifications });
 }
 
+/**
+ * Đánh dấu đã đọc, cập nhật lạc quan.
+ *
+ * Optimistic vì đây là thao tác một chiều và không có gì để tranh chấp: chấm chưa đọc phải
+ * tắt ngay lúc chạm, chờ một vòng mạng rồi mới tắt sẽ khiến người dùng chạm lần hai.
+ */
+export function useMarkNotificationRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.markNotificationRead(id),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: qk.notifications() });
+      const prev = qc.getQueryData<Notif[]>(qk.notifications());
+      qc.setQueryData<Notif[]>(qk.notifications(), (old) =>
+        (old ?? []).map((n) => (n.id === id ? { ...n, unread: false } : n)),
+      );
+      return { prev };
+    },
+    onError: (_e, _id, ctx) => {
+      if (ctx?.prev) qc.setQueryData(qk.notifications(), ctx.prev);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: qk.notifications() }),
+  });
+}
+
 export function useProfile() {
   return useQuery({ queryKey: qk.profile(), queryFn: api.getProfile });
 }
 
 /* --------------------------- mutations --------------------------- */
+
+/**
+ * Hạn mức đăng tin. Key nằm dưới prefix `qk.listings()` nên mọi lần đăng/gỡ tin đã tự làm mới
+ * nó — không cần invalidate riêng.
+ */
+export function useQuota() {
+  return useQuery({
+    queryKey: qk.listingQuota(),
+    queryFn: api.getQuota,
+  });
+}
 
 export function useCreateListing() {
   const qc = useQueryClient();

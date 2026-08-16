@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AuthLoginData, AuthLoginErrors, AuthLoginResponses, AuthRefreshData, AuthRefreshErrors, AuthRefreshResponses, AuthRegisterData, AuthRegisterErrors, AuthRegisterResponses, CategoryGetByIdData, CategoryGetByIdErrors, CategoryGetByIdResponses, CategoryListData, CategoryListErrors, CategoryListResponses, ChainBroadcastData, ChainBroadcastErrors, ChainBroadcastResponses, ChainOrganizationsData, ChainOrganizationsErrors, ChainOrganizationsResponses, ChainStatsData, ChainStatsErrors, ChainStatsResponses, ChatGetByIdData, ChatGetByIdErrors, ChatGetByIdResponses, ChatListData, ChatListErrors, ChatListResponses, ChatMarkReadData, ChatMarkReadErrors, ChatMarkReadResponses, ChatMessagesData, ChatMessagesErrors, ChatMessagesResponses, ChatOpenData, ChatOpenErrors, ChatOpenResponses, ChatSendData, ChatSendErrors, ChatSendResponses, ListingCreateData, ListingCreateErrors, ListingCreateResponses, ListingGetByIdData, ListingGetByIdErrors, ListingGetByIdResponses, ListingListData, ListingListErrors, ListingListResponses, ListingMineData, ListingMineErrors, ListingMineResponses, ListingNearbyData, ListingNearbyErrors, ListingNearbyResponses, ListingRemoveData, ListingRemoveErrors, ListingRemoveResponses, ListingUpdateData, ListingUpdateErrors, ListingUpdateResponses, LocationProvincesData, LocationProvincesResponses, LocationWardsData, LocationWardsErrors, LocationWardsResponses, ModerationActivityData, ModerationActivityErrors, ModerationActivityResponses, ModerationListingsData, ModerationListingsErrors, ModerationListingsResponses, ModerationOverviewData, ModerationOverviewErrors, ModerationOverviewResponses, ModerationRemoveListingData, ModerationRemoveListingErrors, ModerationRemoveListingResponses, ModerationSetListingStatusData, ModerationSetListingStatusErrors, ModerationSetListingStatusResponses, NotificationCreateData, NotificationCreateErrors, NotificationCreateResponses, NotificationListData, NotificationListErrors, NotificationListResponses, NotificationMarkReadData, NotificationMarkReadErrors, NotificationMarkReadResponses, PlatformAdminAssignChainData, PlatformAdminAssignChainErrors, PlatformAdminAssignChainResponses, PlatformAdminCreateCategoryData, PlatformAdminCreateCategoryErrors, PlatformAdminCreateCategoryResponses, PlatformAdminCreateChainData, PlatformAdminCreateChainErrors, PlatformAdminCreateChainResponses, PlatformAdminLoginData, PlatformAdminLoginErrors, PlatformAdminLoginResponses, PlatformAdminSetOrganizationStatusData, PlatformAdminSetOrganizationStatusErrors, PlatformAdminSetOrganizationStatusResponses, PlatformAdminUpdateCategoryData, PlatformAdminUpdateCategoryErrors, PlatformAdminUpdateCategoryResponses, ReportCreateData, ReportCreateErrors, ReportCreateResponses, ReportListData, ReportListErrors, ReportListResponses, ReportResolveData, ReportResolveErrors, ReportResolveResponses, UserDeleteMeData, UserDeleteMeErrors, UserDeleteMeResponses, UserGetByIdData, UserGetByIdErrors, UserGetByIdResponses, UserGetMeData, UserGetMeErrors, UserGetMeResponses, UserUpdateMeData, UserUpdateMeErrors, UserUpdateMeResponses } from './types.gen';
+import type { ApproveJoinRequestData, ApproveJoinRequestErrors, ApproveJoinRequestResponses, AuthLoginData, AuthLoginErrors, AuthLoginResponses, AuthRefreshData, AuthRefreshErrors, AuthRefreshResponses, AuthRegisterData, AuthRegisterErrors, AuthRegisterResponses, BulkApproveJoinRequestsData, BulkApproveJoinRequestsErrors, BulkApproveJoinRequestsResponses, CancelJoinRequestData, CancelJoinRequestErrors, CancelJoinRequestResponses, CategoryGetByIdData, CategoryGetByIdErrors, CategoryGetByIdResponses, CategoryListData, CategoryListErrors, CategoryListResponses, ChangeOrganizationSlugData, ChangeOrganizationSlugErrors, ChangeOrganizationSlugResponses, ChatGetByIdData, ChatGetByIdErrors, ChatGetByIdResponses, ChatListData, ChatListErrors, ChatListResponses, ChatMarkReadData, ChatMarkReadErrors, ChatMarkReadResponses, ChatMessagesData, ChatMessagesErrors, ChatMessagesResponses, ChatOpenData, ChatOpenErrors, ChatOpenResponses, ChatSendData, ChatSendErrors, ChatSendResponses, CreateCategoryData, CreateCategoryErrors, CreateCategoryResponses, CreateJoinRequestData, CreateJoinRequestErrors, CreateJoinRequestResponses, CreateOrganizationData, CreateOrganizationErrors, CreateOrganizationResponses, CreateOrgUnitData, CreateOrgUnitErrors, CreateOrgUnitResponses, CreateRoleGrantData, CreateRoleGrantErrors, CreateRoleGrantResponses, DeleteOrgUnitData, DeleteOrgUnitErrors, DeleteOrgUnitResponses, ListingCreateData, ListingCreateErrors, ListingCreateResponses, ListingGetByIdData, ListingGetByIdErrors, ListingGetByIdResponses, ListingListData, ListingListErrors, ListingListResponses, ListingMineData, ListingMineErrors, ListingMineResponses, ListingNearbyData, ListingNearbyErrors, ListingNearbyResponses, ListingQuotaData, ListingQuotaResponses, ListingRemoveData, ListingRemoveErrors, ListingRemoveResponses, ListingUpdateData, ListingUpdateErrors, ListingUpdateResponses, ListJoinRequestsData, ListJoinRequestsErrors, ListJoinRequestsResponses, ListOrgUnitsData, ListOrgUnitsResponses, LocationProvincesData, LocationProvincesResponses, LocationWardsData, LocationWardsErrors, LocationWardsResponses, ModerationActivityData, ModerationActivityErrors, ModerationActivityResponses, ModerationCoverageData, ModerationCoverageErrors, ModerationCoverageResponses, ModerationListingsData, ModerationListingsErrors, ModerationListingsResponses, ModerationOverviewData, ModerationOverviewErrors, ModerationOverviewResponses, ModerationPublicQueueData, ModerationPublicQueueErrors, ModerationPublicQueueResponses, ModerationRemoveListingData, ModerationRemoveListingErrors, ModerationRemoveListingResponses, ModerationRerouteListingData, ModerationRerouteListingErrors, ModerationRerouteListingResponses, ModerationSetListingStatusData, ModerationSetListingStatusErrors, ModerationSetListingStatusResponses, MyJoinRequestsData, MyJoinRequestsResponses, MyOrganizationsData, MyOrganizationsErrors, MyOrganizationsResponses, MyRoleGrantsData, MyRoleGrantsResponses, NotificationCreateData, NotificationCreateErrors, NotificationCreateResponses, NotificationListData, NotificationListErrors, NotificationListResponses, NotificationMarkReadData, NotificationMarkReadErrors, NotificationMarkReadResponses, OrganizationLookupData, OrganizationLookupErrors, OrganizationLookupResponses, OrganizationSlugAvailabilityData, OrganizationSlugAvailabilityErrors, OrganizationSlugAvailabilityResponses, RejectJoinRequestData, RejectJoinRequestErrors, RejectJoinRequestResponses, ReportCreateData, ReportCreateErrors, ReportCreateResponses, ReportListData, ReportListErrors, ReportListResponses, ReportResolveData, ReportResolveErrors, ReportResolveResponses, RevokeRoleGrantData, RevokeRoleGrantErrors, RevokeRoleGrantResponses, SetOrganizationStatusData, SetOrganizationStatusErrors, SetOrganizationStatusResponses, UpdateCategoryData, UpdateCategoryErrors, UpdateCategoryResponses, UpdateOrgUnitData, UpdateOrgUnitErrors, UpdateOrgUnitResponses, UserDeleteMeData, UserDeleteMeErrors, UserDeleteMeResponses, UserGetByIdData, UserGetByIdErrors, UserGetByIdResponses, UserGetMeData, UserGetMeErrors, UserGetMeResponses, UserUpdateMeData, UserUpdateMeErrors, UserUpdateMeResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -158,34 +158,246 @@ export const listingUpdate = <ThrowOnError extends boolean = false>(options: Opt
 });
 
 /**
- * Thống kê tổng hợp toàn chain (read-only)
+ * Còn bao nhiêu slot đăng tin
+ *
+ * Hiện trạng quota để client nói rõ "bạn có N/M tin chờ duyệt" — thiếu nó thì khi người duyệt bận cả tuần, người dùng chỉ thấy mình bị chặn mà không hiểu vì sao.
  */
-export const chainStats = <ThrowOnError extends boolean = false>(options: Options<ChainStatsData, ThrowOnError>) => (options.client ?? client).get<ChainStatsResponses, ChainStatsErrors, ThrowOnError>({
+export const listingQuota = <ThrowOnError extends boolean = false>(options?: Options<ListingQuotaData, ThrowOnError>) => (options?.client ?? client).get<ListingQuotaResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/chains/{chainId}/stats',
+    url: '/listings/quota',
     ...options
 });
 
 /**
- * Danh sách organization trong chain
+ * Các tổ chức tôi đang là thành viên
+ *
+ * Nguồn của bộ chuyển tổ chức phía client: org hoạt động do client chỉ ra bằng header `X-Org-Slug`, nên client phải biết mình được phép gửi những slug nào.
  */
-export const chainOrganizations = <ThrowOnError extends boolean = false>(options: Options<ChainOrganizationsData, ThrowOnError>) => (options.client ?? client).get<ChainOrganizationsResponses, ChainOrganizationsErrors, ThrowOnError>({
+export const myOrganizations = <ThrowOnError extends boolean = false>(options?: Options<MyOrganizationsData, ThrowOnError>) => (options?.client ?? client).get<MyOrganizationsResponses, MyOrganizationsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/chains/{chainId}/organizations',
+    url: '/organizations/mine',
     ...options
 });
 
 /**
- * Gửi thông báo tới mọi org trong chain (fan-out mỗi org một bản ghi)
+ * Tạo tổ chức và chỉ định người chủ (chỉ master)
+ *
+ * Tạo đồng thời ba thứ: bản ghi tổ chức, quan hệ thành viên `owner`, và quyền `manager` scope org cho người chủ. Người chủ phải có tài khoản trước.
  */
-export const chainBroadcast = <ThrowOnError extends boolean = false>(options: Options<ChainBroadcastData, ThrowOnError>) => (options.client ?? client).post<ChainBroadcastResponses, ChainBroadcastErrors, ThrowOnError>({
+export const createOrganization = <ThrowOnError extends boolean = false>(options?: Options<CreateOrganizationData, ThrowOnError>) => (options?.client ?? client).post<CreateOrganizationResponses, CreateOrganizationErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/chains/{chainId}/notifications',
+    url: '/organizations',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+/**
+ * Khoá/mở tổ chức — có hiệu lực ngay, không đợi token hết hạn
+ */
+export const setOrganizationStatus = <ThrowOnError extends boolean = false>(options: Options<SetOrganizationStatusData, ThrowOnError>) => (options.client ?? client).patch<SetOrganizationStatusResponses, SetOrganizationStatusErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/organizations/{organizationId}/status',
     ...options,
     headers: {
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * Đổi slug, slug cũ tự thành alias redirect 301
+ */
+export const changeOrganizationSlug = <ThrowOnError extends boolean = false>(options: Options<ChangeOrganizationSlugData, ThrowOnError>) => (options.client ?? client).patch<ChangeOrganizationSlugResponses, ChangeOrganizationSlugErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/organizations/{organizationId}/slug',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Dropdown chọn tổ chức theo tên hoặc slug
+ *
+ * Trả DANH SÁCH để người dùng tự xác nhận. Client không được tự lấy phần tử đầu tiên khi có nhiều kết quả: chọn nhầm org là tin chạy vào hàng đợi của tổ chức khác.
+ */
+export const organizationLookup = <ThrowOnError extends boolean = false>(options: Options<OrganizationLookupData, ThrowOnError>) => (options.client ?? client).get<OrganizationLookupResponses, OrganizationLookupErrors, ThrowOnError>({ url: '/organizations/lookup', ...options });
+
+/**
+ * Kiểm tra slug còn dùng được không (kèm gợi ý hậu tố)
+ *
+ * Chỉ trả available + gợi ý. KHÔNG trả tên tổ chức đang giữ slug đó — trả tên là biến endpoint công khai này thành công cụ liệt kê khách hàng.
+ */
+export const organizationSlugAvailability = <ThrowOnError extends boolean = false>(options: Options<OrganizationSlugAvailabilityData, ThrowOnError>) => (options.client ?? client).get<OrganizationSlugAvailabilityResponses, OrganizationSlugAvailabilityErrors, ThrowOnError>({ url: '/organizations/slug-availability', ...options });
+
+/**
+ * Nhóm con của tổ chức hiện tại
+ *
+ * Tổ chức phẳng thì trả mảng rỗng — không phải lỗi, chỉ là không có tầng trung gian.
+ */
+export const listOrgUnits = <ThrowOnError extends boolean = false>(options?: Options<ListOrgUnitsData, ThrowOnError>) => (options?.client ?? client).get<ListOrgUnitsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/org-units',
+    ...options
+});
+
+/**
+ * Tạo nhóm con
+ */
+export const createOrgUnit = <ThrowOnError extends boolean = false>(options?: Options<CreateOrgUnitData, ThrowOnError>) => (options?.client ?? client).post<CreateOrgUnitResponses, CreateOrgUnitErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/org-units',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+/**
+ * Xoá mềm một nhóm con
+ */
+export const deleteOrgUnit = <ThrowOnError extends boolean = false>(options: Options<DeleteOrgUnitData, ThrowOnError>) => (options.client ?? client).delete<DeleteOrgUnitResponses, DeleteOrgUnitErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/org-units/{id}',
+    ...options
+});
+
+/**
+ * Đổi tên nhóm hoặc gán người phụ trách
+ */
+export const updateOrgUnit = <ThrowOnError extends boolean = false>(options: Options<UpdateOrgUnitData, ThrowOnError>) => (options.client ?? client).patch<UpdateOrgUnitResponses, UpdateOrgUnitErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/org-units/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Hàng đợi đơn của tổ chức hiện tại
+ */
+export const listJoinRequests = <ThrowOnError extends boolean = false>(options?: Options<ListJoinRequestsData, ThrowOnError>) => (options?.client ?? client).get<ListJoinRequestsResponses, ListJoinRequestsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/join-requests',
+    ...options
+});
+
+/**
+ * Gửi đơn xin vào một tổ chức
+ *
+ * Không cần thuộc tổ chức nào trước đó. Có trần số đơn đang chờ và cooldown sau khi bị từ chối để hàng đợi của tổ chức không bị rải đơn.
+ */
+export const createJoinRequest = <ThrowOnError extends boolean = false>(options?: Options<CreateJoinRequestData, ThrowOnError>) => (options?.client ?? client).post<CreateJoinRequestResponses, CreateJoinRequestErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/join-requests',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+/**
+ * Đơn của tôi và trạng thái từng đơn
+ */
+export const myJoinRequests = <ThrowOnError extends boolean = false>(options?: Options<MyJoinRequestsData, ThrowOnError>) => (options?.client ?? client).get<MyJoinRequestsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/join-requests/mine',
+    ...options
+});
+
+/**
+ * Rút đơn đang chờ
+ */
+export const cancelJoinRequest = <ThrowOnError extends boolean = false>(options: Options<CancelJoinRequestData, ThrowOnError>) => (options.client ?? client).delete<CancelJoinRequestResponses, CancelJoinRequestErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/join-requests/{id}',
+    ...options
+});
+
+/**
+ * Duyệt đơn và gán nhóm con ngay trong cùng thao tác
+ *
+ * Gán `unitId` ở đây chứ không tách thành bước riêng: cơ chế request không tự phân nhóm được, tách bước ra thì sẽ không ai làm và lớp duyệt phân tầng mất chỗ dựa.
+ */
+export const approveJoinRequest = <ThrowOnError extends boolean = false>(options: Options<ApproveJoinRequestData, ThrowOnError>) => (options.client ?? client).patch<ApproveJoinRequestResponses, ApproveJoinRequestErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/join-requests/{id}/approve',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Từ chối đơn
+ */
+export const rejectJoinRequest = <ThrowOnError extends boolean = false>(options: Options<RejectJoinRequestData, ThrowOnError>) => (options.client ?? client).patch<RejectJoinRequestResponses, RejectJoinRequestErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/join-requests/{id}/reject',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Duyệt hàng loạt, mỗi đơn kèm nhóm con của nó
+ *
+ * Từng đơn hỏng không làm hỏng cả lô — response trả kết quả từng dòng để người duyệt biết đơn nào cần xem lại.
+ */
+export const bulkApproveJoinRequests = <ThrowOnError extends boolean = false>(options?: Options<BulkApproveJoinRequestsData, ThrowOnError>) => (options?.client ?? client).post<BulkApproveJoinRequestsResponses, BulkApproveJoinRequestsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/join-requests/bulk-approve',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+/**
+ * Cấp quyền cho một người
+ *
+ * Master cấp được `manager` (cả hai loại scope) và `staff`. Manager chỉ cấp được `staff` trong đúng scope của mình. Không ai tự cấp quyền cho chính mình.
+ */
+export const createRoleGrant = <ThrowOnError extends boolean = false>(options?: Options<CreateRoleGrantData, ThrowOnError>) => (options?.client ?? client).post<CreateRoleGrantResponses, CreateRoleGrantErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/role-grants',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+/**
+ * Quyền hệ thống của chính mình
+ */
+export const myRoleGrants = <ThrowOnError extends boolean = false>(options?: Options<MyRoleGrantsData, ThrowOnError>) => (options?.client ?? client).get<MyRoleGrantsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/role-grants/mine',
+    ...options
+});
+
+/**
+ * Thu hồi một quyền
+ *
+ * Không thu hồi được master cuối cùng: hệ thống không còn master là hệ thống không ai cấp lại được quyền cho ai.
+ */
+export const revokeRoleGrant = <ThrowOnError extends boolean = false>(options: Options<RevokeRoleGrantData, ThrowOnError>) => (options.client ?? client).delete<RevokeRoleGrantResponses, RevokeRoleGrantErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/role-grants/{id}',
+    ...options
 });
 
 /**
@@ -196,9 +408,37 @@ export const chainBroadcast = <ThrowOnError extends boolean = false>(options: Op
 export const categoryList = <ThrowOnError extends boolean = false>(options?: Options<CategoryListData, ThrowOnError>) => (options?.client ?? client).get<CategoryListResponses, CategoryListErrors, ThrowOnError>({ url: '/categories', ...options });
 
 /**
+ * Tạo danh mục dùng chung toàn hệ thống (chỉ master)
+ */
+export const createCategory = <ThrowOnError extends boolean = false>(options?: Options<CreateCategoryData, ThrowOnError>) => (options?.client ?? client).post<CreateCategoryResponses, CreateCategoryErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/categories',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+/**
  * Chi tiết một danh mục
  */
 export const categoryGetById = <ThrowOnError extends boolean = false>(options: Options<CategoryGetByIdData, ThrowOnError>) => (options.client ?? client).get<CategoryGetByIdResponses, CategoryGetByIdErrors, ThrowOnError>({ url: '/categories/{id}', ...options });
+
+/**
+ * Đổi tên/icon/thứ tự, hoặc bật-tắt một danh mục
+ *
+ * Không có endpoint xoá: gỡ danh mục khỏi lưu thông bằng `isActive: false`, vì tin đã đăng vẫn tham chiếu tới nó.
+ */
+export const updateCategory = <ThrowOnError extends boolean = false>(options: Options<UpdateCategoryData, ThrowOnError>) => (options.client ?? client).patch<UpdateCategoryResponses, UpdateCategoryErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/categories/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Danh sách hội thoại của tôi, mới nhất trước
@@ -267,7 +507,9 @@ export const chatMarkRead = <ThrowOnError extends boolean = false>(options: Opti
 });
 
 /**
- * Thông báo của organization hiện tại (gồm cả bản fan-out từ chain)
+ * Thông báo tôi nhận được
+ *
+ * Gồm thông báo gửi cho cả tổ chức và thông báo gửi cho đúng nhóm con của người gọi. Tài khoản chưa thuộc tổ chức nào nhận danh sách rỗng, không phải lỗi. `scope=managed` đổi câu hỏi thành "tôi gửi được tới đâu" — dùng cho bàn quản trị.
  */
 export const notificationList = <ThrowOnError extends boolean = false>(options?: Options<NotificationListData, ThrowOnError>) => (options?.client ?? client).get<NotificationListResponses, NotificationListErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -277,6 +519,8 @@ export const notificationList = <ThrowOnError extends boolean = false>(options?:
 
 /**
  * Gửi thông báo trong phạm vi organization
+ *
+ * Bỏ trống `unitId` = gửi cho cả tổ chức, cần quyền quản lý cấp org. Staff phụ trách một nhóm con chỉ gửi được cho đúng nhóm đó.
  */
 export const notificationCreate = <ThrowOnError extends boolean = false>(options?: Options<NotificationCreateData, ThrowOnError>) => (options?.client ?? client).post<NotificationCreateResponses, NotificationCreateErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -351,6 +595,43 @@ export const moderationSetListingStatus = <ThrowOnError extends boolean = false>
 });
 
 /**
+ * Hàng đợi duyệt của TRỤC DANH MỤC
+ *
+ * Phạm vi (danh mục × tỉnh) lấy từ role_grants của chính người gọi và được áp ở tầng query, không phải bộ lọc trên giao diện. Master thấy toàn bộ trục này.
+ */
+export const moderationPublicQueue = <ThrowOnError extends boolean = false>(options?: Options<ModerationPublicQueueData, ThrowOnError>) => (options?.client ?? client).get<ModerationPublicQueueResponses, ModerationPublicQueueErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/moderation/public-queue',
+    ...options
+});
+
+/**
+ * Ma trận phủ sóng (danh mục × tỉnh) cho master
+ *
+ * Chỉ trả các ô đáng chú ý: chưa có người phụ trách, hoặc đang tồn đọng. Mỗi ô trống là một dòng tin chảy thẳng vào hàng đợi của master.
+ */
+export const moderationCoverage = <ThrowOnError extends boolean = false>(options?: Options<ModerationCoverageData, ThrowOnError>) => (options?.client ?? client).get<ModerationCoverageResponses, ModerationCoverageErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/moderation/coverage',
+    ...options
+});
+
+/**
+ * Chuyển tin sang ô (danh mục × tỉnh) khác
+ *
+ * Tin quay về đầu hàng đợi mới và để lại vết kiểm toán.
+ */
+export const moderationRerouteListing = <ThrowOnError extends boolean = false>(options: Options<ModerationRerouteListingData, ThrowOnError>) => (options.client ?? client).patch<ModerationRerouteListingResponses, ModerationRerouteListingErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/moderation/listings/{id}/route',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * Hàng đợi báo cáo (quản trị)
  *
  * `count` là số người cùng báo cáo một đối tượng, tính lúc đọc.
@@ -402,82 +683,3 @@ export const locationProvinces = <ThrowOnError extends boolean = false>(options?
  * Mô hình 2 cấp: không còn quận/huyện ở giữa. Trả kèm `province` để client cache theo tỉnh mà không phải tự ghép lại khoá.
  */
 export const locationWards = <ThrowOnError extends boolean = false>(options: Options<LocationWardsData, ThrowOnError>) => (options.client ?? client).get<LocationWardsResponses, LocationWardsErrors, ThrowOnError>({ url: '/locations/wards', ...options });
-
-/**
- * Đăng nhập bên bán phần mềm (JWT type riêng, không thuộc organization nào)
- */
-export const platformAdminLogin = <ThrowOnError extends boolean = false>(options?: Options<PlatformAdminLoginData, ThrowOnError>) => (options?.client ?? client).post<PlatformAdminLoginResponses, PlatformAdminLoginErrors, ThrowOnError>({
-    url: '/platform-admin/auth/login',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers
-    }
-});
-
-/**
- * Tạo chain mới và chỉ định chain owner
- */
-export const platformAdminCreateChain = <ThrowOnError extends boolean = false>(options?: Options<PlatformAdminCreateChainData, ThrowOnError>) => (options?.client ?? client).post<PlatformAdminCreateChainResponses, PlatformAdminCreateChainErrors, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/platform-admin/chains',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers
-    }
-});
-
-/**
- * Gán org vào chain, hoặc tách ra độc lập với chainId = null
- */
-export const platformAdminAssignChain = <ThrowOnError extends boolean = false>(options: Options<PlatformAdminAssignChainData, ThrowOnError>) => (options.client ?? client).patch<PlatformAdminAssignChainResponses, PlatformAdminAssignChainErrors, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/platform-admin/organizations/{organizationId}/chain',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Khoá/mở organization — có hiệu lực ngay, không đợi access token hết hạn
- */
-export const platformAdminSetOrganizationStatus = <ThrowOnError extends boolean = false>(options: Options<PlatformAdminSetOrganizationStatusData, ThrowOnError>) => (options.client ?? client).patch<PlatformAdminSetOrganizationStatusResponses, PlatformAdminSetOrganizationStatusErrors, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/platform-admin/organizations/{organizationId}/status',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Tạo danh mục dùng chung toàn hệ thống
- */
-export const platformAdminCreateCategory = <ThrowOnError extends boolean = false>(options?: Options<PlatformAdminCreateCategoryData, ThrowOnError>) => (options?.client ?? client).post<PlatformAdminCreateCategoryResponses, PlatformAdminCreateCategoryErrors, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/platform-admin/categories',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers
-    }
-});
-
-/**
- * Đổi tên/icon/thứ tự, hoặc bật-tắt một danh mục
- *
- * Không có endpoint xoá: gỡ danh mục khỏi lưu thông bằng `isActive: false`, vì tin đã đăng vẫn tham chiếu tới nó.
- */
-export const platformAdminUpdateCategory = <ThrowOnError extends boolean = false>(options: Options<PlatformAdminUpdateCategoryData, ThrowOnError>) => (options.client ?? client).patch<PlatformAdminUpdateCategoryResponses, PlatformAdminUpdateCategoryErrors, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/platform-admin/categories/{id}',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});

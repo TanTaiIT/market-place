@@ -5,10 +5,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, EmptyState, Loading } from '@/components/ui';
+import { OrgSwitcher } from '@/components/OrgSwitcher';
 import { useToast } from '@/components/Toast';
 import { useSignOut } from '@/queries/auth';
 import { useProfile } from '@/queries/listings';
-import { canOpenAdmin } from '@/api/admin';
+import { useMyGrants } from '@/queries/admin';
+import { canOpenAdmin, topRole } from '@/api/admin';
 import { C, F, shadow } from '@/theme';
 
 export default function Profile() {
@@ -16,6 +18,7 @@ export default function Profile() {
   const toast = useToast();
   const insets = useSafeAreaInsets();
   const { data: profile, error, isLoading } = useProfile();
+  const { data: grants } = useMyGrants();
   const signOut = useSignOut();
 
   if (isLoading) return <Loading />;
@@ -24,7 +27,7 @@ export default function Profile() {
   }
 
   const menu = [
-    ...(canOpenAdmin(profile.role)
+    ...(canOpenAdmin(grants)
       ? [{ icon: '🗂', text: 'Bàn quản trị', admin: true, go: () => router.push('/admin') }]
       : []),
     { icon: '📌', text: 'Tin đã đăng', go: () => router.push('/mylistings') },
@@ -48,6 +51,12 @@ export default function Profile() {
         </View>
       </LinearGradient>
 
+      {/* Đặt TRÊN menu: tổ chức đang chọn quyết định dữ liệu của mọi màn phía sau, nên nó phải
+          nhìn thấy ngay chứ không nằm lẫn trong danh sách tuỳ chọn. */}
+      <View style={styles.orgBlock}>
+        <OrgSwitcher />
+      </View>
+
       <View style={styles.menu}>
         {menu.map((m, i) => (
           <Animated.View key={m.text} entering={FadeInDown.delay(i * 60).duration(320)}>
@@ -67,7 +76,7 @@ export default function Profile() {
               </Text>
               {m.admin && (
                 <View style={styles.adminTag}>
-                  <Text style={styles.adminTagText}>{profile.role.toUpperCase()}</Text>
+                  <Text style={styles.adminTagText}>{(topRole(grants) ?? '').toUpperCase()}</Text>
                 </View>
               )}
               <Text style={styles.arrow}>›</Text>
@@ -96,6 +105,7 @@ const styles = StyleSheet.create({
   stats: { flexDirection: 'row', gap: 28, marginTop: 18 },
   statNum: { fontFamily: F.monoBold, fontSize: 18, color: C.ink },
   statLabel: { fontFamily: F.ui, fontSize: 10.5, color: C.inkSoft, marginTop: 2 },
+  orgBlock: { paddingHorizontal: 16, marginTop: 14 },
   menu: { padding: 20, gap: 10 },
   row: {
     flexDirection: 'row',

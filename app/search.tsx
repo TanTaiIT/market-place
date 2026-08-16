@@ -4,27 +4,31 @@ import { useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ListingPhoto } from '@/components/ListingPhoto';
-import type { ProvinceName } from '@/components/LocationPicker';
-import { ProvinceField } from '@/components/LocationPicker';
+import { SearchFilterPanel } from '@/components/SearchFilterPanel';
 import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
 import { useSearch } from '@/queries/listings';
+import { activeFilterCount, EMPTY_SEARCH, hasSearchCriteria } from '@/api/db';
+import type { SearchFilter } from '@/api/db';
 import { C, F, shadow } from '@/theme';
 
 export default function Search() {
   const router = useRouter();
-  const [text, setText] = useState('');
-  const [debounced, setDebounced] = useState('');
-  // null = toàn quốc. Không debounce vì đổi tỉnh là một thao tác dứt khoát, không phải gõ phím.
-  const [province, setProvince] = useState<ProvinceName | null>(null);
+  /** Thứ người dùng đang chỉnh — hiện ngay trên các ô nhập. */
+  const [draft, setDraft] = useState<SearchFilter>(EMPTY_SEARCH);
+  const [panelOpen, setPanelOpen] = useState(false);
 
-  // Chờ 300ms rồi mới gọi query — tránh gọi API mỗi lần gõ phím
+  // Chờ 300ms rồi mới gọi query. Debounce CẢ bộ lọc chứ không riêng từ khoá: ô giá cũng là gõ
+  // phím, gọi thẳng thì gõ "500000" bắn sáu request. Tỉnh/danh mục là thao tác dứt khoát nên
+  // 300ms không ai thấy.
+  const [filter, setFilter] = useState<SearchFilter>(EMPTY_SEARCH);
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(text), 300);
+    const t = setTimeout(() => setFilter(draft), 300);
     return () => clearTimeout(t);
-  }, [text]);
+  }, [draft]);
 
-  const { data, error, isFetching } = useSearch(debounced, province);
-  const idle = debounced.trim().length === 0 && !province;
+  const { data, error, isFetching } = useSearch(filter);
+  const idle = !hasSearchCriteria(draft);
+  const filterCount = activeFilterCount(draft);
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -34,8 +38,8 @@ export default function Search() {
         <Text style={{ fontSize: 15 }}>🔍</Text>
         <TextInput
           autoFocus
-          value={text}
-          onChangeText={setText}
+          value={draft.q}
+          onChangeText={(q) => setDraft((f) => ({ ...f, q }))}
           placeholder="Tìm xe đạp, sách, laptop..."
           placeholderTextColor={C.muted}
           style={styles.input}
@@ -43,9 +47,26 @@ export default function Search() {
         />
       </View>
 
-      <View style={styles.filterRow}>
-        <ProvinceField label="Khu vực" value={province} onChange={setProvince} allowAll />
+      <View style={styles.filterBar}>
+        <Pressable
+          onPress={() => setPanelOpen((v) => !v)}
+          style={({ pressed }) => [styles.filterBtn, filterCount > 0 && styles.filterBtnOn, pressed && { opacity: 0.7 }]}
+        >
+          <Text style={[styles.filterBtnText, filterCount > 0 && { color: C.paperWarm }]}>
+            {panelOpen ? '⌃' : '⌄'} Bộ lọc{filterCount > 0 ? ` · ${filterCount}` : ''}
+          </Text>
+        </Pressable>
+
+        {filterCount > 0 && (
+          // Xoá lọc giữ nguyên từ khoá: hai thứ độc lập, gộp lại thì người dùng mất luôn thứ
+          // họ vừa gõ chỉ vì muốn bỏ một cái chip.
+          <Pressable onPress={() => setDraft((f) => ({ ...EMPTY_SEARCH, q: f.q }))} hitSlop={6}>
+            <Text style={styles.clear}>Xoá lọc</Text>
+          </Pressable>
+        )}
       </View>
+
+      {panelOpen && <SearchFilterPanel filter={draft} onChange={setDraft} />}
 
       <FlatList
         data={data ?? []}
@@ -107,7 +128,23 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 14,
   },
-  filterRow: { paddingHorizontal: 18 },
+  filterBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingBottom: 12,
+  },
+  filterBtn: {
+    borderWidth: 1,
+    borderColor: C.lineInput,
+    borderRadius: 20,
+    paddingHorizontal: 13,
+    paddingVertical: 6,
+  },
+  filterBtnOn: { backgroundColor: C.moss, borderColor: C.moss },
+  filterBtnText: { fontFamily: F.uiSemi, fontSize: 12, color: C.ink },
+  clear: { fontFamily: F.ui, fontSize: 12, color: C.pin },
   input: { flex: 1, fontFamily: F.ui, fontSize: 14, color: C.ink, paddingVertical: 9 },
   row: {
     flexDirection: 'row',

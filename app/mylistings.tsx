@@ -5,17 +5,30 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ListingPhoto } from '@/components/ListingPhoto';
 import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
-import { useDeleteListing, useMyListings } from '@/queries/listings';
+import { useDeleteListing, useMyListings, useQuota } from '@/queries/listings';
 import { C, F, shadow } from '@/theme';
 
 export default function MyListings() {
   const toast = useToast();
   const { data, error, isLoading } = useMyListings();
   const del = useDeleteListing();
+  const quota = useQuota();
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <ScreenHeader title="Tin đã đăng" />
+
+      {/* Hạn mức đếm theo tin ĐANG CHỜ DUYỆT, không phải tổng số tin. Không nói ra con số này
+          thì lúc bị chặn người dùng chỉ thấy một lỗi và tưởng app hỏng. */}
+      {quota.data ? (
+        <View style={[styles.quota, !quota.data.allowed && styles.quotaFull]}>
+          <Text style={styles.quotaText}>
+            {quota.data.allowed
+              ? `Còn ${quota.data.remaining}/${quota.data.limit} lượt đăng — tin chờ duyệt xong sẽ trả lại lượt`
+              : `Đã dùng hết ${quota.data.limit} lượt đăng · chờ duyệt xong rồi đăng tiếp`}
+          </Text>
+        </View>
+      ) : null}
       <FlatList
         data={data ?? []}
         keyExtractor={(l) => String(l.id)}
@@ -85,6 +98,16 @@ export default function MyListings() {
 }
 
 const styles = StyleSheet.create({
+  quota: {
+    marginHorizontal: 16,
+    marginBottom: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: C.paperWarm,
+  },
+  quotaFull: { backgroundColor: C.pinLight },
+  quotaText: { fontFamily: F.ui, fontSize: 11.5, color: C.inkSoft, lineHeight: 16 },
   screen: { flex: 1, backgroundColor: C.paper },
   row: {
     flexDirection: 'row',

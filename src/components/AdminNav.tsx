@@ -2,7 +2,9 @@ import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAdminListings, useAdminReports } from '@/queries/admin';
+import { useAdminListings, useAdminReports, useMyGrants } from '@/queries/admin';
+import { canModerateOrg, canModeratePublicAxis, isMaster, topRole } from '@/api/admin';
+import { useJoinRequestQueue } from '@/queries/org';
 import { useProfile } from '@/queries/listings';
 import { Avatar } from './ui';
 import { C, F, shadow } from '@/theme';
@@ -16,7 +18,14 @@ import { C, F, shadow } from '@/theme';
  * tốn thêm lượt gọi nào (cache đã có sẵn) mà số vẫn khớp với thứ người dùng sắp thấy.
  */
 
-type NavItem = { href: string; icon: string; label: string; badge?: 'queue' | 'reports' };
+type NavItem = {
+  href: string;
+  icon: string;
+  label: string;
+  badge?: 'queue' | 'reports' | 'joins';
+  /** Quyền BE đòi ở màn đó. Hiện mục mà người dùng chỉ có thể ăn 403 là hứa suông. */
+  gate?: 'master' | 'publicAxis' | 'orgModerator';
+};
 
 const GROUPS: { label: string; items: NavItem[] }[] = [
   {
@@ -25,6 +34,8 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
       { href: '/admin', icon: '▦', label: 'Tổng quan' },
       { href: '/admin/moderation', icon: '📌', label: 'Duyệt tin', badge: 'queue' },
       { href: '/admin/reports', icon: '⚑', label: 'Báo cáo', badge: 'reports' },
+      // Trục danh mục: hàng đợi riêng, không gộp vào 'Duyệt tin' — hai trục không giao nhau.
+      { href: '/admin/public-queue', icon: '🌐', label: 'Hàng đợi công khai', gate: 'publicAxis' },
     ],
   },
   {
@@ -38,9 +49,20 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: 'Cộng đồng',
     items: [
+      {
+        href: '/admin/join-requests',
+        icon: '✋',
+        label: 'Đơn xin gia nhập',
+        badge: 'joins',
+        gate: 'orgModerator',
+      },
       { href: '/admin/users', icon: '◍', label: 'Người dùng' },
       { href: '/admin/schools', icon: '⌂', label: 'Trường & hệ thống' },
     ],
+  },
+  {
+    label: 'Hệ thống',
+    items: [{ href: '/admin/coverage', icon: '◰', label: 'Phủ sóng', gate: 'master' }],
   },
   { label: 'Khác', items: [{ href: '/admin/settings', icon: '⚙', label: 'Cài đặt' }] },
 ];
@@ -51,8 +73,25 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
   const { data: queue } = useAdminListings('pending');
   const { data: reports } = useAdminReports();
   const { data: profile } = useProfile();
+  const { data: grants } = useMyGrants();
+  const { data: joins } = useJoinRequestQueue('pending');
 
-  const counts = { queue: queue?.length ?? 0, reports: reports?.length ?? 0 };
+  const counts = {
+    queue: queue?.length ?? 0,
+    reports: reports?.length ?? 0,
+    joins: joins?.length ?? 0,
+  };
+
+  const allowed = {
+    master: isMaster(grants),
+    publicAxis: canModeratePublicAxis(grants),
+    orgModerator: canModerateOrg(grants),
+  };
+  // Cắt cả nhóm khi nó rỗng, không để lại cái tiêu đề nhóm treo lơ lửng không có mục nào.
+  const visibleGroups = GROUPS.map((g) => ({
+    ...g,
+    items: g.items.filter((i) => !i.gate || allowed[i.gate]),
+  })).filter((g) => g.items.length > 0);
 
   const go = (href: string) => {
     onClose();
@@ -77,7 +116,7 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
         </View>
 
         <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-          {GROUPS.map((group) => (
+          {visibleGroups.map((group) => (
             <View key={group.label}>
               <Text style={styles.group}>{group.label.toUpperCase()}</Text>
               {group.items.map((item) => {
@@ -127,7 +166,7 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
             <Text numberOfLines={1} style={styles.meName}>
               {profile?.name ?? 'Quản trị'}
             </Text>
-            <Text style={styles.meRole}>{(profile?.role ?? '').toUpperCase()}</Text>
+            <Text style={styles.meRole}>{(topRole(grants) ?? '').toUpperCase()}</Text>
           </View>
           <Text style={styles.exit}>Thoát ›</Text>
         </Pressable>

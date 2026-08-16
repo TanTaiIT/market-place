@@ -54,7 +54,7 @@ export function AdminListingSheet({
             <View style={styles.dl}>
               <Row label="Người đăng" value={item.seller} />
               <Row label="Danh mục" value={item.cat} />
-              <Row label="Đăng lúc" value={`${item.at} trước`} />
+              <Row label="Đăng lúc" value={item.at} />
               <Row label="Lượt xem" value={String(item.views)} mono />
               {!!item.reason && <Row label="Lý do từ chối" value={item.reason} bad />}
             </View>

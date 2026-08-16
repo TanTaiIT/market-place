@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminContentApi } from '@/api/admin-content';
-import type { AdminLimits, NoticeSender } from '@/api/admin-content';
+import type { AdminLimits } from '@/api/admin-content';
 import { qk } from './keys';
 
 /**
@@ -55,9 +55,13 @@ export function useSentNotices() {
 export function useSendNotice() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { sender: NoticeSender; title: string; body: string; audienceId: string }) =>
-      adminContentApi.sendNotice(v),
-    onSettled: () => qc.invalidateQueries({ queryKey: qk.adminNotices() }),
+    mutationFn: adminContentApi.sendNotice,
+    // Quét cả `notifications()`: người gửi cũng là người nhận, thông báo vừa gửi phải xuất
+    // hiện ở tab Thông báo của chính họ chứ không phải chờ tới lần mở app sau.
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: qk.adminNotices() });
+      qc.invalidateQueries({ queryKey: qk.notifications() });
+    },
   });
 }
 

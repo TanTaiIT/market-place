@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
-import { setHttpSession, setSessionRefresher } from '@/api/http';
+import { setActiveOrgSlug, setHttpSession, setSessionRefresher } from '@/api/http';
 import { useAuthStore } from '@/stores/auth';
 import { qk } from './keys';
 
@@ -9,9 +9,7 @@ import { qk } from './keys';
 
 export function useLogin() {
   return useMutation({
-    // `orgSlug` bắt buộc đi cùng: BE chỉ unique email theo `(organizationId, email)`.
-    mutationFn: (v: { email: string; password: string; orgSlug?: string }) =>
-      api.login(v.email, v.password, v.orgSlug),
+    mutationFn: (v: { email: string; password: string }) => api.login(v.email, v.password),
   });
 }
 
@@ -53,7 +51,7 @@ function refreshSession(qc: QueryClient): Promise<string | null> {
   if (!current) return Promise.resolve(null);
 
   return api
-    .refreshSession(current.refreshToken, current.orgSlug)
+    .refreshSession(current.refreshToken)
     .then((renewed) => {
       useAuthStore.getState().signIn(renewed);
       setHttpSession({ accessToken: renewed.accessToken, userId: renewed.userId });
@@ -82,11 +80,15 @@ function refreshSession(qc: QueryClient): Promise<string | null> {
  */
 export function useSyncAccessToken(qc: QueryClient): void {
   const session = useAuthStore((s) => s.session);
+  // Org đang chọn cũng phải xuống tầng HTTP: v2 gửi nó theo header ở MỌI request, và nó đổi
+  // được giữa phiên (người dùng chuyển tổ chức) mà không hề đụng tới token.
+  const activeOrgSlug = useAuthStore((s) => s.activeOrgSlug);
 
   // Ghi ngay trong render, KHÔNG qua useEffect: effect của màn con chạy trước effect của
   // layout cha, nên query đầu tiên sau khi mở lại app sẽ bay đi lúc token còn null và nhận
   // 401. Layout cha render trước con, nên ghi ở đây là kịp. An toàn vì lệnh này idempotent.
   setHttpSession(session ? { accessToken: session.accessToken, userId: session.userId } : null);
+  setActiveOrgSlug(activeOrgSlug);
   setSessionRefresher(() => refreshSession(qc));
 }
 

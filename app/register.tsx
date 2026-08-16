@@ -17,7 +17,7 @@ export default function Register() {
   const register = useRegister();
   const signIn = useSignIn();
 
-  const [form, setForm] = useState({ name: '', email: '', phone: '', org: '', password: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '' });
   const set = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const submit = () =>
@@ -26,8 +26,6 @@ export default function Register() {
         name: form.name.trim(),
         email: form.email.trim(),
         password: form.password,
-        // BE tạo Organization mới từ tên này; slug do BE sinh ra.
-        organizationName: form.org.trim(),
         phone: form.phone.trim() || undefined,
       },
       {
@@ -63,7 +61,6 @@ export default function Register() {
               keyboardType="phone-pad"
               placeholder="09xx xxx xxx"
             />
-            <Field label="Trường / tổ chức" value={form.org} onChangeText={set('org')} placeholder="Trường Hùng Vương" />
             <Field
               label="Mật khẩu"
               value={form.password}

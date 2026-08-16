@@ -11,6 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ListingGallery } from '@/components/ListingGallery';
+import { ListingSuggestions } from '@/components/ListingSuggestions';
 import { Avatar, EmptyState, Loading, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useListing, useSavedIds, useToggleSaved } from '@/queries/listings';
@@ -89,7 +90,7 @@ export default function ListingDetail() {
           )}
 
           <Text style={styles.title}>{listing.title}</Text>
-          <Text style={styles.meta}>{listing.meta} trước</Text>
+          <Text style={styles.meta}>{listing.meta}</Text>
 
           <View style={styles.sellerCard}>
             <Avatar text={listing.avatar} size={42} color={C.amber} textColor={C.amberInk} />
@@ -102,6 +103,8 @@ export default function ListingDetail() {
           <Text style={styles.label}>Mô tả</Text>
           <Text style={styles.desc}>{listing.desc}</Text>
         </Animated.View>
+
+        <ListingSuggestions current={listing} />
       </ScrollView>
 
       <View style={[styles.cta, { paddingBottom: insets.bottom || 14 }]}>

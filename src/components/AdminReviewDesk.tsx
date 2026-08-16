@@ -147,7 +147,7 @@ export function AdminReviewDesk({
               <Text style={styles.slipMetaText}>
                 <Text style={styles.slipMetaStrong}>{current.seller}</Text> · {current.cat}
               </Text>
-              <Text style={styles.slipMetaText}>gửi {current.at} trước</Text>
+              <Text style={styles.slipMetaText}>gửi {current.at}</Text>
             </View>
           </Animated.View>
         </Animated.View>

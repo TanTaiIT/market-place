@@ -1,17 +1,25 @@
 import React from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState, Loading, TabHeader } from '@/components/ui';
-import { useNotifications } from '@/queries/listings';
+import { useToast } from '@/components/Toast';
+import { useMarkNotificationRead, useNotifications } from '@/queries/listings';
 import { C, F, shadow } from '@/theme';
 
-const ICON_BG = { org: C.mossLight, chain: '#FDEFD9', system: C.sand } as const;
-const BADGE_BG = { org: C.moss, chain: C.amber, system: C.sand } as const;
-const BADGE_FG = { org: '#fff', chain: C.amberInk, system: C.inkSoft } as const;
+/**
+ * Hai phạm vi BE thật sự phân biệt. `chain`/`system` của bản cũ đã bỏ: chain không còn tồn
+ * tại trong hệ thống, còn system thì chưa từng có endpoint nào gửi.
+ */
+const SCOPE = {
+  org: { icon: '🏫', label: 'Toàn tổ chức', iconBg: C.mossLight, badgeBg: C.moss, badgeFg: '#fff' },
+  unit: { icon: '👥', label: 'Nhóm của bạn', iconBg: C.sand, badgeBg: C.amber, badgeFg: C.amberInk },
+} as const;
 
 export default function Notifications() {
   const { data, error, isLoading } = useNotifications();
+  const markRead = useMarkNotificationRead();
+  const toast = useToast();
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -20,24 +28,36 @@ export default function Notifications() {
         data={data ?? []}
         keyExtractor={(n) => String(n.id)}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, gap: 10 }}
-        renderItem={({ item, index }) => (
-          <Animated.View entering={FadeInDown.delay(index * 70).duration(340)} style={styles.item}>
-            <View style={[styles.icon, { backgroundColor: ICON_BG[item.kind] }]}>
-              <Text style={{ fontSize: 16 }}>{item.icon}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              {item.badge && (
-                <View style={[styles.badge, { backgroundColor: BADGE_BG[item.kind] }]}>
-                  <Text style={[styles.badgeText, { color: BADGE_FG[item.kind] }]}>{item.badge}</Text>
+        renderItem={({ item, index }) => {
+          const scope = SCOPE[item.scope];
+          return (
+            <Animated.View entering={FadeInDown.delay(index * 70).duration(340)}>
+              <Pressable
+                // Chạm để đánh dấu đã đọc. Không tự đánh dấu khi dòng lọt vào khung nhìn: cuộn
+                // lướt qua không phải là đã đọc, và chấm chưa đọc là thứ duy nhất giúp người
+                // dùng tìm lại thông báo họ định xem sau.
+                onPress={() =>
+                  item.unread &&
+                  markRead.mutate(item.id, { onError: (e: Error) => toast(`⚠️ ${e.message}`) })
+                }
+                style={({ pressed }) => [styles.item, pressed && { opacity: 0.85 }]}
+              >
+                <View style={[styles.icon, { backgroundColor: scope.iconBg }]}>
+                  <Text style={{ fontSize: 16 }}>{scope.icon}</Text>
                 </View>
-              )}
-              <Text style={styles.title}>{item.title}</Text>
-              <Text style={styles.body}>{item.body}</Text>
-              <Text style={styles.time}>{item.time}</Text>
-            </View>
-            {item.unread && <View style={styles.dot} />}
-          </Animated.View>
-        )}
+                <View style={{ flex: 1 }}>
+                  <View style={[styles.badge, { backgroundColor: scope.badgeBg }]}>
+                    <Text style={[styles.badgeText, { color: scope.badgeFg }]}>{scope.label}</Text>
+                  </View>
+                  <Text style={styles.title}>{item.title}</Text>
+                  <Text style={styles.body}>{item.body}</Text>
+                  <Text style={styles.time}>{item.time}</Text>
+                </View>
+                {item.unread && <View style={styles.dot} />}
+              </Pressable>
+            </Animated.View>
+          );
+        }}
         ListEmptyComponent={
           isLoading ? (
             <Loading />

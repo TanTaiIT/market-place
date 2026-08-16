@@ -1,3 +1,7 @@
+import { notificationCreate, notificationList } from './generated';
+import { relativeTime, unwrap } from './client';
+import { withAuthRetry } from './http';
+
 /** Bốn danh mục khởi điểm của fixture — trùng với seed bên BE. */
 const MOD_CATEGORIES = ['Sách vở', 'Xe đạp', 'Điện tử', 'Đồ dùng'];
 
@@ -6,8 +10,8 @@ const MOD_CATEGORIES = ['Sách vở', 'Xe đạp', 'Điện tử', 'Đồ dùng'
  * Ba thứ này đều là **cấu hình** — quản trị đặt ra rồi cả trường chạy theo — khác hẳn hàng đợi
  * kiểm duyệt bên `admin.ts` vốn xử từng tin một.
  *
- * Vẫn là fixture in-memory: `/categories` của BE đang trả 501, chưa có route thông báo đẩy
- * lẫn route lưu cấu hình nào.
+ * **Thông báo đã nối BE thật** (`/notifications`). Danh mục và luật vẫn là fixture in-memory:
+ * `/categories` của BE đang trả 501 và chưa có route lưu cấu hình nào.
  */
 
 // ── TYPES ───────────────────────────────────────────────────────────
@@ -20,17 +24,24 @@ export type Category = {
   count: number;
 };
 
-export type NoticeSender = 'org' | 'chain' | 'system';
-
+/**
+ * Một thông báo đã gửi, đọc từ BE.
+ *
+ * Không còn `reach` (số người nhận): BE không đếm được và cũng không có khái niệm "gửi tới N
+ * người" — thông báo là một bản ghi của tổ chức, ai thuộc phạm vi thì đọc được. Thay bằng
+ * `readCount`, con số DUY NHẤT có thật về độ phủ.
+ *
+ * `NoticeSender` (org/chain/system) cũng bỏ: `chain` là khái niệm đã xoá khỏi hệ thống ở v2,
+ * còn `system` chưa từng có endpoint nào gửi.
+ */
 export type SentNotice = {
-  id: number;
+  id: string;
   title: string;
-  audience: string;
-  reach: number;
+  /** `null` = gửi cho cả tổ chức. */
+  unitId: string | null;
+  readCount: number;
   at: string;
 };
-
-export type NoticeAudience = { id: string; label: string; reach: number };
 
 export type AdminRule = { id: string; title: string; desc: string; on: boolean };
 
@@ -44,12 +55,6 @@ export type AdminLimits = {
 /** Tuỳ chọn hợp lệ cho `expiryDays` — để màn không phải tự bịa ra danh sách. */
 export const EXPIRY_CHOICES = [30, 45, 60];
 
-export const NOTICE_AUDIENCES: NoticeAudience[] = [
-  { id: 'school', label: 'Toàn trường', reach: 1284 },
-  { id: 'chain', label: 'Cả hệ thống', reach: 2610 },
-  { id: 'sellers', label: 'Người đang bán', reach: 312 },
-];
-
 /** Tối đa 8 danh mục: quá số đó thì hàng băng dính trên bảng tin của học sinh tràn dòng. */
 export const MAX_CATEGORIES = 8;
 
@@ -59,12 +64,6 @@ let categories: { name: string; scope: string }[] = MOD_CATEGORIES.map((name) =>
   name,
   scope: 'Cả hệ thống',
 }));
-
-let notices: SentNotice[] = [
-  { id: 1, title: 'Hội chợ đồ cũ cuối kỳ', audience: 'toàn trường Hùng Vương', reach: 1284, at: '5 giờ trước' },
-  { id: 2, title: 'Mở xem tin đăng chéo hai trường', audience: 'cả hệ thống', reach: 2610, at: '1 ngày trước' },
-  { id: 3, title: 'Nhắc gia hạn tin sắp hết hạn', audience: 'người đang bán', reach: 312, at: '3 ngày trước' },
-];
 
 const rules: AdminRule[] = [
   {
@@ -134,37 +133,42 @@ export const adminContentApi = {
     return { name };
   },
 
+  /**
+   * `scope: 'managed'` — thứ người gọi GỬI ĐƯỢC TỚI, không phải thứ họ nhận được.
+   *
+   * Mặc định `inbox` sẽ sai ở đúng ca thường gặp nhất: quản lý cấp org không đứng trong nhóm
+   * nào, nên thông báo họ vừa gửi cho một nhóm không nằm trong hộp thư của họ — panel này sẽ
+   * báo gửi xong rồi hiện một danh sách không có nó.
+   */
   async getNotices(): Promise<SentNotice[]> {
-    await delay(140);
-    return clone(notices);
+    const res = await withAuthRetry(() =>
+      notificationList({ query: { limit: 20, scope: 'managed' } }),
+    );
+    return unwrap(res, 'Không tải được thông báo đã gửi').map((n) => ({
+      id: n.id,
+      title: n.title,
+      unitId: n.unitId,
+      readCount: n.readCount,
+      at: relativeTime(n.createdAt),
+    }));
   },
 
   /**
-   * Gửi thông báo đẩy. Trả về số người nhận để call-site báo lại đúng con số — đây là hành động
-   * không rút lại được, người gửi cần thấy mình vừa chạm tới bao nhiêu người.
+   * Gửi thông báo. `unitId` rỗng = cả tổ chức — và BE chặn nếu người gửi chỉ phụ trách một nhóm.
+   *
+   * Không trả "số người nhận": BE không có con số đó, và bịa ra một con số cho một hành động
+   * không rút lại được là kiểu nói dối tệ nhất.
    */
-  async sendNotice(input: {
-    sender: NoticeSender;
-    title: string;
-    body: string;
-    audienceId: string;
-  }): Promise<SentNotice> {
-    await delay(260);
+  async sendNotice(input: { title: string; body: string; unitId: string | null }) {
     if (!input.title.trim() || !input.body.trim()) {
       throw new Error('Điền tiêu đề và nội dung trước khi gửi');
     }
-    const audience = NOTICE_AUDIENCES.find((a) => a.id === input.audienceId);
-    if (!audience) throw new Error('Chọn người nhận trước khi gửi');
-
-    const sent: SentNotice = {
-      id: Math.max(0, ...notices.map((n) => n.id)) + 1,
-      title: input.title.trim(),
-      audience: audience.label.toLowerCase(),
-      reach: audience.reach,
-      at: 'vừa xong',
-    };
-    notices = [sent, ...notices];
-    return clone(sent);
+    const res = await withAuthRetry(() =>
+      notificationCreate({
+        body: { title: input.title.trim(), body: input.body.trim(), unitId: input.unitId },
+      }),
+    );
+    return unwrap(res, 'Không gửi được thông báo');
   },
 
   async getRules(): Promise<AdminRule[]> {

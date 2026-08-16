@@ -13,9 +13,12 @@ import {
   listingGetById,
   listingList,
   listingMine,
+  listingQuota,
   listingRemove,
   locationProvinces,
   locationWards,
+  notificationList,
+  notificationMarkRead,
   userGetMe,
   userUpdateMe,
 } from './generated';
@@ -27,8 +30,17 @@ import type {
   Message as MessageDto,
 } from './generated';
 import type { Province, ProvinceName } from './location';
-import { CHAT_COLORS, db, NEW_PHOTOS } from './db';
-import type { AuthSession, Category, Conversation, Listing, Message, Notif, Profile } from './db';
+import { CHAT_COLORS, db, hasSearchCriteria, NEW_PHOTOS } from './db';
+import type {
+  AuthSession,
+  Category,
+  Conversation,
+  Listing,
+  Message,
+  Notif,
+  Profile,
+  SearchFilter,
+} from './db';
 import { getCurrentUserId, withAuthRetry } from './http';
 
 /**
@@ -84,13 +96,19 @@ export function gradOf(id: string) {
   return NEW_PHOTOS[sum % NEW_PHOTOS.length];
 }
 
+/**
+ * Trả về **cụm hoàn chỉnh**, đã gồm chữ "trước".
+ *
+ * Trước đây hàm trả "5 phút" rồi mỗi call-site tự nối ` trước`, nhưng nhánh dưới 1 phút trả
+ * "vừa xong" — nối vào thành "vừa xong trước". Hậu tố thuộc về chỗ biết mình đang ở nhánh nào.
+ */
 export function relativeTime(iso: string): string {
   const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
   if (minutes < 1) return 'vừa xong';
-  if (minutes < 60) return `${minutes} phút`;
+  if (minutes < 60) return `${minutes} phút trước`;
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} giờ`;
-  return `${Math.round(hours / 24)} ngày`;
+  if (hours < 24) return `${hours} giờ trước`;
+  return `${Math.round(hours / 24)} ngày trước`;
 }
 
 /**
@@ -110,6 +128,8 @@ function toListing(dto: ListingDto, names: Map<string, string>): Listing {
     // BE trả `category` là ObjectId; tên hiển thị tra từ từ điển danh mục. Không tra được
     // thì để rỗng — `NoteCard` tự giấu pill, tin vẫn đọc được bình thường.
     cat: names.get(dto.category) ?? '',
+    categoryId: dto.category,
+    province: dto.location?.province,
     // BE không trả tên organization trong Listing, nên meta chỉ còn mốc thời gian.
     meta: relativeTime(dto.createdAt),
     photo: gradOf(dto._id),
@@ -128,14 +148,13 @@ function toListing(dto: ListingDto, names: Map<string, string>): Listing {
  * Cả ba endpoint auth (`login`/`register`/`refresh`) trả cùng `AuthResponse`, nên phiên chỉ được
  * dựng ở đây — ba bản copy là ba chỗ có thể quên `refreshToken` mới sau khi BE rotate.
  *
- * `orgSlug` không có trong response: BE không trả slug, chỉ trả `organizationId`. Nó là thứ người
- * dùng tự nhập ở màn đăng nhập nên caller truyền lại vào để phiên còn nhớ cho lần sau.
+ * Phiên KHÔNG mang tổ chức nữa: v2 tách org khỏi danh tính. Org là lựa chọn theo từng request
+ * (`X-Org-Slug`) và sống ở `stores/auth.activeOrgSlug`.
  */
-function toSession(auth: AuthResponse, orgSlug?: string): AuthSession {
+function toSession(auth: AuthResponse): AuthSession {
   return {
     userId: auth.user.id,
     email: auth.user.email,
-    orgSlug,
     accessToken: auth.tokens.accessToken,
     refreshToken: auth.tokens.refreshToken,
   };
@@ -149,7 +168,6 @@ function toProfile(dto: MeProfile): Profile {
     org: '',
     phone: dto.phone ?? '',
     avatar: dto.avatar || initialsOf(dto.name),
-    role: dto.role,
     posted: '—',
     sold: '—',
     rating: dto.ratingCount > 0 ? dto.ratingAvg.toFixed(1) : '—',
@@ -229,46 +247,34 @@ async function categoryNames(): Promise<Map<string, string>> {
 
 export const api = {
   /* ---------------- auth ---------------- */
-  /**
-   * `orgSlug` **phải** đi trong body: BE chỉ unique email theo `(organizationId, email)` nên
-   * `authService.login` gọi `requireOrganizationId()`. Org lấy từ subdomain (web) hoặc `orgSlug`
-   * (app) — thiếu cả hai thì `resolveTenant` không mở scope và login chết ở tầng tenant, không
-   * phải vì sai mật khẩu. Đây là lý do tham số này không được nuốt như trước.
-   */
-  async login(email: string, password: string, orgSlug?: string): Promise<AuthSession> {
-    const res = await authLogin({ body: { email, password, orgSlug } });
-    const auth = unwrap(res, 'Đăng nhập không thành công, kiểm tra lại email và mật khẩu');
-    return toSession(auth, orgSlug);
+  /** Email unique TOÀN CỤC ở v2, nên email + mật khẩu là đủ — không cần biết tổ chức nào. */
+  async login(email: string, password: string): Promise<AuthSession> {
+    const res = await authLogin({ body: { email, password } });
+    return toSession(unwrap(res, 'Đăng nhập không thành công, kiểm tra lại email và mật khẩu'));
   },
 
   /**
-   * BE `POST /auth/register` tạo **Organization mới + owner đầu tiên**, không phải thêm người
-   * vào tổ chức có sẵn. Muốn tham gia tổ chức đã tồn tại thì phải chờ endpoint invite của BE.
+   * Đăng ký chỉ tạo TÀI KHOẢN, không tạo tổ chức.
+   *
+   * Ở v2 chỉ master tạo được org; người dùng vào tổ chức bằng đơn xin tham gia
+   * (`POST /join-requests`). `registerSchema` của BE là `.strict()`, nên app còn gửi kèm
+   * `organizationName` như bản cũ sẽ ăn 400 "Validation failed" chứ không phải lỗi nghiệp vụ.
    */
   async register(input: {
     name: string;
     email: string;
     password: string;
-    organizationName: string;
-    organizationSlug?: string;
     phone?: string;
   }): Promise<AuthSession> {
     const res = await authRegister({
-      // `registerSchema` của BE là `.strict()` và **bắt buộc** `organizationName`; bỏ nó đi thì
-      // nhận 400 "Validation failed" chứ không phải lỗi nghiệp vụ nào.
       body: {
-        organizationName: input.organizationName,
-        organizationSlug: input.organizationSlug,
         name: input.name,
         email: input.email,
         password: input.password,
         phone: input.phone,
       },
     });
-    const auth = unwrap(res, 'Tạo tài khoản không thành công');
-    // Slug do BE sinh khi không truyền, và phiên sau đăng ký chưa biết nó là gì. Giữ slug người
-    // dùng tự nhập (nếu có) để lần đăng nhập lại trên thiết bị khác còn điền đúng org.
-    return toSession(auth, input.organizationSlug);
+    return toSession(unwrap(res, 'Tạo tài khoản không thành công'));
   },
 
   /**
@@ -278,10 +284,9 @@ export const api = {
    * Không đi qua `getCurrentUserId()`/session ở module scope: hàm này chạy đúng lúc access token
    * đã hết hạn, nên refresh token phải do caller truyền vào.
    */
-  async refreshSession(refreshToken: string, orgSlug?: string): Promise<AuthSession> {
+  async refreshSession(refreshToken: string): Promise<AuthSession> {
     const res = await authRefresh({ body: { refreshToken } });
-    const auth = unwrap(res, 'Phiên đăng nhập đã hết, đăng nhập lại nhé');
-    return toSession(auth, orgSlug);
+    return toSession(unwrap(res, 'Phiên đăng nhập đã hết, đăng nhập lại nhé'));
   },
 
   /* ---------------- categories ---------------- */
@@ -307,6 +312,34 @@ export const api = {
     return unwrap(res, 'Không tải được bảng tin').map((l) => toListing(l, names));
   },
 
+  /**
+   * Tin gợi ý cho một tin đang xem.
+   *
+   * Lọc CỨNG theo danh mục, còn tỉnh chỉ dùng để XẾP TRƯỚC. Lọc cứng cả hai thì ở tỉnh thưa
+   * tin người xem nhận về khoảng trống, trong khi một món cùng loại ở tỉnh khác vẫn là thứ họ
+   * muốn thấy — cùng lập luận BE đã chốt cho `ward` ở `/listings/nearby`.
+   *
+   * Tải rộng hơn số hiển thị rồi mới cắt: `/listings` không có tham số `exclude` nên chính tin
+   * đang xem luôn nằm trong kết quả, và xếp theo tỉnh chỉ có ý nghĩa khi có đủ tin để xếp —
+   * lấy đúng `take` phần tử thì thứ tự trả về gần như y nguyên của BE.
+   */
+  async getSuggestions(current: Pick<Listing, 'id' | 'categoryId' | 'province'>, take: number) {
+    const [res, names] = await Promise.all([
+      withAuthRetry(() => listingList({ query: { limit: take * 3, category: current.categoryId } })),
+      categoryNames(),
+    ]);
+
+    const rows = unwrap(res, 'Không tải được tin gợi ý')
+      .map((l) => toListing(l, names))
+      .filter((l) => l.id !== current.id);
+
+    // Tách hai nhóm rồi nối, thay vì `sort` với comparator hoà nhau: cách này giữ nguyên thứ
+    // tự mới-nhất-trước của BE trong từng nhóm mà không phải tin vào tính ổn định của `sort`.
+    const sameProvince = rows.filter((l) => l.province === current.province);
+    const elsewhere = rows.filter((l) => l.province !== current.province);
+    return [...sameProvince, ...elsewhere].slice(0, take);
+  },
+
   async getListing(id: string): Promise<Listing> {
     const [res, names] = await Promise.all([
       withAuthRetry(() => listingGetById({ path: { id } })),
@@ -319,16 +352,24 @@ export const api = {
    * `province` phải là đúng chuỗi trong danh sách của `/locations/provinces` — BE so khớp chính
    * xác, gửi "TP. Hồ Chí Minh" thay vì "Hồ Chí Minh" giờ là 400 chứ không còn im lặng trả rỗng.
    */
-  async searchListings(q: string, province?: ProvinceName | null): Promise<Listing[]> {
-    const term = q.trim();
-    if (!term && !province) return [];
+  async searchListings(filter: SearchFilter): Promise<Listing[]> {
+    // Không ràng buộc nào thì đây là "tất cả tin", không phải một lượt tìm — trả rỗng để màn
+    // hình hiện lời mời nhập, thay vì đổ nguyên bảng tin vào ô kết quả tìm kiếm.
+    if (!hasSearchCriteria(filter)) return [];
+
+    const term = filter.q.trim();
     const [res, names] = await Promise.all([
       withAuthRetry(() =>
         listingList({
+          // Bỏ hẳn field khi rỗng chứ không gửi `undefined`/`null`: `listingQuerySchema` của BE
+          // coi `minPrice: null` là có mặt và ép kiểu, còn vắng mặt mới là "không lọc".
           query: {
             limit: 50,
             ...(term ? { q: term } : {}),
-            ...(province ? { province } : {}),
+            ...(filter.province ? { province: filter.province } : {}),
+            ...(filter.categoryId ? { category: filter.categoryId } : {}),
+            ...(filter.minPrice !== null ? { minPrice: filter.minPrice } : {}),
+            ...(filter.maxPrice !== null ? { maxPrice: filter.maxPrice } : {}),
           },
         }),
       ),
@@ -368,6 +409,12 @@ export const api = {
     address?: string | null;
     province?: ProvinceName | null;
     ward?: string | null;
+    /**
+     * Nơi tin sẽ hiển thị — và cũng là thứ quyết định AI DUYỆT nó (BE §0.1): `org_internal`
+     * về hàng đợi của tổ chức, `public` về hàng đợi manager danh mục theo (danh mục × tỉnh).
+     * Bỏ trống thì BE mặc định `org_internal`.
+     */
+    visibility?: 'org_internal' | 'public';
   }): Promise<Listing> {
     // Ô giá là `number-pad` nhưng vẫn lọt dấu phân cách người dùng tự gõ; BE nhận `number`.
     const price = Number(input.price.replace(/\D/g, ''));
@@ -393,12 +440,30 @@ export const api = {
             // `location: {}` rỗng qua được `.strict()` của BE nhưng tạo ra bản ghi không lọc
             // được theo gì — thà vắng hẳn field.
             ...(Object.keys(location).length ? { location } : {}),
+            ...(input.visibility ? { visibility: input.visibility } : {}),
+            // Tin công khai BẮT BUỘC có tỉnh: nó là thứ chọn ra người duyệt. Gửi kèm tường minh
+            // thay vì để BE suy từ tổ chức — người đăng tin công khai có thể không thuộc org nào.
+            ...(input.visibility === 'public' && input.province
+              ? { provinceCode: input.province }
+              : {}),
           },
         }),
       ),
       categoryNames(),
     ]);
     return toListing(unwrap(res, 'Không ghim được tin lên bảng'), names);
+  },
+
+  /**
+   * Còn bao nhiêu slot đăng tin.
+   *
+   * BE chặn theo số tin ĐANG CHỜ DUYỆT, không theo tổng số tin: người dùng chỉ tạo thêm việc
+   * cho người duyệt khi việc cũ đã được xử lý. Không hiện con số này ra thì lúc bị chặn họ chỉ
+   * thấy một lỗi 409 và đổ cho app hỏng.
+   */
+  async getQuota(): Promise<{ limit: number; pending: number; remaining: number; allowed: boolean }> {
+    const res = await withAuthRetry(() => listingQuota());
+    return unwrap(res, 'Không đọc được hạn mức đăng tin');
   },
 
   /* ---------------- địa giới hành chính ---------------- */
@@ -503,9 +568,25 @@ export const api = {
   },
 
   /* ---------------- misc ---------------- */
+  /**
+   * BE đã lọc sẵn theo người gọi: thông báo cả tổ chức + thông báo của đúng nhóm con họ thuộc.
+   * Tài khoản chưa thuộc tổ chức nào nhận mảng rỗng chứ không phải lỗi, nên không cần guard.
+   */
   async getNotifications(): Promise<Notif[]> {
-    await delay(120);
-    return [];
+    const res = await withAuthRetry(() => notificationList({ query: { limit: 50 } }));
+    return unwrap(res, 'Không tải được thông báo').map((n) => ({
+      id: n.id,
+      scope: n.unitId ? ('unit' as const) : ('org' as const),
+      title: n.title,
+      body: n.body,
+      time: relativeTime(n.createdAt),
+      unread: !n.isRead,
+    }));
+  },
+
+  async markNotificationRead(id: string): Promise<void> {
+    const res = await withAuthRetry(() => notificationMarkRead({ path: { id } }));
+    unwrap(res, 'Không đánh dấu được đã đọc');
   },
 
   async getProfile(): Promise<Profile> {

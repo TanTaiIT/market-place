@@ -16,8 +16,6 @@ export default function Login() {
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  // BE scope đăng nhập theo Organization: lấy từ subdomain ở web, còn app phải gửi `orgSlug`.
-  const [orgSlug, setOrgSlug] = useState('');
   const login = useLogin();
   const signIn = useSignIn();
 
@@ -34,7 +32,7 @@ export default function Login() {
 
   const submit = () => {
     login.mutate(
-      { email: email.trim(), password, orgSlug: orgSlug.trim() || undefined },
+      { email: email.trim(), password },
       {
         // Chỉ bật phiên, không tự điều hướng — `Stack.Protected` đổi tập route khả dụng,
         // gọi router.replace ngay đây sẽ chạy trước khi route đích được đăng ký.
@@ -73,13 +71,6 @@ export default function Login() {
               secureTextEntry
               placeholder="••••••••"
             />
-            <Field
-              label="Mã trường / tổ chức"
-              value={orgSlug}
-              onChangeText={setOrgSlug}
-              placeholder="hung-vuong"
-            />
-
             <PinButton
               label="Đăng nhập"
               onPress={submit}

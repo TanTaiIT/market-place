@@ -13,73 +13,55 @@ import { AdminPanel, AdminScreen } from '@/components/AdminScreen';
 import { Field, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useSendNotice, useSentNotices } from '@/queries/admin-content';
-import { NOTICE_AUDIENCES } from '@/api/admin-content';
-import type { NoticeSender } from '@/api/admin-content';
+import { useOrgUnits } from '@/queries/org';
 import { C, F, shadow } from '@/theme';
 
-/** Ba danh nghĩa gửi — icon và màu nền của huy hiệu phải khớp với màn Thông báo của học sinh. */
-const SENDERS: { id: NoticeSender; icon: string; label: string; tag: string; bg: string }[] = [
-  { id: 'org', icon: '🏫', label: 'Từ trường', tag: 'Từ trường', bg: C.mossDeep },
-  { id: 'chain', icon: '🔗', label: 'Từ hệ thống', tag: 'Từ hệ thống', bg: C.inkSoft },
-  { id: 'system', icon: '📌', label: 'Từ Ghim', tag: 'Từ Ghim', bg: C.pinDark },
-];
-
-/** Hermes không có Intl đầy đủ nên `toLocaleString` không tin được — chấm nghìn bằng tay. */
-const group = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-
 /**
- * Soạn và gửi thông báo đẩy. Ô xem trước dựng lại đúng thẻ thông báo của app người dùng — gửi
- * đi là không rút lại được, nên người soạn phải thấy trước thứ 1.284 học sinh sắp nhận.
+ * Soạn và gửi thông báo cho tổ chức đang hoạt động.
+ *
+ * Bản trước có ba "danh nghĩa gửi" (trường / hệ thống / Ghim) và ba nhóm người nhận kèm số
+ * lượng — tất cả đều là fixture, BE không có khái niệm nào trong đó: `chain` đã bị xoá khỏi
+ * hệ thống ở v2, và `POST /notifications` chỉ nhận `{ title, body, unitId }`.
+ *
+ * Thứ còn lại là thứ có thật: gửi cho cả tổ chức, hoặc gửi cho một nhóm con. Người chỉ phụ
+ * trách một nhóm sẽ bị BE chặn nếu chọn "cả tổ chức" — nên ô đó vẫn hiện, để họ nhận được lời
+ * từ chối rõ ràng thay vì không hiểu vì sao mình thiếu một lựa chọn.
  */
 export default function AdminNotice() {
   const toast = useToast();
   const send = useSendNotice();
   const { data: sent } = useSentNotices();
+  const { data: units } = useOrgUnits();
 
-  const [sender, setSender] = useState<NoticeSender>('org');
-  const [title, setTitle] = useState('Trường Hùng Vương');
-  const [body, setBody] = useState('Hội chợ đồ cũ cuối kỳ diễn ra thứ 7 tuần này tại sân trường.');
-  const [audienceId, setAudienceId] = useState(NOTICE_AUDIENCES[0].id);
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  /** `null` = cả tổ chức. */
+  const [unitId, setUnitId] = useState<string | null>(null);
 
-  const meta = SENDERS.find((s) => s.id === sender) ?? SENDERS[0];
+  const unitName = (id: string | null) => units?.find((u) => u.id === id)?.name ?? null;
 
   const submit = () =>
     send.mutate(
-      { sender, title, body, audienceId },
+      { title, body, unitId },
       {
-        onSuccess: (notice) => toast(`Đã gửi thông báo tới ${group(notice.reach)} người`),
+        onSuccess: () => {
+          toast(unitId ? `Đã gửi cho nhóm ${unitName(unitId)}` : 'Đã gửi cho cả tổ chức');
+          setTitle('');
+          setBody('');
+        },
         onError: (e: Error) => toast(`⚠️ ${e.message}`),
       },
     );
 
   return (
-    <AdminScreen title="Gửi thông báo" note="nói với cả trường">
+    <AdminScreen title="Gửi thông báo" note="cả tổ chức, hoặc một nhóm">
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <AdminPanel title="Soạn thông báo">
-            <Text style={styles.label}>GỬI VỚI DANH NGHĨA</Text>
-            <View style={styles.pills}>
-              {SENDERS.map((s) => (
-                <Pressable
-                  key={s.id}
-                  onPress={() => setSender(s.id)}
-                  style={({ pressed }) => [
-                    styles.pill,
-                    s.id === sender && styles.pillOn,
-                    pressed && { opacity: 0.7 },
-                  ]}
-                >
-                  <Text style={[styles.pillText, s.id === sender && { color: C.paper }]}>
-                    {s.icon} {s.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <View style={{ marginTop: 18 }}>
+            <View>
               <Field onDark label="Tiêu đề" value={title} onChangeText={setTitle} />
             </View>
 
@@ -96,24 +78,40 @@ export default function AdminNotice() {
               Viết ngắn, một ý. Học sinh đọc thông báo này trên điện thoại giữa giờ ra chơi.
             </Text>
 
-            <Text style={styles.label}>NGƯỜI NHẬN</Text>
+            <Text style={styles.label}>GỬI CHO</Text>
             <View style={styles.pills}>
-              {NOTICE_AUDIENCES.map((a) => (
+              <Pressable
+                onPress={() => setUnitId(null)}
+                style={({ pressed }) => [
+                  styles.pill,
+                  unitId === null && styles.pillOn,
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <Text style={[styles.pillText, unitId === null && { color: C.paper }]}>
+                  🏫 Cả tổ chức
+                </Text>
+              </Pressable>
+              {(units ?? []).map((u) => (
                 <Pressable
-                  key={a.id}
-                  onPress={() => setAudienceId(a.id)}
+                  key={u.id}
+                  onPress={() => setUnitId(u.id)}
                   style={({ pressed }) => [
                     styles.pill,
-                    a.id === audienceId && styles.pillOn,
+                    unitId === u.id && styles.pillOn,
                     pressed && { opacity: 0.7 },
                   ]}
                 >
-                  <Text style={[styles.pillText, a.id === audienceId && { color: C.paper }]}>
-                    {a.label} · {group(a.reach)}
+                  <Text style={[styles.pillText, unitId === u.id && { color: C.paper }]}>
+                    👥 {u.name}
                   </Text>
                 </Pressable>
               ))}
             </View>
+            <Text style={styles.hint}>
+              Không có &quot;số người nhận&quot;: thông báo là bản ghi của tổ chức, ai thuộc phạm
+              vi thì đọc được. Con số duy nhất đo được là bao nhiêu người đã mở nó.
+            </Text>
 
             <View style={{ marginTop: 18 }}>
               <PinButton label="Gửi ngay" loading={send.isPending} onPress={submit} />
@@ -128,12 +126,14 @@ export default function AdminNotice() {
                   <Text style={styles.frameBarText}>Thông báo</Text>
                 </View>
                 <View style={styles.preview}>
-                  <View style={[styles.previewIcon, { backgroundColor: meta.bg }]}>
-                    <Text style={{ fontSize: 15 }}>{meta.icon}</Text>
+                  <View style={[styles.previewIcon, { backgroundColor: C.mossDeep }]}>
+                    <Text style={{ fontSize: 15 }}>{unitId ? '👥' : '🏫'}</Text>
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <View style={styles.previewTag}>
-                      <Text style={styles.previewTagText}>{meta.tag}</Text>
+                      <Text style={styles.previewTagText}>
+                        {unitId ? `Nhóm ${unitName(unitId) ?? ''}` : 'Toàn tổ chức'}
+                      </Text>
                     </View>
                     <Text style={styles.previewTitle}>{title || 'Chưa có tiêu đề'}</Text>
                     <Text style={styles.previewBody}>
@@ -153,10 +153,13 @@ export default function AdminNotice() {
                   <View style={styles.sentDot} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.sentTitle}>
-                      {notice.title} <Text style={styles.sentAudience}>· {notice.audience}</Text>
+                      {notice.title}{' '}
+                      <Text style={styles.sentAudience}>
+                        · {unitName(notice.unitId) ?? 'cả tổ chức'}
+                      </Text>
                     </Text>
                     <Text style={styles.sentMeta}>
-                      {notice.at} · {group(notice.reach)} người nhận
+                      {notice.at} · {notice.readCount} người đã đọc
                     </Text>
                   </View>
                 </View>

@@ -29,6 +29,22 @@ type HttpSession = {
 let session: HttpSession | null = null;
 
 /**
+ * Tổ chức đang thao tác, gắn vào MỌI request dưới dạng header `X-Org-Slug`.
+ *
+ * BE v2 không còn đọc org từ token: nó lấy theo subdomain (web) hoặc header này (app), rồi đối
+ * chiếu `memberships` ngay tại request đó. Hệ quả cần nhớ khi đọc code này: rời tổ chức là mất
+ * quyền NGAY, không phải chờ token hết hạn.
+ *
+ * `null` = chưa chọn org. Không gửi header rỗng: BE sẽ coi chuỗi rỗng là "không chỉ ra org" và
+ * tự suy ra khi người dùng chỉ thuộc đúng một org — gửi `''` chỉ làm nhiễu log.
+ */
+let activeOrgSlug: string | null = null;
+
+export function setActiveOrgSlug(next: string | null): void {
+  activeOrgSlug = next;
+}
+
+/**
  * Tăng mỗi khi access token đổi. `withAuthRetry` chụp mốc này TRƯỚC khi gửi để phân biệt hai
  * tình huống nhìn giống nhau: token thật sự hết hạn (phải refresh) và token đã được request khác
  * làm mới trong lúc mình đang bay (chỉ cần gọi lại). So theo giá trị token chứ không đếm số lần
@@ -73,15 +89,14 @@ function refreshOnce(): Promise<string | null> {
   }));
 }
 
-/** Sentinel của `TenantScopeMissingError` bên BE — khớp theo tiền tố, không phải toàn chuỗi. */
-const TENANT_SCOPE_ERROR = 'Missing tenant context';
-
 /**
- * Sentinel 403 của `resolveTenant`/`readUserPayload`: org trong token đã bị xoá hoặc khoá, hoặc
- * token thuộc org khác. Refresh token cũng mang đúng org đó nên không tự cứu được — mục đích
- * duy nhất của việc nhận diện chúng là để `withAuthRetry` dẫn tới đường đăng xuất.
+ * Sentinel 403 của `resolveTenant` bên BE: tổ chức đang chọn đã bị khoá hoặc không còn tồn tại.
+ *
+ * KHÔNG còn gộp "không thuộc org này" vào đây như bản v1: ở v2 quan hệ thành viên là thứ đổi
+ * được trong lúc dùng (bị gỡ khỏi tổ chức), mà PHIÊN ĐĂNG NHẬP thì vẫn tốt nguyên. Đăng xuất
+ * người ta vì lý do đó là phản ứng sai — đúng ra chỉ cần bỏ chọn org.
  */
-const ORG_GONE_ERRORS = ['Organization đã bị khoá', 'Organization không tồn tại', 'organization khác'];
+const ORG_GONE_ERRORS = ['Organization đã bị khoá', 'Organization không tồn tại'];
 
 /**
  * Endpoint DUY NHẤT mà 404 mang nghĩa "phiên trỏ tới một user không còn tồn tại". Ở mọi đường
@@ -116,11 +131,9 @@ function isDeadSession(outcome: SdkOutcome): boolean {
   const status = outcome.response?.status;
   if (status === 401) return true;
 
-  if (status === 400 || status === 403) {
+  if (status === 403) {
     const message = errorMessage(outcome);
-    return (
-      message.includes(TENANT_SCOPE_ERROR) || ORG_GONE_ERRORS.some((s) => message.includes(s))
-    );
+    return ORG_GONE_ERRORS.some((s) => message.includes(s));
   }
 
   // `response.url` là URL tuyệt đối đã resolve, nên so bằng `includes` chứ không phải `===`.
@@ -167,4 +180,19 @@ export const createClientConfig: CreateClientConfig = (config) => ({
   security: [{ scheme: 'bearer', type: 'http' }],
   // Hàm chứ không phải giá trị: token đổi giữa các request, phải đọc lúc gửi mới đúng.
   auth: () => session?.accessToken,
+  /**
+   * Gắn org đang chọn qua `fetch` chứ không qua `headers` của config: `headers` chỉ nhận giá
+   * trị TĨNH, đọc một lần lúc dựng client — mà org thì đổi giữa phiên (người dùng chuyển tổ
+   * chức) nên phải đọc đúng lúc gửi. Đây cũng là chỗ duy nhất làm được việc đó mà không phải
+   * import `client.gen.ts` vào đây: file đó import ngược lại chính `http.ts` làm runtime config.
+   */
+  fetch: (request) => {
+    // Kiểu khai của hey-api rộng hơn thực tế (`string | URL | Request`), nhưng client-fetch
+    // luôn dựng sẵn `Request` trước khi gọi. Thu hẹp bằng `instanceof` thay vì ép kiểu: nếu
+    // một bản sau đổi cách gọi, header chỉ đơn giản không được gắn thay vì nổ lúc chạy.
+    if (activeOrgSlug && request instanceof Request) {
+      request.headers.set('X-Org-Slug', activeOrgSlug);
+    }
+    return globalThis.fetch(request);
+  },
 });

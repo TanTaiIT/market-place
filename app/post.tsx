@@ -20,23 +20,20 @@ import Animated, {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Corkboard } from '@/components/Corkboard';
 import { PhotoPicker } from '@/components/PhotoPicker';
-import { EMPTY_LOCATION, LocationFields, validateLocation, type ListingLocation } from '@/components/LocationFields';
+import { EMPTY_LOCATION, LocationFields, type ListingLocation } from '@/components/LocationFields';
+import { validateListingDraft } from '@/components/listingDraft';
+import { VisibilityPicker, type PostVisibility } from '@/components/VisibilityPicker';
 import { CatTape, Field, ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useCategories, useCreateListing } from '@/queries/listings';
+import { useOrgSlug } from '@/stores/auth';
 import { useListingPhotos } from '@/queries/upload';
 import { C, F, shadow } from '@/theme';
-
-/*
- * Khớp `createListingSchema` của BE. Chặn ở đây để người dùng biết ngay lúc bấm, thay vì gõ
- * xong cả form rồi mới ăn 400 từ server.
- */
-const MIN_TITLE = 5;
-const MIN_DESC = 10;
 
 export default function Post() {
   const router = useRouter();
   const toast = useToast();
+  const activeOrg = useOrgSlug();
   const create = useCreateListing();
   const { photos, addPhotos, removePhoto, retryPhoto, photoUrls, uploadingCount, hasFailed } =
     useListingPhotos();
@@ -48,6 +45,11 @@ export default function Post() {
   // Giữ id chứ không giữ tên: BE nhận `categoryId` là ObjectId. Rỗng cho tới khi danh mục
   // tải xong hoặc người dùng chọn.
   const [categoryId, setCategoryId] = useState('');
+  // Mặc định nội bộ: tin ở lại trong tổ chức cho tới khi người đăng chủ động đưa ra công khai.
+  // Không thuộc tổ chức nào thì chỉ còn một lựa chọn, và nó đã đúng.
+  const [visibility, setVisibility] = useState<PostVisibility>(
+    activeOrg ? 'org_internal' : 'public',
+  );
   // Tên tỉnh/xã, không phải mã — BE lưu và lọc bằng chính chuỗi này.
   const [location, setLocation] = useState<ListingLocation>(EMPTY_LOCATION);
 
@@ -65,40 +67,19 @@ export default function Post() {
       withSpring(0),
     );
 
-    // Ảnh đã bay lên Cloudinary từ lúc chọn, ở đây chỉ còn chốt lại là chúng xong hết chưa
-    if (hasFailed) {
-      toast('⚠️ Có ảnh tải lỗi — chạm vào ảnh đó để thử lại');
-      return;
-    }
-    // Theo thứ tự người dùng đọc form, để toast trỏ đúng ô họ vừa bỏ qua.
-    if (photoUrls.length === 0) {
-      toast('⚠️ Tin cần ít nhất 1 ảnh');
-      return;
-    }
-    if (title.trim().length < MIN_TITLE) {
-      toast(`⚠️ Tên món đồ cần ít nhất ${MIN_TITLE} ký tự`);
-      return;
-    }
-    if (!price.trim()) {
-      toast('⚠️ Nhập giá bán — cho tặng thì ghi 0');
-      return;
-    }
-    if (desc.trim().length < MIN_DESC) {
-      toast(`⚠️ Mô tả cần ít nhất ${MIN_DESC} ký tự`);
-      return;
-    }
-    if (!categoryId) {
-      toast('⚠️ Chọn danh mục cho tin trước đã');
-      return;
-    }
-    const locationError = validateLocation(location);
-    if (locationError) {
-      toast(locationError);
-      return;
-    }
+    const error = validateListingDraft({
+      title,
+      price,
+      desc,
+      categoryId,
+      photoCount: photoUrls.length,
+      hasFailedPhoto: hasFailed,
+      location,
+    });
+    if (error) return toast(error);
 
     create.mutate(
-      { title, price, desc, categoryId, photoUrls, ...location },
+      { title, price, desc, categoryId, photoUrls, visibility, ...location },
       {
         onSuccess: () => {
           // Tin vào BE ở trạng thái `pending`, feed chỉ hiện tin `active` — về feed là không
@@ -173,6 +154,8 @@ export default function Post() {
                 />
               ))}
             </View>
+
+            <VisibilityPicker value={visibility} onChange={setVisibility} />
 
             <LocationFields value={location} onChange={setLocation} />
 

@@ -28,6 +28,14 @@ export const qk = {
   notifications: () => ['notifications'] as const,
   profile: () => ['profile'] as const,
 
+  /*
+   * Người bán. Cố tình đứng NGOÀI cụm `profile`: `profile()` là hồ sơ của chính mình và đăng
+   * một tin làm lệch nó, còn hồ sơ người khác thì không — mà `invalidateQueries` khớp theo
+   * prefix, nên nhét vào đó là mỗi lần đăng tin lại quét sạch hồ sơ của mọi người bán đã xem.
+   */
+  sellerProfile: (id: string) => ['seller', id] as const,
+  sellerListings: (id: string) => ['seller', id, 'listings'] as const,
+
   // Từ điển hành chính. Xã tách theo tỉnh để đổi tỉnh là một cache entry khác, không phải
   // ghi đè lên danh sách xã của tỉnh trước đó.
   provinces: () => ['locations', 'provinces'] as const,
@@ -47,6 +55,8 @@ export const qk = {
   joinRequestQueue: (orgSlug: string, status: string) =>
     ['join-requests', 'queue', orgSlug, status] as const,
   orgUnits: (orgSlug: string) => ['orgs', 'units', orgSlug] as const,
+  /** Mang cả slug đang gõ, cùng lý do với `orgLookup` — mỗi slug là một câu trả lời khác. */
+  slugAvailability: (slug: string) => ['orgs', 'slug-check', slug] as const,
 
   /*
    * Bàn quản trị. Mọi thao tác duyệt đều đổi nhiều mặt cùng lúc (hàng đợi, bảng tin, thẻ số),
@@ -65,7 +75,8 @@ export const qk = {
   adminUsers: (school: string) => ['admin', 'users', school] as const,
   adminSchools: () => ['admin', 'schools'] as const,
   adminSchoolLinks: () => ['admin', 'school-links'] as const,
-  adminCategories: (school: string) => ['admin', 'categories', school] as const,
+  /** Không mang tên trường: danh mục là từ điển dùng chung toàn hệ thống, không thuộc tổ chức nào. */
+  adminCategories: () => ['admin', 'categories'] as const,
   adminNotices: () => ['admin', 'notices'] as const,
   adminRules: () => ['admin', 'rules'] as const,
   adminLimits: () => ['admin', 'limits'] as const,

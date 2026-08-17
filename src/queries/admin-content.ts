@@ -1,49 +1,44 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminContentApi } from '@/api/admin-content';
 import type { AdminLimits } from '@/api/admin-content';
 import { qk } from './keys';
 
 /**
  * Nhóm "Nội dung" + "Khác": danh mục, thông báo đẩy, luật của bảng tin.
- *
- * Refetch contract — thêm/đổi/gỡ danh mục invalidate `qk.adminRoot()` vì số đếm danh mục còn
- * hiện ở tổng quan; các mutation còn lại chỉ chạm đúng key của mình.
  */
 
 /* -------------------------------- danh mục -------------------------------- */
 
-export function useAdminCategories(school: string) {
-  return useQuery({
-    queryKey: qk.adminCategories(school),
-    queryFn: () => adminContentApi.getCategories(school),
-    placeholderData: keepPreviousData,
+/** Từ điển toàn hệ thống, gồm cả danh mục đã tắt — không có tham số trường để lọc. */
+export function useAdminCategories() {
+  return useQuery({ queryKey: qk.adminCategories(), queryFn: adminContentApi.getCategories });
+}
+
+/**
+ * Refetch contract của cả hai mutation danh mục: quét `adminCategories()` (bảng đang sửa) VÀ
+ * `categories()` — hàng chip trên bảng tin của học sinh đọc từ điển đó, đổi tên hay tắt một
+ * danh mục mà không quét là chip cũ còn nằm đấy tới hết `staleTime` 30 phút.
+ *
+ * `adminRoot()` thì không: phân bố danh mục ở màn tổng quan đếm theo TIN, mà thêm một danh mục
+ * rỗng không làm lệch con số nào.
+ */
+function useCategoryMutation<TVars, TData>(fn: (v: TVars) => Promise<TData>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.adminCategories() });
+      qc.invalidateQueries({ queryKey: qk.categories() });
+    },
   });
 }
 
 export function useAddCategory() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: { name: string; scope: string }) =>
-      adminContentApi.addCategory(v.name, v.scope),
-    onSettled: () => qc.invalidateQueries({ queryKey: qk.adminRoot() }),
-  });
+  return useCategoryMutation(adminContentApi.addCategory);
 }
 
-export function useRenameCategory() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: { from: string; to: string }) =>
-      adminContentApi.renameCategory(v.from, v.to),
-    onSettled: () => qc.invalidateQueries({ queryKey: qk.adminRoot() }),
-  });
-}
-
-export function useRemoveCategory() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (name: string) => adminContentApi.removeCategory(name),
-    onSettled: () => qc.invalidateQueries({ queryKey: qk.adminRoot() }),
-  });
+export function useEditCategory() {
+  return useCategoryMutation(adminContentApi.editCategory);
 }
 
 /* ------------------------------- thông báo ------------------------------- */

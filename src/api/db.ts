@@ -12,8 +12,18 @@ import type { ProvinceName } from './location';
 export type Listing = {
   /** Mongo ObjectId 24 hex từ BE — không phải số, đừng `Number()` khi đọc route param. */
   id: string;
+  /**
+   * `_id` của người đăng, giữ riêng bên cạnh tên hiển thị `seller`: hồ sơ công khai
+   * (`GET /users/{id}`) tra theo id, còn `posterName` chỉ là snapshot BE chốt lúc tạo tin.
+   */
+  sellerId: string;
   title: string;
   price: string;
+  /**
+   * Giá thô như BE lưu, đứng cạnh bản đã format cùng lý do với `categoryId`: form sửa tin phải
+   * nạp lại con số, mà đọc ngược từ chuỗi hiển thị thì "Miễn phí" không còn đường về 0.
+   */
+  priceValue: number;
   cat: string;
   /**
    * Id danh mục + tỉnh giữ nguyên bên cạnh bản hiển thị (`cat`): đây là hai tiêu chí đi tìm
@@ -21,7 +31,15 @@ export type Listing = {
    */
   categoryId: string;
   /** Tên tỉnh như BE lưu trong `location.province` — cũng chính là giá trị `?province=` nhận. */
-  province?: string;
+  province?: ProvinceName;
+  /** Hai mảnh còn lại của địa chỉ. Chỉ form sửa tin đọc tới — thẻ tin chỉ hiện tới cấp tỉnh. */
+  ward?: string;
+  address?: string;
+  /**
+   * Nơi tin hiển thị, và qua đó là AI DUYỆT nó. Form sửa tin phải nạp lại đúng lựa chọn cũ:
+   * để nó rơi về mặc định là lặng lẽ đẩy tin sang một hàng đợi khác chỉ vì người dùng sửa tiêu đề.
+   */
+  visibility: 'org_internal' | 'public';
   meta: string;
   /** Cặp màu dựng ảnh giả — dùng khi tin chưa có ảnh thật */
   photo: Grad;
@@ -102,6 +120,26 @@ export type Profile = {
   posted: string;
   sold: string;
   rating: string;
+};
+
+/**
+ * Hồ sơ công khai của một người bán (`GET /users/{id}`).
+ *
+ * Không có email/phone và đừng đi tìm: BE cố tình không trả chúng ở route công khai này. Liên hệ
+ * người bán đi qua `posterContact` của từng tin hoặc qua chat, không qua hồ sơ.
+ *
+ * Tách khỏi `Profile` (hồ sơ của chính mình) chứ không dùng chung: hai bên trả về hai tập field
+ * khác nhau, gộp lại thì mọi field phải thành optional và không chỗ nào biết cái nào chắc có.
+ */
+export type PublicProfile = {
+  id: string;
+  name: string;
+  avatar: string;
+  /** `—` khi chưa ai đánh giá: hiện `0.0` trông y hệt một điểm số thật đã bị chấm thấp. */
+  rating: string;
+  ratingCount: number;
+  /** Mốc tham gia dạng "tháng 3/2026" — thước đo duy nhất BE trả về độ "cũ" của tài khoản. */
+  joined: string;
 };
 
 /**

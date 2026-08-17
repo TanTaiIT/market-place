@@ -3,14 +3,20 @@ import {
   bulkApproveJoinRequests,
   cancelJoinRequest,
   createJoinRequest,
+  createOrgUnit,
+  deleteOrgUnit,
   listJoinRequests,
   listOrgUnits,
   myJoinRequests,
   myOrganizations,
   organizationLookup,
   rejectJoinRequest,
+  updateOrgUnit,
 } from './generated';
-import type { JoinRequest, OrgUnit } from './generated';
+import type { CreateOrgUnit, JoinRequest, OrgUnit, UpdateOrgUnit } from './generated';
+
+/** Màn hình dùng nhóm con đi qua đây, không import thẳng `generated` — `app/**` chỉ biết tới `api/**`. */
+export type { OrgUnit };
 import { relativeTime, unwrap } from './client';
 import { withAuthRetry } from './http';
 
@@ -81,6 +87,32 @@ export const orgApi = {
   async orgUnits(): Promise<OrgUnit[]> {
     const res = await withAuthRetry(() => listOrgUnits());
     return unwrap(res, 'Không đọc được danh sách nhóm con');
+  },
+
+  /**
+   * Tạo nhóm con. `parentUnitId` bỏ trống = nhóm nằm thẳng dưới tổ chức.
+   *
+   * Không gửi `moderatorId: null` khi chưa chọn ai: BE phân biệt "không đụng tới" với "gỡ người
+   * phụ trách", mà lúc TẠO thì chỉ có nghĩa thứ nhất là đúng.
+   */
+  async createUnit(input: CreateOrgUnit): Promise<OrgUnit> {
+    const res = await withAuthRetry(() => createOrgUnit({ body: input }));
+    return unwrap(res, 'Không tạo được nhóm con');
+  },
+
+  /**
+   * Đổi tên nhóm hoặc gán/gỡ người phụ trách. Ở đây `null` mang nghĩa thật: gỡ người phụ trách —
+   * nên màn hình phải gửi `null` tường minh chứ không phải bỏ trống field.
+   */
+  async updateUnit({ id, ...patch }: UpdateOrgUnit & { id: string }): Promise<OrgUnit> {
+    const res = await withAuthRetry(() => updateOrgUnit({ path: { id }, body: patch }));
+    return unwrap(res, 'Không cập nhật được nhóm con');
+  },
+
+  /** Xoá mềm. Thành viên đang thuộc nhóm không mất chỗ — họ về lại mức tổ chức. */
+  async deleteUnit(id: string): Promise<OrgUnit> {
+    const res = await withAuthRetry(() => deleteOrgUnit({ path: { id } }));
+    return unwrap(res, 'Không xoá được nhóm con');
   },
 
   async joinRequests(status?: JoinRequestStatus): Promise<JoinRequestRow[]> {

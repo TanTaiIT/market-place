@@ -12,10 +12,12 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ListingGallery } from '@/components/ListingGallery';
 import { ListingSuggestions } from '@/components/ListingSuggestions';
+import { ReportButton } from '@/components/ReportButton';
 import { Avatar, EmptyState, Loading, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useListing, useSavedIds, useToggleSaved } from '@/queries/listings';
 import { useOpenConversation } from '@/queries/chat';
+import { useCreateReport } from '@/queries/report';
 import { C, F, shadow } from '@/theme';
 
 export default function ListingDetail() {
@@ -30,6 +32,7 @@ export default function ListingDetail() {
   const { data: savedIds } = useSavedIds();
   const toggleSaved = useToggleSaved();
   const openChat = useOpenConversation();
+  const report = useCreateReport();
 
   const saved = !!savedIds?.includes(listingId);
 
@@ -92,16 +95,45 @@ export default function ListingDetail() {
           <Text style={styles.title}>{listing.title}</Text>
           <Text style={styles.meta}>{listing.meta}</Text>
 
-          <View style={styles.sellerCard}>
+          {/* Tin của chính mình không mở hồ sơ: hồ sơ công khai là chỗ để soi NGƯỜI LẠ trước khi
+              giao dịch, còn tự soi mình thì đã có tab Hồ sơ với đủ thông tin hơn hẳn. */}
+          <Pressable
+            disabled={listing.mine}
+            onPress={() => router.push(`/user/${listing.sellerId}`)}
+            style={({ pressed }) => [styles.sellerCard, pressed && { opacity: 0.7 }]}
+          >
             <Avatar text={listing.avatar} size={42} color={C.amber} textColor={C.amberInk} />
             <View style={{ flex: 1 }}>
               <Text style={styles.sellerName}>{listing.seller}</Text>
               {!!listing.contact && <Text style={styles.sellerOrg}>{listing.contact}</Text>}
             </View>
-          </View>
+            {!listing.mine && <Text style={styles.sellerChevron}>›</Text>}
+          </Pressable>
 
           <Text style={styles.label}>Mô tả</Text>
           <Text style={styles.desc}>{listing.desc}</Text>
+
+          {/* Tin của mình thì không: BE trả 400 cho tự báo cáo chính mình, hiện nút ra chỉ để
+              người ta bấm vào một lỗi. */}
+          {!listing.mine && (
+            <ReportButton
+              label="⚑ Báo cáo tin này"
+              target="tin này"
+              pending={report.isPending}
+              onSubmit={(values, close) =>
+                report.mutate(
+                  { targetType: 'listing', targetId: listingId, ...values },
+                  {
+                    onSuccess: () => {
+                      close();
+                      toast('⚑ Đã gửi báo cáo — quản trị sẽ xem trong 24 giờ');
+                    },
+                    onError: (e: Error) => toast(`⚠️ ${e.message}`),
+                  },
+                )
+              }
+            />
+          )}
         </Animated.View>
 
         <ListingSuggestions current={listing} />
@@ -176,6 +208,7 @@ const styles = StyleSheet.create({
   },
   sellerName: { fontFamily: F.uiBold, fontSize: 13.5, color: C.ink },
   sellerOrg: { fontFamily: F.ui, fontSize: 11, color: C.inkSoft, marginTop: 1 },
+  sellerChevron: { fontFamily: F.uiBold, fontSize: 20, color: C.inkSoft },
   label: {
     fontFamily: F.uiBold,
     fontSize: 11.5,

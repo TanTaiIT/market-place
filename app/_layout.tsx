@@ -111,6 +111,8 @@ export default function RootLayout() {
                       tổ chức đầu tiên của một tài khoản mới. */}
                   <Stack.Screen name="join-org" />
                   <Stack.Screen name="listing/[id]" />
+                  <Stack.Screen name="listing/edit/[id]" />
+                  <Stack.Screen name="user/[id]" />
                   <Stack.Screen name="chat/[id]" />
                   {/* Khai cả cụm `admin` một lần: `app/admin/_layout.tsx` giữ Stack riêng bên trong */}
                   <Stack.Screen name="admin" />

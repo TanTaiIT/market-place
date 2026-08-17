@@ -4,7 +4,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState, Loading, TabHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
-import { useMarkNotificationRead, useNotifications } from '@/queries/listings';
+import { useMarkNotificationRead, useNotifications } from '@/queries/notifications';
 import { C, F, shadow } from '@/theme';
 
 /**

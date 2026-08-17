@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { orgApi } from '@/api/org';
 import type { JoinRequestStatus } from '@/api/org';
@@ -96,6 +97,53 @@ export function useOrgUnits() {
     enabled: Boolean(orgSlug),
     staleTime: 5 * 60_000,
   });
+}
+
+/**
+ * Danh bạ thành viên của tổ chức, dựng từ đơn ĐÃ DUYỆT.
+ *
+ * BE chưa có route liệt kê thành viên, mà cả `createRoleGrant` lẫn `updateOrgUnit` đều cần
+ * `userId` — đơn đã duyệt là nguồn duy nhất trong app ghép được `userId` với một cái tên đọc
+ * được. Hệ quả phải nói ra ở màn hình: ai vào tổ chức bằng đường khác (người chủ do master chỉ
+ * định lúc tạo tổ chức) sẽ KHÔNG có trong danh bạ này.
+ *
+ * Gộp theo `userId` chứ không theo `id` của đơn: một người bị từ chối rồi nộp lại và được duyệt
+ * sẽ có hai đơn, mà danh bạ thì phải hiện đúng một dòng.
+ */
+export function useOrgRoster() {
+  const queue = useJoinRequestQueue('approved');
+  const rows = queue.data;
+  const members = useMemo(
+    () => Array.from(new Map((rows ?? []).map((r) => [r.userId, r])).values()),
+    [rows],
+  );
+  return { ...queue, members };
+}
+
+/**
+ * Refetch contract của ba mutation nhóm con: invalidate đúng key nhóm con của tổ chức đang hoạt
+ * động. Không quét `['orgs']`: `myOrgs` và `orgLookup` cũng nằm dưới prefix đó và không hề lệch
+ * khi thêm một nhóm.
+ */
+function useOrgUnitMutation<TVars, TData>(fn: (v: TVars) => Promise<TData>) {
+  const qc = useQueryClient();
+  const orgSlug = useOrgSlug();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.orgUnits(orgSlug ?? '-') }),
+  });
+}
+
+export function useCreateOrgUnit() {
+  return useOrgUnitMutation(orgApi.createUnit);
+}
+
+export function useUpdateOrgUnit() {
+  return useOrgUnitMutation(orgApi.updateUnit);
+}
+
+export function useDeleteOrgUnit() {
+  return useOrgUnitMutation(orgApi.deleteUnit);
 }
 
 /**

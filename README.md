@@ -58,6 +58,8 @@ app/                        # expo-router: mỗi file là một route
 ├── search.tsx              # tìm kiếm có debounce
 ├── post.tsx                # ghim tin mới
 ├── listing/[id].tsx        # chi tiết tin
+├── listing/edit/[id].tsx   # sửa tin (cùng form với post.tsx)
+├── user/[id].tsx           # hồ sơ công khai của người bán
 ├── chat/[id].tsx           # phòng chat
 └── mylistings.tsx  saved.tsx  settings.tsx
 

@@ -1,27 +1,41 @@
-import { notificationCreate, notificationList } from './generated';
+import {
+  categoryList,
+  createCategory,
+  notificationCreate,
+  notificationList,
+  updateCategory,
+} from './generated';
+import type { Category as CategoryDto } from './generated';
 import { relativeTime, unwrap } from './client';
 import { withAuthRetry } from './http';
-
-/** Bốn danh mục khởi điểm của fixture — trùng với seed bên BE. */
-const MOD_CATEGORIES = ['Sách vở', 'Xe đạp', 'Điện tử', 'Đồ dùng'];
 
 /**
  * Nhóm "Nội dung" + "Khác" của bàn quản trị: danh mục, thông báo đẩy, và luật của bảng tin.
  * Ba thứ này đều là **cấu hình** — quản trị đặt ra rồi cả trường chạy theo — khác hẳn hàng đợi
  * kiểm duyệt bên `admin.ts` vốn xử từng tin một.
  *
- * **Thông báo đã nối BE thật** (`/notifications`). Danh mục và luật vẫn là fixture in-memory:
- * `/categories` của BE đang trả 501 và chưa có route lưu cấu hình nào.
+ * **Danh mục và thông báo đã nối BE thật.** Chỉ luật bảng tin + hạn mức còn là fixture in-memory:
+ * BE chưa có route nào lưu cấu hình đó.
  */
 
 // ── TYPES ───────────────────────────────────────────────────────────
 
-export type Category = {
-  name: string;
-  /** Mở cho ai — `'Cả hệ thống'` hoặc tên một trường. */
-  scope: string;
-  /** Số tin đang có, đếm lúc đọc từ `admin.ts`. */
-  count: number;
+/**
+ * Danh mục dưới góc nhìn quản trị: đủ `order` và `isActive`, khác `Category` trong `db.ts` vốn
+ * chỉ là ba field bảng tin cần để vẽ hàng chip.
+ */
+export type AdminCategory = CategoryDto;
+
+/**
+ * Thứ bàn quản trị gõ ra ở form danh mục. `order` là **chuỗi thô** từ `TextInput` — đổi sang số
+ * là việc của file này chứ không phải của màn hình (HARD#2), cùng lý do `price` của tin đăng
+ * chuẩn hoá trong `client.ts`.
+ */
+export type CategoryDraft = {
+  name?: string;
+  icon?: string;
+  order?: string;
+  isActive?: boolean;
 };
 
 /**
@@ -55,15 +69,7 @@ export type AdminLimits = {
 /** Tuỳ chọn hợp lệ cho `expiryDays` — để màn không phải tự bịa ra danh sách. */
 export const EXPIRY_CHOICES = [30, 45, 60];
 
-/** Tối đa 8 danh mục: quá số đó thì hàng băng dính trên bảng tin của học sinh tràn dòng. */
-export const MAX_CATEGORIES = 8;
-
 // ── STATE ───────────────────────────────────────────────────────────
-
-let categories: { name: string; scope: string }[] = MOD_CATEGORIES.map((name) => ({
-  name,
-  scope: 'Cả hệ thống',
-}));
 
 const rules: AdminRule[] = [
   {
@@ -91,46 +97,70 @@ const limits: AdminLimits = { maxPerUser: 10, expiryDays: 45 };
 const delay = (ms = 180) => new Promise<void>((r) => setTimeout(r, ms));
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
 
+/**
+ * `CategoryDraft` → body BE nhận, dùng chung cho tạo và sửa.
+ *
+ * Ô thứ tự để trống = "không đụng tới", KHÔNG phải 0: `Number('')` ra 0 và sẽ đẩy danh mục lên
+ * đầu hàng mà người sửa không hề yêu cầu. Field vắng mặt hẳn mới mang đúng nghĩa đó.
+ */
+function categoryBody({ name, icon, order }: CategoryDraft) {
+  const rank = order?.trim() ? Number(order.trim()) : undefined;
+  if (rank !== undefined && !Number.isFinite(rank)) throw new Error('Thứ tự phải là số');
+  return {
+    ...(name?.trim() ? { name: name.trim() } : {}),
+    ...(icon !== undefined ? { icon: icon.trim() } : {}),
+    ...(rank !== undefined ? { order: rank } : {}),
+  };
+}
+
 // ── API ─────────────────────────────────────────────────────────────
 
 export const adminContentApi = {
-  async getCategories(_school: string): Promise<Category[]> {
-    await delay(150);
-    // Đếm tin theo danh mục thuộc về `OrganizationCategory` (bước 5 trong admin-console.md).
-    // Chưa có thì trả 0 chứ không dựng số từ fixture đã bỏ — thà trống còn hơn sai.
-    return categories.map((c) => ({ ...c, count: 0 }));
+  /**
+   * Từ điển danh mục dùng chung TOÀN HỆ THỐNG — không thuộc tổ chức nào, nên bàn quản trị không
+   * lọc theo trường như các mục khác.
+   *
+   * `includeInactive` để thấy cả danh mục đã tắt: không có endpoint xoá (tin cũ vẫn tham chiếu
+   * tới danh mục), nên "đã tắt" là trạng thái sống chứ không phải rác cần giấu đi.
+   */
+  async getCategories(): Promise<AdminCategory[]> {
+    const res = await withAuthRetry(() => categoryList({ query: { includeInactive: 'true' } }));
+    // Sắp theo `order` ngay tại đây: nó là thứ tự hàng băng dính trên bảng tin của học sinh, mà
+    // BE không hứa trả về đã sắp — để màn tự sắp là mỗi màn một kiểu.
+    // `sort` chứ không `toSorted`: Hermes chưa có change-array-by-copy, mà `lib: ESNext` của
+    // expo/tsconfig.base khai là có nên `tsc` không chặn — chỉ nổ lúc chạy. Mảng đây là bản vừa
+    // parse từ response, không ai khác giữ reference nên sắp tại chỗ là an toàn.
+    return unwrap(res, 'Không tải được danh mục').sort((a, b) => a.order - b.order);
   },
 
-  async addCategory(name: string, scope: string): Promise<Category> {
-    await delay(200);
-    const clean = name.trim();
-    if (!clean) throw new Error('Nhập tên danh mục trước đã');
-    if (categories.length >= MAX_CATEGORIES) {
-      throw new Error(`Đã đủ ${MAX_CATEGORIES} danh mục, gỡ bớt một cái trước`);
-    }
-    if (categories.some((c) => c.name.toLowerCase() === clean.toLowerCase())) {
-      throw new Error(`Đã có danh mục "${clean}" rồi`);
-    }
-    categories = [...categories, { name: clean, scope }];
-    return { name: clean, scope, count: 0 };
+  /**
+   * Tạo danh mục (chỉ master). Không gửi `slug`: BE tự sinh từ tên, và một slug gõ tay lệch với
+   * tên là thứ chỉ lộ ra nhiều tháng sau, lúc đã có tin trỏ vào nó.
+   */
+  async addCategory(input: CategoryDraft): Promise<AdminCategory> {
+    const { name, ...rest } = categoryBody(input);
+    if (!name) throw new Error('Nhập tên danh mục trước đã');
+    const res = await withAuthRetry(() => createCategory({ body: { ...rest, name } }));
+    return unwrap(res, 'Không tạo được danh mục');
   },
 
-  async renameCategory(from: string, to: string): Promise<Category> {
-    await delay(200);
-    const clean = to.trim();
-    if (!clean) throw new Error('Nhập tên mới trước đã');
-    const target = categories.find((c) => c.name === from);
-    if (!target) throw new Error('Danh mục này không còn nữa');
-    // Chốt chặn "còn tin trong danh mục này" cần đếm tin theo danh mục — thuộc về
-    // `OrganizationCategory` (bước 5). Ở fixture này không kiểm được nên không giả vờ kiểm.
-    target.name = clean;
-    return { name: clean, scope: target.scope, count: 0 };
-  },
-
-  async removeCategory(name: string): Promise<{ name: string }> {
-    await delay(200);
-    categories = categories.filter((c) => c.name !== name);
-    return { name };
+  /**
+   * Sửa danh mục (chỉ master). Cũng là đường DUY NHẤT gỡ một danh mục khỏi lưu thông:
+   * `isActive: false`. BE cố ý không có endpoint xoá vì tin đã đăng vẫn trỏ tới nó — xoá thật là
+   * để lại một đống tin mang danh mục không còn tồn tại.
+   */
+  async editCategory({
+    id,
+    isActive,
+    ...draft
+  }: CategoryDraft & { id: string }): Promise<AdminCategory> {
+    const res = await withAuthRetry(() =>
+      updateCategory({
+        path: { id },
+        body: { ...categoryBody(draft), ...(isActive !== undefined ? { isActive } : {}) },
+      }),
+    );
+    return unwrap(res, 'Không cập nhật được danh mục');
   },
 
   /**

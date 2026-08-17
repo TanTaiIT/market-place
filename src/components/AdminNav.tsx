@@ -42,7 +42,8 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
     label: 'Nội dung',
     items: [
       { href: '/admin/listings', icon: '▤', label: 'Tin đăng' },
-      { href: '/admin/categories', icon: '▩', label: 'Danh mục' },
+      // Từ điển toàn hệ thống: BE đòi master cho cả tạo lẫn sửa, nên người khác vào chỉ để ăn 403.
+      { href: '/admin/categories', icon: '▩', label: 'Danh mục', gate: 'master' },
       { href: '/admin/notice', icon: '◈', label: 'Gửi thông báo' },
     ],
   },
@@ -57,12 +58,17 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
         gate: 'orgModerator',
       },
       { href: '/admin/users', icon: '◍', label: 'Người dùng' },
+      { href: '/admin/org-units', icon: '🗂', label: 'Nhóm con', gate: 'orgModerator' },
+      { href: '/admin/role-grants', icon: '🔑', label: 'Phân quyền', gate: 'orgModerator' },
       { href: '/admin/schools', icon: '⌂', label: 'Trường & hệ thống' },
     ],
   },
   {
     label: 'Hệ thống',
-    items: [{ href: '/admin/coverage', icon: '◰', label: 'Phủ sóng', gate: 'master' }],
+    items: [
+      { href: '/admin/organizations', icon: '🏫', label: 'Tổ chức', gate: 'master' },
+      { href: '/admin/coverage', icon: '◰', label: 'Phủ sóng', gate: 'master' },
+    ],
   },
   { label: 'Khác', items: [{ href: '/admin/settings', icon: '⚙', label: 'Cài đặt' }] },
 ];

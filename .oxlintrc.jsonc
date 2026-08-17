@@ -39,6 +39,11 @@
         "caughtErrorsIgnorePattern": "^_",
       },
     ],
+    // ── HERMES RUNTIME ────────────────────────────────────────────
+    // Rule đòi đổi `.sort()` sang `.toSorted()`, nhưng Hermes (RN 0.81) chưa có
+    // change-array-by-copy, mà `lib: ESNext` của expo/tsconfig.base lại khai là có — nên
+    // `tsc` im lặng và lỗi chỉ nổ trên máy thật. Nghe theo rule ở đây là tự tạo BLOCKER.
+    "unicorn/no-array-sort": "off",
     // ── CORRECTNESS ───────────────────────────────────────────────
     "no-var": "error",
     "prefer-const": "error",

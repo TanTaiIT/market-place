@@ -15,10 +15,12 @@ import {
   listingMine,
   listingQuota,
   listingRemove,
+  listingUpdate,
   locationProvinces,
   locationWards,
   notificationList,
   notificationMarkRead,
+  userGetById,
   userGetMe,
   userUpdateMe,
 } from './generated';
@@ -28,6 +30,7 @@ import type {
   Listing as ListingDto,
   MeProfile,
   Message as MessageDto,
+  PublicProfile as PublicProfileDto,
 } from './generated';
 import type { Province, ProvinceName } from './location';
 import { CHAT_COLORS, db, hasSearchCriteria, NEW_PHOTOS } from './db';
@@ -39,6 +42,7 @@ import type {
   Message,
   Notif,
   Profile,
+  PublicProfile,
   SearchFilter,
 } from './db';
 import { getCurrentUserId, withAuthRetry } from './http';
@@ -123,13 +127,18 @@ function toListing(dto: ListingDto, names: Map<string, string>): Listing {
 
   return {
     id: dto._id,
+    sellerId: dto.seller,
     title: dto.title,
     price: formatPrice(dto.price),
+    priceValue: dto.price,
     // BE trả `category` là ObjectId; tên hiển thị tra từ từ điển danh mục. Không tra được
     // thì để rỗng — `NoteCard` tự giấu pill, tin vẫn đọc được bình thường.
     cat: names.get(dto.category) ?? '',
     categoryId: dto.category,
     province: dto.location?.province,
+    ward: dto.location?.ward,
+    address: dto.location?.address,
+    visibility: dto.visibility,
     // BE không trả tên organization trong Listing, nên meta chỉ còn mốc thời gian.
     meta: relativeTime(dto.createdAt),
     photo: gradOf(dto._id),
@@ -171,6 +180,22 @@ function toProfile(dto: MeProfile): Profile {
     posted: '—',
     sold: '—',
     rating: dto.ratingCount > 0 ? dto.ratingAvg.toFixed(1) : '—',
+  };
+}
+
+/**
+ * Hồ sơ công khai. Không map email/phone vì BE không trả — xem `PublicProfile` trong `db.ts`.
+ */
+function toPublicProfile(dto: PublicProfileDto): PublicProfile {
+  const joined = new Date(dto.createdAt);
+  return {
+    id: dto.id,
+    name: dto.name,
+    avatar: dto.avatar || initialsOf(dto.name),
+    rating: dto.ratingCount > 0 ? dto.ratingAvg.toFixed(1) : '—',
+    ratingCount: dto.ratingCount,
+    // Ghép tay, không `toLocaleDateString`: Hermes không có Intl đầy đủ (cùng lý do `clockTime`).
+    joined: `tháng ${joined.getMonth() + 1}/${joined.getFullYear()}`,
   };
 }
 
@@ -243,6 +268,68 @@ async function categoryNames(): Promise<Map<string, string>> {
   } catch {
     return new Map();
   }
+}
+
+/**
+ * Thứ người đăng gõ ra ở form tin — chung cho cả tạo mới lẫn sửa. `price` là chuỗi vì nó tới
+ * thẳng từ `TextInput`; chuẩn hoá thành số là việc của `toListingBody`, không phải của màn hình.
+ */
+type ListingInput = {
+  title: string;
+  price: string;
+  desc: string;
+  categoryId: string;
+  photoUrls?: string[];
+  address?: string | null;
+  province?: ProvinceName | null;
+  ward?: string | null;
+  /**
+   * Nơi tin sẽ hiển thị — và cũng là thứ quyết định AI DUYỆT nó (BE §0.1): `org_internal`
+   * về hàng đợi của tổ chức, `public` về hàng đợi manager danh mục theo (danh mục × tỉnh).
+   * Bỏ trống thì BE mặc định `org_internal`.
+   */
+  visibility?: 'org_internal' | 'public';
+};
+
+/**
+ * Payload gửi lên BE, dùng chung cho `POST /listings` và `PATCH /listings/{id}`.
+ *
+ * Một chỗ duy nhất chuẩn hoá giá và gom `location`: hai đường đi tới cùng một schema, tách đôi
+ * thì lần sau chỉ sửa một nhánh là tin sửa xong lại rơi mất `provinceCode` mà tin mới vẫn đúng.
+ *
+ * `location` chỉ gửi khi người đăng đã chọn khu vực, và KHÔNG có toạ độ — BE đã bỏ hẳn geo,
+ * gửi kèm `coordinates` giờ là 400. "Tin gần đây" chạy theo xã/tỉnh chứ không theo bán kính.
+ *
+ * `address` là số nhà / tên đường tự gõ, nằm dưới xã trong mô hình 2 cấp — không phải cấp
+ * quận/huyện đã bỏ từ 01/07/2025.
+ */
+function toListingBody(input: ListingInput) {
+  // Ô giá là `number-pad` nhưng vẫn lọt dấu phân cách người dùng tự gõ; BE nhận `number`.
+  const price = Number(input.price.replace(/\D/g, ''));
+
+  // Gom từng mảnh có thật rồi mới quyết định gửi hay không: gắn `address` vào nhánh
+  // `if (province)` cũ sẽ nuốt mất địa chỉ của người chỉ gõ đường mà chưa chọn tỉnh.
+  const address = input.address?.trim();
+  const location = {
+    ...(address ? { address } : {}),
+    ...(input.province ? { province: input.province } : {}),
+    ...(input.ward ? { ward: input.ward } : {}),
+  };
+
+  return {
+    title: input.title.trim(),
+    description: input.desc.trim(),
+    price,
+    categoryId: input.categoryId,
+    images: input.photoUrls ?? [],
+    // `location: {}` rỗng qua được `.strict()` của BE nhưng tạo ra bản ghi không lọc
+    // được theo gì — thà vắng hẳn field.
+    ...(Object.keys(location).length ? { location } : {}),
+    ...(input.visibility ? { visibility: input.visibility } : {}),
+    // Tin công khai BẮT BUỘC có tỉnh: nó là thứ chọn ra người duyệt. Gửi kèm tường minh
+    // thay vì để BE suy từ tổ chức — người đăng tin công khai có thể không thuộc org nào.
+    ...(input.visibility === 'public' && input.province ? { provinceCode: input.province } : {}),
+  };
 }
 
 export const api = {
@@ -393,65 +480,29 @@ export const api = {
   /**
    * Tin mới vào BE ở trạng thái `pending` chờ duyệt, nên nó KHÔNG hiện ngay ngoài feed —
    * `/listings` chỉ trả tin `active`. Người đăng thấy nó ở "Tin của tôi".
-   *
-   * `location` chỉ gửi khi người đăng đã chọn khu vực, và KHÔNG có toạ độ — BE đã bỏ hẳn geo,
-   * gửi kèm `coordinates` giờ là 400. "Tin gần đây" chạy theo xã/tỉnh chứ không theo bán kính.
-   *
-   * `address` là số nhà / tên đường tự gõ, nằm dưới xã trong mô hình 2 cấp — không phải cấp
-   * quận/huyện đã bỏ từ 01/07/2025.
    */
-  async createListing(input: {
-    title: string;
-    price: string;
-    desc: string;
-    categoryId: string;
-    photoUrls?: string[];
-    address?: string | null;
-    province?: ProvinceName | null;
-    ward?: string | null;
-    /**
-     * Nơi tin sẽ hiển thị — và cũng là thứ quyết định AI DUYỆT nó (BE §0.1): `org_internal`
-     * về hàng đợi của tổ chức, `public` về hàng đợi manager danh mục theo (danh mục × tỉnh).
-     * Bỏ trống thì BE mặc định `org_internal`.
-     */
-    visibility?: 'org_internal' | 'public';
-  }): Promise<Listing> {
-    // Ô giá là `number-pad` nhưng vẫn lọt dấu phân cách người dùng tự gõ; BE nhận `number`.
-    const price = Number(input.price.replace(/\D/g, ''));
-
-    // Gom từng mảnh có thật rồi mới quyết định gửi hay không: gắn `address` vào nhánh
-    // `if (province)` cũ sẽ nuốt mất địa chỉ của người chỉ gõ đường mà chưa chọn tỉnh.
-    const address = input.address?.trim();
-    const location = {
-      ...(address ? { address } : {}),
-      ...(input.province ? { province: input.province } : {}),
-      ...(input.ward ? { ward: input.ward } : {}),
-    };
-
+  async createListing(input: ListingInput): Promise<Listing> {
     const [res, names] = await Promise.all([
-      withAuthRetry(() =>
-        listingCreate({
-          body: {
-            title: input.title.trim(),
-            description: input.desc.trim(),
-            price,
-            categoryId: input.categoryId,
-            images: input.photoUrls ?? [],
-            // `location: {}` rỗng qua được `.strict()` của BE nhưng tạo ra bản ghi không lọc
-            // được theo gì — thà vắng hẳn field.
-            ...(Object.keys(location).length ? { location } : {}),
-            ...(input.visibility ? { visibility: input.visibility } : {}),
-            // Tin công khai BẮT BUỘC có tỉnh: nó là thứ chọn ra người duyệt. Gửi kèm tường minh
-            // thay vì để BE suy từ tổ chức — người đăng tin công khai có thể không thuộc org nào.
-            ...(input.visibility === 'public' && input.province
-              ? { provinceCode: input.province }
-              : {}),
-          },
-        }),
-      ),
+      withAuthRetry(() => listingCreate({ body: toListingBody(input) })),
       categoryNames(),
     ]);
     return toListing(unwrap(res, 'Không ghim được tin lên bảng'), names);
+  },
+
+  /**
+   * Sửa tin của chính mình. BE trả 403 cho tin của người khác — không cần tự kiểm ở đây, và
+   * cũng không nên: chủ tin là thứ server biết chắc, app chỉ đang cầm một bản chụp.
+   *
+   * Gửi TRỌN payload chứ không chỉ field đã đổi. `UpdateListing` khai mọi field optional theo
+   * nghĩa "bỏ qua field này", nên gửi thiếu `images` sau khi người dùng vừa gỡ một ảnh sẽ giữ
+   * nguyên bộ ảnh cũ — thao tác xoá ảnh im lặng không có tác dụng, kiểu hỏng khó thấy nhất.
+   */
+  async updateListing({ id, ...input }: ListingInput & { id: string }): Promise<Listing> {
+    const [res, names] = await Promise.all([
+      withAuthRetry(() => listingUpdate({ path: { id }, body: toListingBody(input) })),
+      categoryNames(),
+    ]);
+    return toListing(unwrap(res, 'Không lưu được thay đổi'), names);
   },
 
   /**
@@ -592,6 +643,30 @@ export const api = {
   async getProfile(): Promise<Profile> {
     const res = await withAuthRetry(() => userGetMe());
     return toProfile(unwrap(res, 'Không tải được hồ sơ'));
+  },
+
+  /**
+   * Hồ sơ công khai của một người bán.
+   *
+   * `withAuthRetry` như mọi call khác dù BE khai route này công khai: `createClientConfig` gắn
+   * Bearer cho MỌI request, nên token hết hạn vẫn làm nó 401 (cùng lý do với `/locations/*`).
+   */
+  async getSellerProfile(id: string): Promise<PublicProfile> {
+    const res = await withAuthRetry(() => userGetById({ path: { id } }));
+    return toPublicProfile(unwrap(res, 'Không tìm thấy người bán này'));
+  },
+
+  /**
+   * Tin đang bán của một người. Đi qua `/listings?seller=` chứ không phải `/listings/mine`:
+   * bộ lọc cứng về `active` của nó đúng ở đây — khách xem hồ sơ không được thấy tin chờ duyệt
+   * hay tin bị từ chối của người khác.
+   */
+  async getSellerListings(id: string): Promise<Listing[]> {
+    const [res, names] = await Promise.all([
+      withAuthRetry(() => listingList({ query: { limit: 50, seller: id } })),
+      categoryNames(),
+    ]);
+    return unwrap(res, 'Không tải được tin của người bán này').map((l) => toListing(l, names));
   },
 
   async updateProfile(input: Partial<Profile>): Promise<Profile> {

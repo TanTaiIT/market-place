@@ -1,116 +1,130 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { AdminFilter, AdminPanel, AdminScreen } from '@/components/AdminScreen';
+import { AdminPanel, AdminScreen } from '@/components/AdminScreen';
+import { AdminSmallBtn, adminFormStyles } from '@/components/AdminPicker';
 import { EmptyState, Field, Loading, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
-import {
-  useAddCategory,
-  useAdminCategories,
-  useRemoveCategory,
-  useRenameCategory,
-} from '@/queries/admin-content';
-import { MAX_CATEGORIES } from '@/api/admin-content';
-import { SCHOOLS } from '@/api/admin-people';
-import { useAdminSchool, useSetAdminSchool } from '@/stores/admin';
+import { useAddCategory, useAdminCategories, useEditCategory } from '@/queries/admin-content';
+import type { AdminCategory } from '@/api/admin-content';
 import { C, F, shadow } from '@/theme';
-
-const SCHOOL_OPTIONS = [
-  { value: 'all', label: 'Tất cả trường' },
-  ...SCHOOLS.map((s) => ({ value: s, label: s })),
-];
-
-const SCOPES = ['Cả hệ thống', ...SCHOOLS];
 
 /**
  * Danh mục = mẩu băng dính phân loại trên bảng tin của học sinh.
  *
- * Một ô nhập lo cả thêm lẫn đổi tên: bấm "Đổi tên" nạp tên cũ vào ô và chuyển nút thành "Lưu
- * tên mới". Android không có `prompt()`, mà dựng thêm một hộp thoại nhập liệu nữa cho đúng một
- * trường chữ thì thừa.
+ * Từ điển dùng chung TOÀN HỆ THỐNG, không thuộc tổ chức nào — nên màn này không có bộ lọc trường
+ * như các mục khác của bàn quản trị, và chỉ master sửa được (`AdminNav` đã chặn ở cửa).
+ *
+ * Không có nút xoá: BE cố ý không mở endpoint đó vì tin đã đăng vẫn trỏ tới danh mục. Gỡ khỏi
+ * lưu thông bằng `isActive: false` — danh mục tắt vẫn nằm trong danh sách, mờ đi, bật lại được.
+ *
+ * Một panel lo cả thêm lẫn sửa: Android không có `prompt()`, mà dựng thêm modal cho ba ô nhập
+ * thì thừa. Bấm "Sửa" nạp danh mục cũ vào form và đổi nút thành "Lưu thay đổi".
  */
 export default function AdminCategories() {
   const toast = useToast();
-  const school = useAdminSchool();
-  const setSchool = useSetAdminSchool();
-
-  const { data, error, isLoading } = useAdminCategories(school);
+  const { data, error, isLoading } = useAdminCategories();
   const add = useAddCategory();
-  const rename = useRenameCategory();
-  const remove = useRemoveCategory();
+  const edit = useEditCategory();
 
+  const [editing, setEditing] = useState<AdminCategory | null>(null);
   const [name, setName] = useState('');
-  const [scope, setScope] = useState(SCOPES[0]);
-  /** Tên danh mục đang sửa, `null` = đang ở chế độ thêm mới. */
-  const [editing, setEditing] = useState<string | null>(null);
+  const [icon, setIcon] = useState('');
+  const [order, setOrder] = useState('');
 
-  const busy = add.isPending || rename.isPending;
-  const surface = (done: string) => ({
-    onSuccess: () => {
-      toast(done);
-      setName('');
-      setEditing(null);
-    },
-    onError: (e: Error) => toast(`⚠️ ${e.message}`),
-  });
+  const rows = data ?? [];
+  const fail = (e: Error) => toast(`⚠️ ${e.message}`);
 
-  const submit = () =>
-    editing
-      ? rename.mutate({ from: editing, to: name }, surface(`Đã đổi tên thành "${name.trim()}"`))
-      : add.mutate({ name, scope }, surface(`Đã thêm danh mục "${name.trim()}"`));
+  const reset = () => {
+    setEditing(null);
+    setName('');
+    setIcon('');
+    setOrder('');
+  };
+
+  const submit = () => {
+    if (!name.trim()) return toast('⚠️ Nhập tên danh mục trước đã');
+
+    const done = (msg: string) => ({
+      onSuccess: () => {
+        reset();
+        toast(msg);
+      },
+      onError: fail,
+    });
+
+    if (editing) {
+      return edit.mutate(
+        { id: editing.id, name, icon, order },
+        done(`✓ Đã cập nhật "${name.trim()}"`),
+      );
+    }
+    add.mutate({ name, icon, order }, done(`✓ Đã thêm danh mục "${name.trim()}"`));
+  };
+
+  const toggleActive = (cat: AdminCategory) =>
+    edit.mutate(
+      { id: cat.id, isActive: !cat.isActive },
+      {
+        onSuccess: (c) =>
+          toast(c.isActive ? `✓ Đã bật lại "${c.name}"` : `✓ Đã tắt "${c.name}"`),
+        onError: fail,
+      },
+    );
 
   return (
     <AdminScreen title="Danh mục" note="băng dính phân loại">
-      <AdminFilter options={SCHOOL_OPTIONS} value={school} onChange={setSchool} />
-
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         {isLoading ? (
           <Loading onDark />
         ) : error ? (
           <EmptyState icon="📡" onDark text={(error as Error).message} />
+        ) : rows.length === 0 ? (
+          <EmptyState icon="▩" onDark text="Chưa có danh mục nào" />
         ) : (
           <View style={styles.grid}>
-            {(data ?? []).map((cat, i) => (
-              <View key={cat.name} style={styles.card}>
+            {rows.map((cat, i) => (
+              <View key={cat.id} style={[styles.card, !cat.isActive && { opacity: 0.55 }]}>
                 <View style={styles.cardTop}>
-                  <View style={[styles.chip, { transform: [{ rotate: i % 2 ? '1.3deg' : '-1.4deg' }] }]}>
-                    <Text style={styles.chipText}>{cat.name}</Text>
+                  <View
+                    style={[styles.chip, { transform: [{ rotate: i % 2 ? '1.3deg' : '-1.4deg' }] }]}
+                  >
+                    <Text style={styles.chipText}>
+                      {cat.icon ? `${cat.icon} ${cat.name}` : cat.name}
+                    </Text>
                   </View>
-                  <Text style={styles.count}>{cat.count}</Text>
                 </View>
                 <Text style={styles.meta}>
-                  {cat.scope.toUpperCase()} · {cat.count} TIN ĐANG CÓ
+                  /{cat.slug} · THỨ TỰ {cat.order} · {cat.isActive ? 'ĐANG BẬT' : 'ĐÃ TẮT'}
                 </Text>
                 <View style={styles.cardActs}>
-                  <Pressable
+                  <AdminSmallBtn
+                    label="Sửa"
                     onPress={() => {
-                      setEditing(cat.name);
+                      setEditing(cat);
                       setName(cat.name);
+                      setIcon(cat.icon);
+                      setOrder(String(cat.order));
                     }}
-                    style={({ pressed }) => [styles.smallBtn, pressed && { opacity: 0.7 }]}
-                  >
-                    <Text style={styles.smallBtnText}>Đổi tên</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() =>
-                      remove.mutate(cat.name, {
-                        onSuccess: () => toast(`Đã gỡ danh mục "${cat.name}"`),
-                        onError: (e: Error) => toast(`⚠️ ${e.message}`),
-                      })
-                    }
-                    style={({ pressed }) => [styles.smallBtn, pressed && { opacity: 0.7 }]}
-                  >
-                    <Text style={styles.smallBtnText}>Gỡ bỏ</Text>
-                  </Pressable>
+                  />
+                  <AdminSmallBtn
+                    label={cat.isActive ? 'Tắt' : 'Bật lại'}
+                    onPress={() => toggleActive(cat)}
+                  />
                 </View>
               </View>
             ))}
           </View>
         )}
 
+        <Text style={adminFormStyles.limit}>
+          Danh mục đã tắt không hiện trên bảng tin nhưng tin cũ vẫn trỏ tới nó — vì thế BE không
+          có đường xoá hẳn.
+        </Text>
+
         <View style={{ marginTop: 18 }}>
           <AdminPanel
-            title={editing ? `Đổi tên "${editing}"` : 'Thêm danh mục'}
-            note={editing ? 'tên cũ đang nằm trong ô' : `tối đa ${MAX_CATEGORIES} cái thôi`}
+            title={editing ? `Sửa "${editing.name}"` : 'Thêm danh mục'}
+            note={editing ? 'slug giữ nguyên, chỉ tên đổi' : 'slug do hệ thống tự đặt từ tên'}
           >
             <Field
               onDark
@@ -119,47 +133,36 @@ export default function AdminCategories() {
               onChangeText={setName}
               placeholder="Ví dụ: Dụng cụ thể thao"
             />
-            <Text style={styles.hint}>
-              Tên sẽ hiện thành mẩu băng dính trên bảng tin của học sinh.
-            </Text>
+            <Field
+              onDark
+              label="Biểu tượng (emoji)"
+              value={icon}
+              onChangeText={setIcon}
+              placeholder="🏸"
+              maxLength={4}
+            />
+            <Field
+              onDark
+              label="Thứ tự hiển thị"
+              value={order}
+              onChangeText={setOrder}
+              placeholder="Số càng nhỏ càng đứng trước"
+              keyboardType="number-pad"
+            />
 
-            {!editing && (
-              <View style={{ marginTop: 16 }}>
-                <Text style={styles.label}>MỞ CHO</Text>
-                <View style={styles.scopes}>
-                  {SCOPES.map((s) => (
-                    <Pressable
-                      key={s}
-                      onPress={() => setScope(s)}
-                      style={({ pressed }) => [
-                        styles.scope,
-                        s === scope && styles.scopeOn,
-                        pressed && { opacity: 0.7 },
-                      ]}
-                    >
-                      <Text style={[styles.scopeText, s === scope && { color: C.paper }]}>{s}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            <View style={styles.formActs}>
+            <View style={adminFormStyles.formActs}>
               <PinButton
-                label={editing ? 'Lưu tên mới' : 'Thêm danh mục'}
-                loading={busy}
-                onPress={submit}
+                label={editing ? 'Lưu thay đổi' : 'Thêm danh mục'}
+                loading={add.isPending || edit.isPending}
                 style={{ flex: 1 }}
+                onPress={submit}
               />
               {!!editing && (
                 <Pressable
-                  onPress={() => {
-                    setEditing(null);
-                    setName('');
-                  }}
-                  style={({ pressed }) => [styles.cancel, pressed && { opacity: 0.7 }]}
+                  onPress={reset}
+                  style={({ pressed }) => [adminFormStyles.cancel, pressed && { opacity: 0.7 }]}
                 >
-                  <Text style={styles.smallBtnText}>Huỷ</Text>
+                  <Text style={adminFormStyles.smallText}>Huỷ</Text>
                 </Pressable>
               )}
             </View>
@@ -191,45 +194,6 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   chipText: { fontFamily: F.uiBold, fontSize: 12, color: C.tapeInk },
-  count: { marginLeft: 'auto', fontFamily: F.monoBold, fontSize: 18, color: C.paper },
   meta: { fontFamily: F.mono, fontSize: 9.5, letterSpacing: 0.5, color: C.deskTxtDim },
   cardActs: { flexDirection: 'row', gap: 7, marginTop: 11 },
-  smallBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: C.deskRaise,
-    borderWidth: 1,
-    borderColor: C.deskLineStrong,
-  },
-  smallBtnText: { fontFamily: F.uiBold, fontSize: 11.5, color: C.deskTxt },
-
-  hint: { fontFamily: F.ui, fontSize: 11.5, lineHeight: 17, color: C.deskTxtDim, marginTop: -8 },
-  label: {
-    fontFamily: F.mono,
-    fontSize: 9.5,
-    letterSpacing: 1.3,
-    color: C.deskTxtDim,
-    marginBottom: 8,
-  },
-  scopes: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  scope: {
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: C.desk,
-    borderWidth: 1,
-    borderColor: C.deskLineStrong,
-  },
-  scopeOn: { backgroundColor: C.deskHi, borderColor: C.cork },
-  scopeText: { fontFamily: F.uiSemi, fontSize: 12.5, color: C.deskTxtSoft },
-  formActs: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, marginTop: 18 },
-  cancel: {
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    borderRadius: 6,
-    backgroundColor: C.deskRaise,
-    borderWidth: 1,
-    borderColor: C.deskLineStrong,
-  },
 });

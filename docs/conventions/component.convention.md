@@ -14,7 +14,8 @@ trạng thái rỗng/đang tải, LOC caps.
 
 **Không dựng raw `<TextInput>`/`<Pressable>` cho nút và ô nhập khi đã có primitive tương ứng.**
 Ngoại lệ hợp lệ: input có layout đặc thù không nhét vừa `Field` — ô giá có tiền tố `đ` và ô mô tả multiline
-trong [post.tsx:120-141](../../app/post.tsx#L120-L141).
+trong [ListingForm.tsx:145-166](../../src/components/ListingForm.tsx#L145-L166) (dùng chung cho cả ghim tin mới
+lẫn sửa tin).
 
 ---
 
@@ -144,7 +145,8 @@ Vượt cap → tách **theo vùng UI có state riêng**, không tách máy móc
 
 **Known baseline — không mở lại tranh luận:** `app/chat/[id].tsx` (264) và `src/components/ui.tsx` (352, là
 barrel có chủ ý) đã vượt cap từ trước. Chỉ chặn khi các file này *tăng thêm*, không chặn hiện trạng.
-Các file còn lại đều dưới cap; sát nhất là `app/post.tsx` (242) — cẩn thận khi thêm vào nó.
+Các file còn lại đều dưới cap; sát nhất là `app/listing/[id].tsx` (244) rồi `app/admin/org-units.tsx` (236) —
+cẩn thận khi thêm vào hai file đó.
 
 ---
 

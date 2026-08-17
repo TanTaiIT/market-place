@@ -26,8 +26,14 @@ export type ListingPhoto = {
  * Đánh đổi đã cân nhắc: bỏ ngang form hoặc xoá ảnh sau khi chọn sẽ để lại ảnh mồ côi trên
  * Cloudinary. Xoá chúng cần chữ ký nên là việc của BE, FE không làm được.
  */
-export function useListingPhotos() {
-  const [photos, setPhotos] = useState<ListingPhoto[]>([]);
+export function useListingPhotos(initialUrls: string[] = []) {
+  // Ảnh của tin đang sửa đã nằm sẵn trên Cloudinary nên vào thẳng `done`, không upload lại;
+  // `uri` mượn chính URL đó vì trong hook này `uri` vừa là khoá vừa là nguồn hiển thị.
+  // Lazy initializer: `initialUrls` chỉ đọc ở lần mount đầu, các render sau không nuốt mất
+  // ảnh người dùng vừa thêm — nên màn sửa phải chờ tin về rồi mới mount form.
+  const [photos, setPhotos] = useState<ListingPhoto[]>(() =>
+    initialUrls.map((url) => ({ uri: url, url, status: 'done' as const })),
+  );
   const upload = useMutation({ mutationFn: uploadImage });
 
   const patch = (uri: string, next: Partial<ListingPhoto>) =>
@@ -69,3 +75,12 @@ export function useListingPhotos() {
     hasFailed: photos.some((p) => p.status === 'error'),
   };
 }
+
+/**
+ * Bộ ảnh đã mount, truyền nguyên khối từ route xuống `ListingForm`.
+ *
+ * Route gọi hook chứ không phải form: upload là `useMutation`, mà mutation chỉ được khởi động
+ * từ `app/**` (ranh giới ở AGENTS §Kiến trúc). Truyền cả object thay vì bung ra sáu prop rời —
+ * chúng luôn đi cùng nhau, tách ra chỉ để mỗi call-site phải nối lại đúng sáu mảnh đó.
+ */
+export type ListingPhotosController = ReturnType<typeof useListingPhotos>;

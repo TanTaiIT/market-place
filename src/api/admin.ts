@@ -12,6 +12,7 @@ import {
   reportResolve,
 } from './generated';
 import type { Listing as ListingDto, RerouteListing, RoleGrant } from './generated';
+import { reportKindLabel } from './report';
 import { formatPrice, gradOf, relativeTime, unwrap } from './client';
 import { withAuthRetry } from './http';
 import type { Grad } from '@/theme';
@@ -82,15 +83,6 @@ type Overview = {
   kpis: AdminKpi[];
   trend: TrendPoint[];
   cats: CatShare[];
-};
-
-/** Nhãn tiếng Việt cho `REPORT_KIND` của BE. */
-const REPORT_KIND_LABEL: Record<string, string> = {
-  scam: 'Nghi lừa đảo',
-  wrong_info: 'Sai mô tả',
-  harassment: 'Nhắn tin làm phiền',
-  banned_item: 'Hàng không được bán',
-  other: 'Khác',
 };
 
 /** Màu chấm dòng thời gian theo nhóm hành động. */
@@ -222,7 +214,8 @@ export const adminApi = {
       // "Nghi lừa đảo" là loại nặng nhất — viền đỏ, xếp trước.
       urgent: r.kind === 'scam',
       target: r.targetTitle,
-      kind: REPORT_KIND_LABEL[r.kind] ?? r.kind,
+      // Nhãn lấy từ `report.ts` — cùng bản với ngăn người dùng chọn lúc gửi (xem file đó).
+      kind: reportKindLabel(r.kind),
       by: r.reporterName,
       at: relativeTime(r.createdAt),
       count: r.count,

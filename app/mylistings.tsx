@@ -1,5 +1,6 @@
 import React from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, SlideOutRight } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ListingPhoto } from '@/components/ListingPhoto';
@@ -9,6 +10,7 @@ import { useDeleteListing, useMyListings, useQuota } from '@/queries/listings';
 import { C, F, shadow } from '@/theme';
 
 export default function MyListings() {
+  const router = useRouter();
   const toast = useToast();
   const { data, error, isLoading } = useMyListings();
   const del = useDeleteListing();
@@ -67,6 +69,12 @@ export default function MyListings() {
               </View>
             </View>
             <View style={{ gap: 6, justifyContent: 'center' }}>
+              <Pressable
+                style={styles.iconBtn}
+                onPress={() => router.push(`/listing/edit/${item.id}`)}
+              >
+                <Text style={{ fontSize: 12 }}>✏️</Text>
+              </Pressable>
               <Pressable
                 style={[styles.iconBtn, { backgroundColor: '#FCE4E1' }]}
                 onPress={() =>

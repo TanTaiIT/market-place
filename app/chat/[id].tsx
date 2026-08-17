@@ -81,7 +81,7 @@ export default function Chat() {
           >
             <Text style={{ fontSize: 16 }}>←</Text>
           </Pressable>
-          <Avatar text={conversation.avatar} size={36} color={chatColor(conversation.name)} />
+          <Avatar text={conversation.avatar} url={conversation.avatarUrl} size={36} color={chatColor(conversation.name)} />
           <View style={{ flex: 1 }}>
             <Text style={styles.name}>{conversation.name}</Text>
             <Text style={styles.sub}>Đang hoạt động</Text>

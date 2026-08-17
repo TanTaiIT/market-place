@@ -15,7 +15,9 @@ export default function Search() {
   const router = useRouter();
   /** Thứ người dùng đang chỉnh — hiện ngay trên các ô nhập. */
   const [draft, setDraft] = useState<SearchFilter>(EMPTY_SEARCH);
-  const [panelOpen, setPanelOpen] = useState(false);
+  // Mở sẵn: người vào màn tìm kiếm thường đã biết mình muốn lọc gì, bắt bấm thêm một nhịp để
+  // thấy bộ lọc là che mất thứ họ tới để dùng. Nút thu gọn vẫn giữ cho ai cần chỗ xem kết quả.
+  const [panelOpen, setPanelOpen] = useState(true);
 
   // Chờ 300ms rồi mới gọi query. Debounce CẢ bộ lọc chứ không riêng từ khoá: ô giá cũng là gõ
   // phím, gọi thẳng thì gõ "500000" bắn sáu request. Tỉnh/danh mục là thao tác dứt khoát nên

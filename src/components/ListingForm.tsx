@@ -13,7 +13,7 @@ import { validateListingDraft } from './listingDraft';
 import { VisibilityPicker, type PostVisibility } from './VisibilityPicker';
 import { CatTape, Field } from './ui';
 import { useToast } from './Toast';
-import { useCategories } from '@/queries/listings';
+import { useCategories, useProfile } from '@/queries/listings';
 import type { ListingPhotosController } from '@/queries/upload';
 import type { Listing } from '@/api/db';
 import { useOrgSlug } from '@/stores/auth';
@@ -82,6 +82,7 @@ export function ListingForm({
   const toast = useToast();
   const activeOrg = useOrgSlug();
   const { data: categories } = useCategories();
+  const { data: profile } = useProfile();
 
   const [title, setTitle] = useState(initial?.title ?? '');
   const [price, setPrice] = useState(initial?.price ?? '');
@@ -94,8 +95,23 @@ export function ListingForm({
   const [visibility, setVisibility] = useState<PostVisibility>(
     initial?.visibility ?? (activeOrg ? 'org_internal' : 'public'),
   );
-  // Tên tỉnh/xã, không phải mã — BE lưu và lọc bằng chính chuỗi này.
-  const [location, setLocation] = useState<ListingLocation>(initial?.location ?? EMPTY_LOCATION);
+  /**
+   * Tên tỉnh/xã, không phải mã — BE lưu và lọc bằng chính chuỗi này.
+   *
+   * Tin MỚI điền sẵn khu vực từ hồ sơ (`initial` vắng mặt = đang đăng mới). Đây là công dụng duy
+   * nhất của khu vực riêng tư trong hồ sơ — nó KHÔNG khoá gì cả: người dùng sửa lại thoải mái,
+   * vì bán món đồ ở chỗ khác nơi mình ở là chuyện thường.
+   *
+   * Đọc một lần lúc mount, không `useEffect` đồng bộ về sau: hồ sơ đã được `useValidateSession`
+   * nạp vào cache từ lúc mở app nên hầu như luôn có sẵn ở đây. Ca hiếm còn lại — mở app rồi vào
+   * ngay màn đăng tin trước khi hồ sơ về — chỉ là không điền sẵn, đúng như trước khi có tính năng.
+   */
+  const [location, setLocation] = useState<ListingLocation>(
+    initial?.location ??
+      (profile
+        ? { province: profile.province ?? null, ward: profile.ward ?? null, address: '' }
+        : EMPTY_LOCATION),
+  );
 
   /* @keyframes pinPress — nút lún xuống rồi bật nhẹ lên */
   const press = useSharedValue(0);

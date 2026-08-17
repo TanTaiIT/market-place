@@ -145,6 +145,7 @@ function toListing(dto: ListingDto, names: Map<string, string>): Listing {
     photoUrls: dto.images,
     seller: sellerName,
     avatar: initialsOf(sellerName),
+    avatarUrl: dto.posterAvatar || undefined,
     contact: dto.posterContact,
     desc: dto.description,
     // UI chỉ có hai trạng thái; 5 trạng thái còn lại của BE đều là "chưa hiển thị".
@@ -176,7 +177,16 @@ function toProfile(dto: MeProfile): Profile {
     // hiện lên UI trông y hệt một thống kê thật, tức là con số bịa.
     org: '',
     phone: dto.phone ?? '',
-    avatar: dto.avatar || initialsOf(dto.name),
+    // Hai field tách nhau: `avatar` là chữ viết tắt để vẽ vòng tròn khi CHƯA có ảnh, `avatarUrl`
+    // là ảnh thật. Nhồi cả hai vào một field thì call-site phải tự đoán mình đang giữ URL hay
+    // hai chữ cái — và `Avatar` component thì chỉ nhận chữ.
+    avatar: initialsOf(dto.name),
+    avatarUrl: dto.avatar || undefined,
+    gender: dto.gender,
+    province: dto.location?.province,
+    ward: dto.location?.ward,
+    address: dto.location?.address,
+    showPhone: dto.showPhone,
     posted: '—',
     sold: '—',
     rating: dto.ratingCount > 0 ? dto.ratingAvg.toFixed(1) : '—',
@@ -191,7 +201,9 @@ function toPublicProfile(dto: PublicProfileDto): PublicProfile {
   return {
     id: dto.id,
     name: dto.name,
-    avatar: dto.avatar || initialsOf(dto.name),
+    avatar: initialsOf(dto.name),
+    avatarUrl: dto.avatar || undefined,
+    gender: dto.gender,
     rating: dto.ratingCount > 0 ? dto.ratingAvg.toFixed(1) : '—',
     ratingCount: dto.ratingCount,
     // Ghép tay, không `toLocaleDateString`: Hermes không có Intl đầy đủ (cùng lý do `clockTime`).
@@ -206,6 +218,7 @@ function toConversation(dto: ConversationDto): Conversation {
     listingTitle: dto.listingTitle,
     name: dto.partnerName,
     avatar: initialsOf(dto.partnerName),
+    avatarUrl: dto.partnerAvatar || undefined,
     lastMsg: dto.lastMessage || 'Bắt đầu cuộc trò chuyện',
     time: relativeTime(dto.lastMessageAt),
     unread: dto.unread,
@@ -669,11 +682,36 @@ export const api = {
     return unwrap(res, 'Không tải được tin của người bán này').map((l) => toListing(l, names));
   },
 
+  /**
+   * `org`/`posted`/`sold`/`rating` không gửi lên: chúng là thứ đọc được, không phải thứ sửa được.
+   *
+   * `location` gộp lại từ ba field phẳng của `Profile` và **bỏ hẳn key khi cả ba đều rỗng** —
+   * gửi `location: {}` sẽ ghi một subdoc rỗng, mà "chưa điền khu vực" và "khu vực rỗng" phải là
+   * cùng một thứ (đúng cách `createListing` xử lý).
+   */
   async updateProfile(input: Partial<Profile>): Promise<Profile> {
+    // `in` chứ không phải kiểm giá trị: người dùng xoá trắng cả ba ô khu vực thì mọi giá trị đều
+    // rỗng, mà bỏ hẳn key `location` lại có nghĩa "đừng đụng tới" — BE giữ nguyên giá trị cũ và
+    // khu vực không bao giờ xoá được. Gửi `location: {}` mới là "xoá".
+    const touchedLocation = 'province' in input || 'ward' in input || 'address' in input;
+    const location = {
+      ...(input.province ? { province: input.province } : {}),
+      ...(input.ward ? { ward: input.ward } : {}),
+      ...(input.address?.trim() ? { address: input.address.trim() } : {}),
+    };
+
     const res = await withAuthRetry(() =>
       userUpdateMe({
-        // BE chỉ nhận ba field này; `org`/`posted`/`sold` không thuộc hồ sơ user.
-        body: { name: input.name, phone: input.phone },
+        body: {
+          ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+          // Chuỗi rỗng đi thẳng lên: BE nhận `''` nghĩa là xoá số. Chặn ở đây thì người dùng
+          // không có đường bỏ số đã lưu.
+          ...(input.phone !== undefined ? { phone: input.phone.trim() } : {}),
+          ...(input.avatarUrl !== undefined ? { avatar: input.avatarUrl } : {}),
+          ...(input.gender !== undefined ? { gender: input.gender } : {}),
+          ...(input.showPhone !== undefined ? { showPhone: input.showPhone } : {}),
+          ...(touchedLocation ? { location } : {}),
+        },
       }),
     );
     return toProfile(unwrap(res, 'Không lưu được hồ sơ'));

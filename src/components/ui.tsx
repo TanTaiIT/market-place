@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -245,12 +246,21 @@ export function Field({
 
 export function Avatar({
   text,
+  url,
   size = 36,
   color = C.moss,
   textColor = '#fff',
   ring,
 }: {
   text: string;
+  /**
+   * Ảnh thật. Có thì vẽ ảnh, không thì rơi về chữ viết tắt.
+   *
+   * `text` vẫn BẮT BUỘC kể cả khi có `url`: ảnh có thể tải hỏng (mạng, link chết), và lúc đó
+   * một vòng tròn trống là tệ hơn hai chữ cái. Nhận URL rỗng cũng coi như không có — BE trả
+   * `avatar: ''` cho người chưa đặt ảnh.
+   */
+  url?: string;
   size?: number;
   color?: string;
   textColor?: string;
@@ -266,12 +276,21 @@ export function Avatar({
           backgroundColor: color,
           alignItems: 'center',
           justifyContent: 'center',
+          overflow: 'hidden',
         },
         ring && { borderWidth: 2, borderColor: C.paperWarm },
         shadow,
       ]}
     >
-      <Text style={{ color: textColor, fontFamily: F.uiBold, fontSize: size * 0.36 }}>{text}</Text>
+      {url ? (
+        // '100%' chứ không phải `size`: `ring` thêm border 2px mà RN tính border VÀO width, nên
+        // ảnh đúng `size` sẽ tràn 4px và bị `overflow: hidden` cắt mất viền ngoài.
+        <Image source={{ uri: url }} style={{ width: '100%', height: '100%' }} />
+      ) : (
+        <Text style={{ color: textColor, fontFamily: F.uiBold, fontSize: size * 0.36 }}>
+          {text}
+        </Text>
+      )}
     </View>
   );
 }

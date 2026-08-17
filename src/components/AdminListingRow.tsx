@@ -87,7 +87,7 @@ export function AdminListingRow({
         </Text>
 
         <View style={styles.seller}>
-          <Avatar text={item.avatar} size={20} color={colorOf(item.seller)} textColor={C.desk} />
+          <Avatar text={item.avatar} url={item.avatarUrl} size={20} color={colorOf(item.seller)} textColor={C.desk} />
           <Text numberOfLines={1} style={styles.sellerText}>
             {item.seller} · gửi {item.at}
           </Text>

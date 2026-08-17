@@ -47,6 +47,8 @@ export type Listing = {
   photoUrls?: string[];
   seller: string;
   avatar: string;
+  /** Ảnh đại diện người bán, snapshot lúc tạo tin. Rỗng = rơi về chữ viết tắt. */
+  avatarUrl?: string;
   contact: string;
   desc: string;
   status: 'live' | 'pending';
@@ -77,6 +79,8 @@ export type Conversation = {
   /** Người còn lại trong hội thoại. */
   name: string;
   avatar: string;
+  /** Ảnh đại diện của người đó, snapshot lúc mở hội thoại. Rỗng = rơi về chữ viết tắt. */
+  avatarUrl?: string;
   lastMsg: string;
   time: string;
   unread: boolean;
@@ -110,12 +114,34 @@ export type AuthSession = {
   refreshToken: string;
 };
 
+/** Bốn giá trị BE nhận. `undisclosed` là lựa chọn thật ("không muốn nêu"), không phải bỏ trống. */
+export type Gender = 'male' | 'female' | 'other' | 'undisclosed';
+
+export const GENDER_LABEL: Record<Gender, string> = {
+  male: 'Nam',
+  female: 'Nữ',
+  other: 'Khác',
+  undisclosed: 'Không nêu',
+};
+
 export type Profile = {
   name: string;
   org: string;
   phone: string;
   avatar: string;
-  /** Không có `role`: vai trò là quan hệ, đọc qua `useMyGrants` / `useMyOrgs` chứ không ở hồ sơ. */
+  /** URL Cloudinary. `avatar` ở trên là chữ viết tắt dựng từ tên khi chưa có ảnh thật. */
+  avatarUrl?: string;
+  gender: Gender;
+  /**
+   * Khu vực của chính mình — RIÊNG TƯ, BE không trả nó ở hồ sơ công khai. Dùng để điền sẵn
+   * form đăng tin, KHÔNG phải nguồn của `Listing.location`: bán đồ ở chỗ khác nơi mình ở là
+   * chuyện thường, nên mỗi tin vẫn tự mang khu vực riêng.
+   */
+  province?: ProvinceName;
+  ward?: string;
+  address?: string;
+  /** Cho hiện SĐT trên tin đăng MỚI. Tin đã đăng giữ nguyên vì `posterContact` là snapshot. */
+  showPhone: boolean;
   /** Chuỗi chứ không phải số: BE chưa trả thống kê nào, nên `—` là giá trị hợp lệ. */
   posted: string;
   sold: string;
@@ -135,6 +161,8 @@ export type PublicProfile = {
   id: string;
   name: string;
   avatar: string;
+  avatarUrl?: string;
+  gender: Gender;
   /** `—` khi chưa ai đánh giá: hiện `0.0` trông y hệt một điểm số thật đã bị chấm thấp. */
   rating: string;
   ratingCount: number;

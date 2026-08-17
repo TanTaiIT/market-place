@@ -44,6 +44,8 @@ export type ModListing = {
   photo: Grad;
   seller: string;
   avatar: string;
+  /** Snapshot ảnh đại diện lúc tạo tin. Rỗng = rơi về chữ viết tắt. */
+  avatarUrl?: string;
   at: string;
   views: number;
   status: ModStatus;
@@ -113,6 +115,7 @@ function toModListing(dto: ListingDto, categoryNames: Map<string, string>): ModL
     photo: gradOf(dto._id),
     seller: dto.posterName || 'Người bán',
     avatar: initialsOf(dto.posterName || 'Người bán'),
+    avatarUrl: dto.posterAvatar || undefined,
     at: relativeTime(dto.createdAt),
     views: dto.viewCount,
     status: dto.status as ModStatus,

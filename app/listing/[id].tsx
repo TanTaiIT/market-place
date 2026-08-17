@@ -102,7 +102,7 @@ export default function ListingDetail() {
             onPress={() => router.push(`/user/${listing.sellerId}`)}
             style={({ pressed }) => [styles.sellerCard, pressed && { opacity: 0.7 }]}
           >
-            <Avatar text={listing.avatar} size={42} color={C.amber} textColor={C.amberInk} />
+            <Avatar text={listing.avatar} url={listing.avatarUrl} size={42} color={C.amber} textColor={C.amberInk} />
             <View style={{ flex: 1 }}>
               <Text style={styles.sellerName}>{listing.seller}</Text>
               {!!listing.contact && <Text style={styles.sellerOrg}>{listing.contact}</Text>}

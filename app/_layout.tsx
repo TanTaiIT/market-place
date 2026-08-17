@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -19,6 +19,7 @@ import {
   JetBrainsMono_600SemiBold,
 } from '@expo-google-fonts/jetbrains-mono';
 import { BootSplash } from '@/components/BootSplash';
+import { ErrorScreen } from '@/components/ErrorScreen';
 import { ToastProvider } from '@/components/Toast';
 import { useSyncAccessToken, useValidateSession } from '@/queries/auth';
 import { useChatSocket } from '@/queries/chat';
@@ -36,6 +37,32 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+/**
+ * Lưới an toàn cuối cùng cho lỗi render. expo-router tự bọc route bằng component tên
+ * `ErrorBoundary` nếu file có export nó (không cần package nào).
+ *
+ * Dùng `queryClient` ở module scope chứ KHÔNG `useQueryClient()`: boundary do expo-router dựng
+ * ở NGOÀI `RootLayout`, tức là ngoài `<QueryClientProvider>` bên dưới — cùng lý do
+ * `useSyncAccessToken`/`useValidateSession` phải nhận `queryClient` qua tham số.
+ *
+ * `clear()` trước `retry()` vì nguyên nhân thường là dữ liệu xấu ĐANG nằm trong cache: render
+ * lại mà không dọn thì đọc đúng cái dữ liệu đó và vỡ lại, nút "Thử lại" thành vô nghĩa.
+ *
+ * Không bắt được: lỗi trong `onPress`, promise rejection, crash native, và lỗi của chính
+ * `RootLayout` — boundary không tự bắt lỗi của component nó bọc ở trên.
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <ErrorScreen
+      error={error}
+      onRetry={() => {
+        queryClient.clear();
+        retry();
+      }}
+    />
+  );
+}
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({

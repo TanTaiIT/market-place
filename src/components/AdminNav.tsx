@@ -167,7 +167,7 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
           }}
           style={({ pressed }) => [styles.foot, pressed && { opacity: 0.7 }]}
         >
-          <Avatar text={profile?.avatar ?? '·'} size={32} color={C.mossDeep} />
+          <Avatar text={profile?.avatar ?? '·'} url={profile?.avatarUrl} size={32} color={C.mossDeep} />
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text numberOfLines={1} style={styles.meName}>
               {profile?.name ?? 'Quản trị'}

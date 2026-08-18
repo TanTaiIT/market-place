@@ -55,7 +55,7 @@ export default function Feed() {
               <Text style={styles.title}>Bảng tin của bạn</Text>
 
               <Pressable onPress={() => router.push('/(tabs)/profile')}>
-                <Avatar text={profile?.avatar ?? '·'} ring />
+                <Avatar text={profile?.avatar ?? '·'} url={profile?.avatarUrl} ring />
               </Pressable>
             </View>
 

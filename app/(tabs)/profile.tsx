@@ -40,7 +40,7 @@ export default function Profile() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 24 }}>
       <LinearGradient colors={[C.cork, C.paper]} style={[styles.hero, { paddingTop: insets.top + 24 }]}>
-        <Avatar text={profile.avatar} size={76} ring />
+        <Avatar text={profile.avatar} url={profile.avatarUrl} size={76} ring />
         <Text style={styles.name}>{profile.name}</Text>
         <Text style={styles.org}>{profile.org}</Text>
 

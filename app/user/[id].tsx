@@ -8,6 +8,7 @@ import { Avatar, EmptyState, Loading, ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useSellerListings, useSellerProfile } from '@/queries/users';
 import { useCreateReport } from '@/queries/report';
+import { GENDER_LABEL } from '@/api/db';
 import { C, F, shadow } from '@/theme';
 
 /**
@@ -57,7 +58,7 @@ export default function SellerProfile() {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View style={styles.card}>
-            <Avatar text={seller.avatar} size={56} color={C.amber} textColor={C.amberInk} />
+            <Avatar text={seller.avatar} url={seller.avatarUrl} size={56} color={C.amber} textColor={C.amberInk} />
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>{seller.name}</Text>
               <Text style={styles.meta}>
@@ -67,7 +68,12 @@ export default function SellerProfile() {
                   ? `⭐ ${seller.rating} · ${seller.ratingCount} đánh giá`
                   : '⭐ Chưa có đánh giá nào'}
               </Text>
-              <Text style={styles.meta}>Tham gia từ {seller.joined}</Text>
+              <Text style={styles.meta}>
+                {/* Giấu khi người bán chọn "không nêu" — hiện chữ đó ra là biến một lựa chọn
+                    riêng tư thành một dòng thông tin, đúng thứ họ vừa từ chối cung cấp. */}
+                {seller.gender !== 'undisclosed' ? `${GENDER_LABEL[seller.gender]} · ` : ''}
+                Tham gia từ {seller.joined}
+              </Text>
               {/* Không kiểm "có phải chính mình không" ở đây: màn này chỉ mở được từ tin của
                   NGƯỜI KHÁC (thẻ người bán của tin mình đã bị khoá), còn tự báo cáo chính mình
                   thì BE trả 400 — hai lớp chặn là đủ, thêm lớp thứ ba chỉ để lệch nhau. */}

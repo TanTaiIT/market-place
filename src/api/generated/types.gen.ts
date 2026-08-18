@@ -46,14 +46,22 @@ export type AuthResponse = {
 
 export type UpdateProfile = {
     name?: string;
-    phone?: string;
-    avatar?: string;
+    phone?: string | '';
+    avatar?: string | '';
+    gender?: 'male' | 'female' | 'other' | 'undisclosed';
+    location?: {
+        province?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
+        ward?: string;
+        address?: string;
+    };
+    showPhone?: boolean;
 };
 
 export type PublicProfile = {
     id: string;
     name: string;
     avatar: string;
+    gender: 'male' | 'female' | 'other' | 'undisclosed';
     ratingAvg: number;
     ratingCount: number;
     createdAt: string;
@@ -62,6 +70,12 @@ export type PublicProfile = {
 export type MeProfile = PublicProfile & {
     email: string;
     phone?: string;
+    location?: {
+        province?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
+        ward?: string;
+        address?: string;
+    };
+    showPhone: boolean;
     isEmailVerified: boolean;
     isActive: boolean;
 };
@@ -190,6 +204,10 @@ export type Listing = {
      * Snapshot liên hệ công khai lúc tạo tin
      */
     posterContact: string;
+    /**
+     * Snapshot ảnh đại diện lúc tạo tin
+     */
+    posterAvatar: string;
     location?: {
         address?: string;
         province?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
@@ -377,6 +395,7 @@ export type Conversation = {
     listingTitle: string;
     partnerId: string;
     partnerName: string;
+    partnerAvatar: string;
     lastMessage: string;
     lastMessageAt: string;
     /**

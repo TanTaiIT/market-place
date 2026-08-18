@@ -25,7 +25,7 @@ export default function ChatList() {
               onPress={() => router.push(`/chat/${item.id}`)}
               style={({ pressed }) => [styles.row, pressed && { transform: [{ scale: 0.98 }] }]}
             >
-              <Avatar text={item.avatar} size={46} color={chatColor(item.name)} />
+              <Avatar text={item.avatar} url={item.avatarUrl} size={46} color={chatColor(item.name)} />
               <View style={{ flex: 1 }}>
                 <View style={styles.top}>
                   <Text style={[styles.name, item.unread && { color: C.pin }]}>{item.name}</Text>

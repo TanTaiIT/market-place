@@ -6,6 +6,15 @@ export const qk = {
   listingsByCategory: (categoryId: string) => ['listings', 'cat', categoryId] as const,
   myListings: () => ['listings', 'mine'] as const,
   categories: () => ['categories'] as const,
+  /**
+   * Template của MỘT danh mục. Nằm dưới prefix `categories` vì nó đổi cùng nhịp với từ điển
+   * danh mục (cả hai chỉ đổi khi master seed lại), nên một lần invalidate quét được cả cụm.
+   *
+   * `version` nằm TRONG key: form sửa tin ghim bản cũ, form đăng tin lấy bản mới nhất — hai
+   * câu trả lời khác nhau cho cùng một danh mục, dùng chung key là bên này đọc cache bên kia.
+   */
+  categoryTemplate: (categoryId: string, version?: number) =>
+    ['categories', 'template', categoryId, version ?? 'latest'] as const,
   /** Hạn mức đăng tin — đổi sau mỗi lần đăng hoặc mỗi lần một tin được duyệt. */
   listingQuota: () => ['listings', 'quota'] as const,
   listing: (id: string) => ['listing', id] as const,

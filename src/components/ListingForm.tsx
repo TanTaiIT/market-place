@@ -7,6 +7,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { AttrFields, visibleAttrFields } from './AttrFields';
 import { PhotoPicker } from './PhotoPicker';
 import { EMPTY_LOCATION, LocationFields, type ListingLocation } from './LocationFields';
 import { validateListingDraft } from './listingDraft';
@@ -14,8 +15,9 @@ import { VisibilityPicker, type PostVisibility } from './VisibilityPicker';
 import { CatTape, Field } from './ui';
 import { useToast } from './Toast';
 import { useCategories } from '@/queries/listings';
+import { useCategoryTemplate } from '@/queries/templates';
 import type { ListingPhotosController } from '@/queries/upload';
-import type { Listing } from '@/api/db';
+import type { Listing, ListingAttributes } from '@/api/db';
 import { useOrgSlug } from '@/stores/auth';
 import { C, F, shadow } from '@/theme';
 
@@ -37,6 +39,13 @@ type ListingFormValues = {
   categoryId: string;
   visibility: PostVisibility;
   location: ListingLocation;
+  /** Thuộc tính động theo template của danh mục — rỗng khi danh mục chưa có field nào. */
+  attributes: ListingAttributes;
+  /**
+   * Bản template của tin đang sửa. Chỉ form SỬA mới có — tin mới luôn dùng bản mới nhất.
+   * Không gửi lên BE; nó chỉ quyết định form hỏi template nào.
+   */
+  templateVersion?: number;
 };
 
 /**
@@ -52,6 +61,8 @@ export function listingToFormValues(listing: Listing): ListingFormValues {
     desc: listing.desc,
     categoryId: listing.categoryId,
     visibility: listing.visibility,
+    attributes: listing.attributes ?? {},
+    templateVersion: listing.templateVersion,
     location: {
       province: listing.province ?? null,
       ward: listing.ward ?? null,
@@ -97,6 +108,30 @@ export function ListingForm({
   // Tên tỉnh/xã, không phải mã — BE lưu và lọc bằng chính chuỗi này.
   const [location, setLocation] = useState<ListingLocation>(initial?.location ?? EMPTY_LOCATION);
 
+  const [attributes, setAttributes] = useState<ListingAttributes>(initial?.attributes ?? {});
+
+  /**
+   * Ghim version của tin đang sửa — nhưng CHỈ khi danh mục chưa đổi.
+   *
+   * Đổi danh mục thì version cũ thuộc về một template khác hẳn; ghim nó là hỏi "bản 1 của
+   * danh mục Xe cộ" bằng số version của danh mục Điện thoại. BE cũng ghim theo đúng luật này
+   * lúc validate (`listing.service.update`), nên hai bên xét cùng một bộ field.
+   */
+  const pinnedVersion = categoryId === initial?.categoryId ? initial?.templateVersion : undefined;
+  const { data: template } = useCategoryTemplate(categoryId, pinnedVersion);
+  const attrFields = template?.fields ?? [];
+
+  /**
+   * Đổi danh mục là đổi cả template → thuộc tính cũ thuộc về một bộ field khác, phải xoá.
+   *
+   * Giữ lại thì form hiện `batteryHealth` của điện thoại trên một tin xe máy cho tới lúc BE
+   * lặng lẽ loại nó — người dùng tưởng đã nhập, mà tin đăng ra thì không có.
+   */
+  const pickCategory = (id: string) => {
+    setCategoryId(id);
+    if (id !== categoryId) setAttributes({});
+  };
+
   /* @keyframes pinPress — nút lún xuống rồi bật nhẹ lên */
   const press = useSharedValue(0);
   const pressStyle = useAnimatedStyle(() => ({ transform: [{ translateY: press.value }] }));
@@ -119,10 +154,13 @@ export function ListingForm({
       photoCount: photos.photoUrls.length,
       hasFailedPhoto: photos.hasFailed,
       location,
+      // Chỉ field ĐANG HIỆN mới bị đòi: field bị `showIf` ẩn không phải là thứ người dùng bỏ sót.
+      attrFields: visibleAttrFields(attrFields, attributes),
+      attributes,
     });
     if (error) return toast(error);
 
-    onSubmit({ title, price, desc, categoryId, visibility, location });
+    onSubmit({ title, price, desc, categoryId, visibility, location, attributes });
   };
 
   return (
@@ -172,10 +210,13 @@ export function ListingForm({
             key={c.id}
             label={c.icon ? `${c.icon} ${c.name}` : c.name}
             active={categoryId === c.id}
-            onPress={() => setCategoryId(c.id)}
+            onPress={() => pickCategory(c.id)}
           />
         ))}
       </View>
+
+      {/* Ngay dưới chip danh mục: field động là hệ quả trực tiếp của lựa chọn vừa rồi. */}
+      <AttrFields fields={attrFields} values={attributes} onChange={setAttributes} />
 
       <VisibilityPicker value={visibility} onChange={setVisibility} />
 

@@ -2,6 +2,7 @@ import {
   authLogin,
   authRefresh,
   authRegister,
+  categoryGetTemplate,
   categoryList,
   chatGetById,
   chatList,
@@ -37,8 +38,10 @@ import { CHAT_COLORS, db, hasSearchCriteria, NEW_PHOTOS } from './db';
 import type {
   AuthSession,
   Category,
+  CategoryTemplate,
   Conversation,
   Listing,
+  ListingAttributes,
   Message,
   Notif,
   Profile,
@@ -147,6 +150,10 @@ function toListing(dto: ListingDto, names: Map<string, string>): Listing {
     avatar: initialsOf(sellerName),
     contact: dto.posterContact,
     desc: dto.description,
+    // BE đã ép kiểu qua template nên nhận nguyên, không `String()` lại — form sửa tin cần đúng
+    // kiểu để switch và dropdown chọn lại được lựa chọn cũ.
+    attributes: dto.attributes as ListingAttributes | undefined,
+    templateVersion: dto.templateRef?.version,
     // UI chỉ có hai trạng thái; 5 trạng thái còn lại của BE đều là "chưa hiển thị".
     status: dto.status === 'active' ? 'live' : 'pending',
     mine: isMine,
@@ -289,6 +296,11 @@ type ListingInput = {
    * Bỏ trống thì BE mặc định `org_internal`.
    */
   visibility?: 'org_internal' | 'public';
+  /**
+   * Thuộc tính động theo template của danh mục. Gửi thô — BE ép kiểu và loại key lạ ở
+   * `validateAttributes`, app không đoán trước luật đó (nó nằm trong DB, không trong bundle).
+   */
+  attributes?: ListingAttributes;
 };
 
 /**
@@ -326,6 +338,11 @@ function toListingBody(input: ListingInput) {
     // được theo gì — thà vắng hẳn field.
     ...(Object.keys(location).length ? { location } : {}),
     ...(input.visibility ? { visibility: input.visibility } : {}),
+    // Bỏ hẳn key khi rỗng, cùng lý do với `location`: `attributes: {}` qua được `.strict()`
+    // của BE nhưng ghi ra một tin không lọc được theo gì.
+    ...(input.attributes && Object.keys(input.attributes).length
+      ? { attributes: input.attributes }
+      : {}),
     // Tin công khai BẮT BUỘC có tỉnh: nó là thứ chọn ra người duyệt. Gửi kèm tường minh
     // thay vì để BE suy từ tổ chức — người đăng tin công khai có thể không thuộc org nào.
     ...(input.visibility === 'public' && input.province ? { provinceCode: input.province } : {}),
@@ -385,6 +402,30 @@ export const api = {
       name: c.name,
       icon: c.icon,
     }));
+  },
+
+  /**
+   * Template thuộc tính của một danh mục.
+   *
+   * Trả về NGUYÊN DTO chứ không map lại: field đã ghép sẵn và đã sắp theo `order` ở BE, thu
+   * hẹp thêm ở đây chỉ để mất `min`/`max`/`showIf` — đúng những thứ renderer cần.
+   *
+   * Danh mục chưa có template riêng vẫn trả 200 với bản chung; chưa seed gì thì `fields` rỗng.
+   * Không có nhánh 404 nào để bắt — "không có thuộc tính" là trạng thái hợp lệ, không phải lỗi.
+   *
+   * `version` do form SỬA TIN truyền vào (`listing.templateVersion`) để dựng lại đúng bộ field
+   * lúc tin được tạo. Bỏ trống ở form đăng tin mới: ở đó bản mới nhất mới là bản đúng.
+   */
+  async getCategoryTemplate(categoryId: string, version?: number): Promise<CategoryTemplate> {
+    const res = await withAuthRetry(() =>
+      // `!= null` chứ không truthiness: `version` là số, và `0` phải đi vào nhánh "có ghim"
+      // chứ không lặng lẽ rơi về bản mới nhất.
+      categoryGetTemplate({
+        path: { id: categoryId },
+        query: version != null ? { version } : undefined,
+      }),
+    );
+    return unwrap(res, 'Không tải được mẫu thông tin của danh mục');
   },
 
   /* ---------------- listings ---------------- */

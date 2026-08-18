@@ -1,4 +1,5 @@
 import { validateLocation, type ListingLocation } from './LocationFields';
+import type { ListingAttributes, TemplateField } from '@/api/db';
 
 /*
  * Khớp `createListingSchema` của BE. Chặn ở client để người dùng biết ngay lúc bấm, thay vì gõ
@@ -15,6 +16,9 @@ export type ListingDraft = {
   photoCount: number;
   hasFailedPhoto: boolean;
   location: ListingLocation;
+  /** Field động ĐANG HIỆN của danh mục đã chọn — đã lọc `showIf` bởi `AttrFields`. */
+  attrFields: TemplateField[];
+  attributes: ListingAttributes;
 };
 
 /**
@@ -35,5 +39,14 @@ export function validateListingDraft(draft: ListingDraft): string | null {
   if (draft.desc.trim().length < MIN_DESC) return `⚠️ Mô tả cần ít nhất ${MIN_DESC} ký tự`;
   if (!draft.categoryId) return '⚠️ Chọn danh mục cho tin trước đã';
 
+  const missing = draft.attrFields.find((f) => f.required && isBlank(draft.attributes[f.key]));
+  if (missing) return `⚠️ Nhập "${missing.label}" — danh mục này bắt buộc`;
+
   return validateLocation(draft.location);
+}
+
+/** Rỗng = người dùng chưa nhập. `false` và `0` là giá trị THẬT — khớp `isBlank` bên BE. */
+function isBlank(value: ListingAttributes[string] | undefined): boolean {
+  if (value === undefined || value === '') return true;
+  return Array.isArray(value) && value.length === 0;
 }

@@ -49,6 +49,16 @@ export type Listing = {
   avatar: string;
   contact: string;
   desc: string;
+  /**
+   * Thuộc tính động theo danh mục. Vắng khi tin được đăng lúc danh mục chưa có template —
+   * màn chi tiết phải chịu được tin không có thuộc tính nào.
+   */
+  attributes?: ListingAttributes;
+  /**
+   * Bản template lúc tạo tin. Form sửa tin đọc `version` này để dựng lại ĐÚNG bộ field cũ,
+   * không phải bộ mới nhất — nếu không, tin cũ hiện field chưa từng có.
+   */
+  templateVersion?: number;
   status: 'live' | 'pending';
   mine: boolean;
 };
@@ -152,6 +162,24 @@ export type Category = {
   name: string;
   icon: string;
 };
+
+/**
+ * Template thuộc tính của một danh mục — RE-EXPORT từ SDK generated, không phải bản chép.
+ *
+ * Khác `Category`/`Listing` (hai type được thu hẹp lại cho UI), BE đã trả về đúng hình mà form
+ * cần dùng: field đã ghép sẵn `label`/`options`/`showIf`, đã sắp theo `order`. Chép lại ở đây
+ * là dựng một bản thứ hai phải sửa tay mỗi lần `npm run api:sync` đổi hợp đồng.
+ *
+ * `templateId: null` = hệ thống chưa seed template nào; `fields` rỗng và form không hiện thêm gì.
+ */
+export type { CategoryTemplate, TemplateField } from './generated';
+
+/**
+ * Giá trị thuộc tính động của một tin. Kiểu là THẬT (BE đã ép qua template): số cho `odo`,
+ * boolean cho `warranty`, mảng cho `amenities`. Đừng `String()` khi đọc — form sửa tin phải
+ * nạp lại đúng kiểu để dropdown và switch chọn đúng.
+ */
+export type ListingAttributes = Record<string, string | number | boolean | string[]>;
 
 /**
  * Bộ lọc của màn tìm kiếm.

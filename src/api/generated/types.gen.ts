@@ -132,7 +132,7 @@ export type CreateListing = {
         ward?: string;
     };
     attributes?: {
-        [key: string]: string;
+        [key: string]: string | number | boolean | Array<string>;
     };
     visibility?: 'org_internal' | 'public';
     provinceCode?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
@@ -161,7 +161,7 @@ export type UpdateListing = {
         ward?: string;
     };
     attributes?: {
-        [key: string]: string;
+        [key: string]: string | number | boolean | Array<string>;
     };
     visibility?: 'org_internal' | 'public';
     provinceCode?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
@@ -194,6 +194,14 @@ export type Listing = {
         address?: string;
         province?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
         ward?: string;
+    };
+    attributes?: {
+        [key: string]: unknown;
+    };
+    templateRef?: {
+        id: string;
+        version: number;
+        isFallback: boolean;
     };
     status: 'draft' | 'pending' | 'pending_unverified' | 'active' | 'sold' | 'expired' | 'rejected' | 'hidden';
     viewCount: number;
@@ -295,6 +303,7 @@ export type CreateCategory = {
     slug?: string;
     icon?: string;
     order?: number;
+    requireManualReview?: boolean;
 };
 
 export type UpdateCategory = {
@@ -302,6 +311,7 @@ export type UpdateCategory = {
     icon?: string;
     order?: number;
     isActive?: boolean;
+    requireManualReview?: boolean;
 };
 
 export type Category = {
@@ -311,6 +321,45 @@ export type Category = {
     icon: string;
     order: number;
     isActive: boolean;
+    requireManualReview: boolean;
+};
+
+export type FieldOption = {
+    value: string;
+    label: string;
+};
+
+export type FieldShowIf = {
+    key: string;
+    eq?: string | number | boolean;
+    in?: Array<string>;
+};
+
+export type TemplateField = {
+    key: string;
+    label: string;
+    type: 'text' | 'textarea' | 'number' | 'select' | 'multiselect' | 'boolean' | 'year';
+    options: Array<FieldOption>;
+    placeholder?: string;
+    helpText?: string;
+    unit?: string;
+    min?: number;
+    max?: number;
+    /**
+     * Cách nhau 10 để sau chèn giữa được
+     */
+    order: number;
+    required: boolean;
+    filterable: boolean;
+    group?: string;
+    showIf?: FieldShowIf;
+};
+
+export type CategoryTemplate = {
+    templateId: string | null;
+    version: number;
+    isFallback: boolean;
+    fields: Array<TemplateField>;
 };
 
 export type OpenConversation = {
@@ -1601,6 +1650,39 @@ export type RevokeRoleGrantResponses = {
 };
 
 export type RevokeRoleGrantResponse = RevokeRoleGrantResponses[keyof RevokeRoleGrantResponses];
+
+export type CategoryGetTemplateData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        version?: number;
+    };
+    url: '/categories/{id}/template';
+};
+
+export type CategoryGetTemplateErrors = {
+    /**
+     * Chưa seed template nào
+     */
+    404: ErrorResponse;
+};
+
+export type CategoryGetTemplateError = CategoryGetTemplateErrors[keyof CategoryGetTemplateErrors];
+
+export type CategoryGetTemplateResponses = {
+    /**
+     * Template của danh mục
+     */
+    200: {
+        success: true;
+        message: string;
+        data: CategoryTemplate;
+    };
+};
+
+export type CategoryGetTemplateResponse = CategoryGetTemplateResponses[keyof CategoryGetTemplateResponses];
 
 export type CategoryListData = {
     body?: never;

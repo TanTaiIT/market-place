@@ -10,6 +10,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ListingAttrs } from '@/components/ListingAttrs';
 import { ListingGallery } from '@/components/ListingGallery';
 import { ListingSuggestions } from '@/components/ListingSuggestions';
 import { ReportButton } from '@/components/ReportButton';
@@ -112,6 +113,9 @@ export default function ListingDetail() {
 
           <Text style={styles.label}>Mô tả</Text>
           <Text style={styles.desc}>{listing.desc}</Text>
+
+          {/* Tự ẩn khi tin không có thuộc tính nào — tin cũ đăng trước hệ template là ca thường. */}
+          <ListingAttrs listing={listing} />
 
           {/* Tin của mình thì không: BE trả 400 cho tự báo cáo chính mình, hiện nút ra chỉ để
               người ta bấm vào một lỗi. */}

@@ -33,7 +33,9 @@ export function ListingAttrs({ listing }: { listing: Listing }) {
    * khác nhau giữa hai tin cùng danh mục.
    */
   const rows = template.fields
-    .filter((f) => values[f.key] !== undefined)
+    // Không chỉ lọc `undefined`: chuỗi rỗng và mảng rỗng cũng là "chưa điền", mà chúng lọt qua
+    // thì bảng có một dòng nhãn treo lơ lửng không giá trị — trông như dữ liệu bị mất.
+    .filter((f) => !isBlank(values[f.key]))
     .map((f) => ({ key: f.key, label: f.label, text: display(f, values[f.key]) }));
 
   if (rows.length === 0) return null;
@@ -49,6 +51,9 @@ export function ListingAttrs({ listing }: { listing: Listing }) {
     </View>
   );
 }
+
+const isBlank = (value: ListingAttributes[string] | undefined) =>
+  value === undefined || value === '' || (Array.isArray(value) && value.length === 0);
 
 /** Giá trị thô → chuỗi cho người đọc: nhãn của option, "Có/Không", và hậu tố đơn vị. */
 function display(field: TemplateField, value: ListingAttributes[string]): string {

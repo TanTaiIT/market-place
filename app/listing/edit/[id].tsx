@@ -1,5 +1,5 @@
 import React from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Corkboard } from '@/components/Corkboard';
@@ -38,15 +38,9 @@ export default function EditListing() {
               text={(error as Error | null)?.message ?? 'Không tìm thấy tin này'}
             />
           ) : (
-            <ScrollView
-              contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 8, paddingBottom: 40 }}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              {/* Mount sau khi tin đã về: cả bộ ảnh cũ lẫn giá trị điền sẵn chỉ được đọc ở lần
-                  mount đầu, dựng sớm là form trắng và người dùng lưu đè lên tin bằng bản rỗng. */}
-              <EditForm listing={listing} />
-            </ScrollView>
+            /* Mount sau khi tin đã về: cả bộ ảnh cũ lẫn giá trị điền sẵn chỉ được đọc ở lần
+               mount đầu, dựng sớm là form trắng và người dùng lưu đè bằng bản rỗng. */
+            <EditForm listing={listing} />
           )}
         </KeyboardAvoidingView>
       </SafeAreaView>

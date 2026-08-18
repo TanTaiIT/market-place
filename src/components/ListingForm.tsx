@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -12,11 +12,12 @@ import { PhotoPicker } from './PhotoPicker';
 import { EMPTY_LOCATION, LocationFields, type ListingLocation } from './LocationFields';
 import { validateListingDraft } from './listingDraft';
 import { VisibilityPicker, type PostVisibility } from './VisibilityPicker';
-import { CatTape, Field } from './ui';
+import { BoxField, FormSection } from './FormSection';
+import { CategoryField } from './CategoryField';
 import { useToast } from './Toast';
 import { useCategoryTemplate } from '@/queries/templates';
-import { useCategories, useProfile } from '@/queries/listings';
-import type { ListingPhotosController } from '@/queries/upload';
+import { useProfile } from '@/queries/listings';
+import { MAX_PHOTOS, type ListingPhotosController } from '@/queries/upload';
 import type { Listing, ListingAttributes } from '@/api/db';
 import { useOrgSlug } from '@/stores/auth';
 import { C, F, shadow } from '@/theme';
@@ -92,7 +93,6 @@ export function ListingForm({
 }) {
   const toast = useToast();
   const activeOrg = useOrgSlug();
-  const { data: categories } = useCategories();
   const { data: profile } = useProfile();
 
   const [title, setTitle] = useState(initial?.title ?? '');
@@ -181,126 +181,133 @@ export function ListingForm({
 
   return (
     <>
-      <PhotoPicker
-        photos={photos.photos}
-        onAdd={photos.addPhotos}
-        onRemove={photos.removePhoto}
-        onRetry={photos.retryPhoto}
-      />
+      {/* `flex: 1` BẮT BUỘC: trong cột flex của RN con mặc định không co, nên ScrollView
+          không có nó sẽ lấy chiều cao theo NỘI DUNG. Form Xe cộ 17 field vượt màn hình là
+          thanh nút dính đáy bị đẩy ra ngoài vùng nhìn thấy — nút gửi thành không bấm được. */}
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Tờ giấy ghim lên bảng bần — cùng ẩn dụ với NoteCard. Không chỉ để đẹp: mọi màu
+            chữ của form được chọn cho nền giấy, đặt thẳng lên bần (#B98851) thì nhãn chỉ còn
+            tương phản 2.48:1, dưới xa ngưỡng 4.5:1. Trên giấy nó lên 7.3:1. */}
+        <View style={styles.sheet}>
+          <CategoryField value={categoryId} onChange={pickCategory} autoOpen={!initial} />
 
-      <Field
-        label="Tên món đồ"
-        hand
-        value={title}
-        onChangeText={setTitle}
-        placeholder="Ví dụ: Xe đạp thể thao..."
-      />
+          {/*
+            Điều kiện là chính categoryId, không phải một state "bước 1 / bước 2" riêng: form
+            SỬA luôn có sẵn danh mục nên vào thẳng phần nhập, không qua một bước chọn thừa.
+          */}
+          {!!categoryId && (
+            <>
+              <FormSection
+                title="Hình ảnh sản phẩm"
+                hint={`Thêm tối đa ${MAX_PHOTOS} ảnh — ảnh đầu tiên là ảnh bìa`}
+              />
+              <PhotoPicker
+                photos={photos.photos}
+                onAdd={photos.addPhotos}
+                onRemove={photos.removePhoto}
+                onRetry={photos.retryPhoto}
+              />
 
-      <Text style={styles.label}>Giá bán</Text>
-      <View style={styles.priceRow}>
-        <Text style={styles.dong}>đ</Text>
-        <TextInput
-          value={price}
-          onChangeText={setPrice}
-          placeholder="0"
-          placeholderTextColor={C.muted}
-          keyboardType="number-pad"
-          style={styles.priceInput}
-        />
-      </View>
+              <FormSection title="Chi tiết tin đăng" />
+              <BoxField
+                label="Tiêu đề tin đăng"
+                value={title}
+                onChangeText={setTitle}
+                placeholder="Ví dụ: Xe đạp thể thao Giant, còn mới"
+              />
+              <BoxField
+                label="Mức giá"
+                value={price}
+                onChangeText={setPrice}
+                placeholder="0"
+                keyboardType="number-pad"
+                suffix="đ"
+              />
 
-      <Text style={styles.label}>Mô tả ngắn</Text>
-      <TextInput
-        value={desc}
-        onChangeText={setDesc}
-        placeholder="Tình trạng, lý do bán, ghi chú thêm..."
-        placeholderTextColor={C.muted}
-        multiline
-        style={styles.textarea}
-      />
+              {/* Field động của đúng danh mục vừa chọn — vẫn trong nhóm "Chi tiết". */}
+              <AttrFields fields={attrFields} values={attributes} onChange={setAttributes} />
 
-      <Text style={[styles.label, { marginTop: 18 }]}>Danh mục</Text>
-      <View style={styles.catRow}>
-        {(categories ?? []).map((c) => (
-          <CatTape
-            key={c.id}
-            label={c.icon ? `${c.icon} ${c.name}` : c.name}
-            active={categoryId === c.id}
-            onPress={() => pickCategory(c.id)}
-          />
-        ))}
-      </View>
+              <FormSection title="Mô tả" />
+              <BoxField
+                label="Nói thêm về món đồ"
+                value={desc}
+                onChangeText={setDesc}
+                placeholder="Tình trạng, lý do bán, ghi chú thêm..."
+                multiline
+                style={styles.descInput}
+              />
 
-      {/* Ngay dưới chip danh mục: field động là hệ quả trực tiếp của lựa chọn vừa rồi. */}
-      <AttrFields fields={attrFields} values={attributes} onChange={setAttributes} />
+              <FormSection title="Khu vực & hiển thị" />
+              <VisibilityPicker value={visibility} onChange={setVisibility} />
+              <LocationFields value={location} onChange={setLocation} />
+            </>
+          )}
+        </View>
+      </ScrollView>
 
-      <VisibilityPicker value={visibility} onChange={setVisibility} />
+      {/*
+        Nút chính DÍNH ĐÁY, không cuộn theo nội dung.
 
-      <LocationFields value={location} onChange={setLocation} />
-
-      <Animated.View style={[{ marginTop: 18 }, pressStyle]}>
-        <View style={styles.submitShadow} />
-        <Pressable
-          onPress={submit}
-          disabled={blocked}
-          style={[styles.submit, blocked && { opacity: 0.7 }]}
-        >
-          <Text style={styles.submitText}>
-            {busy
-              ? busyLabel
-              : photos.uploadingCount > 0
-                ? `Đang tải ảnh (${photos.photos.length - photos.uploadingCount}/${photos.photos.length})...`
-                : submitLabel}
-          </Text>
-        </Pressable>
-      </Animated.View>
+        Form dài tới 17 field ở danh mục Xe cộ. Nút nằm cuối trang nghĩa là muốn bấm phải cuộn
+        hết mọi thứ, và suốt lúc điền người dùng không nhìn thấy hành động chính. Chỉ hiện khi
+        đã chọn danh mục: chưa chọn thì chưa có gì để gửi.
+      */}
+      {!!categoryId && (
+        <View style={styles.bar}>
+          {/* Hiệu ứng lún áp lên riêng NÚT, không lên cả thanh: thanh trượt xuống sẽ hở ra nội
+              dung đang cuộn phía dưới ở mép đáy. */}
+          <Animated.View style={pressStyle}>
+            <Pressable
+              onPress={submit}
+              disabled={blocked}
+              style={[styles.submit, blocked && { opacity: 0.6 }]}
+            >
+              <Text style={styles.submitText}>
+                {busy
+                  ? busyLabel
+                  : photos.uploadingCount > 0
+                    ? `Đang tải ảnh (${photos.photos.length - photos.uploadingCount}/${photos.photos.length})...`
+                    : submitLabel}
+              </Text>
+            </Pressable>
+          </Animated.View>
+        </View>
+      )}
     </>
   );
 }
 
+
 const styles = StyleSheet.create({
-  label: {
-    fontFamily: F.uiBold,
-    fontSize: 11.5,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    color: C.inkSoft,
-    marginBottom: 6,
+  flex: { flex: 1 },
+  scroll: { paddingHorizontal: 14, paddingTop: 6, paddingBottom: 24 },
+  sheet: {
+    backgroundColor: C.paperWarm,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 22,
+    ...shadow,
   },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderBottomWidth: 2,
-    borderBottomColor: C.lineInput,
-    marginBottom: 18,
-  },
-  dong: { fontFamily: F.monoBold, color: C.pin, fontSize: 16 },
-  priceInput: { flex: 1, fontFamily: F.handLight, fontSize: 18, color: C.ink, paddingVertical: 6 },
-  textarea: {
-    borderBottomWidth: 2,
-    borderBottomColor: C.lineInput,
-    minHeight: 76,
-    textAlignVertical: 'top',
-    fontFamily: F.ui,
-    fontSize: 15,
-    lineHeight: 26,
-    color: C.ink,
-    paddingVertical: 6,
-  },
-  catRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
-  submitShadow: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 6,
-    bottom: -6,
-    backgroundColor: C.pinDark,
-    borderRadius: 10,
+  descInput: { minHeight: 84, textAlignVertical: 'top', lineHeight: 22, fontFamily: F.ui },
+  // Nền đục + viền trên: nội dung cuộn qua bên dưới phải bị che hẳn, nếu không chữ sẽ chạy
+  // lẫn vào nút và trông như lỗi render.
+  bar: {
+    backgroundColor: C.paperWarm,
+    borderTopWidth: 1,
+    borderTopColor: C.line,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 14,
   },
   submit: {
     backgroundColor: C.pin,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
     ...shadow,

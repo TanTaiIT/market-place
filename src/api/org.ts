@@ -7,16 +7,17 @@ import {
   deleteOrgUnit,
   listJoinRequests,
   listOrgUnits,
+  membershipList,
   myJoinRequests,
   myOrganizations,
   organizationLookup,
   rejectJoinRequest,
   updateOrgUnit,
 } from './generated';
-import type { CreateOrgUnit, JoinRequest, OrgUnit, UpdateOrgUnit } from './generated';
+import type { CreateOrgUnit, JoinRequest, Member, OrgUnit, UpdateOrgUnit } from './generated';
 
 /** Màn hình dùng nhóm con đi qua đây, không import thẳng `generated` — `app/**` chỉ biết tới `api/**`. */
-export type { OrgUnit };
+export type { Member, OrgUnit };
 import { relativeTime, unwrap } from './client';
 import { withAuthRetry } from './http';
 
@@ -113,6 +114,18 @@ export const orgApi = {
   async deleteUnit(id: string): Promise<OrgUnit> {
     const res = await withAuthRetry(() => deleteOrgUnit({ path: { id } }));
     return unwrap(res, 'Không xoá được nhóm con');
+  },
+
+  /**
+   * Danh bạ thành viên của tổ chức đang hoạt động.
+   *
+   * `limit: 100` (trần của BE) chứ không phân trang: mọi call-site đều là dropdown "chọn một
+   * người", mà dropdown thì cần cả tập để tìm — phân trang ở đó là ẩn mất người thứ 101 khỏi ô
+   * tìm kiếm. Trường quá 100 thành viên thì đổi dropdown trước, đổi hàm này sau.
+   */
+  async members(): Promise<Member[]> {
+    const res = await withAuthRetry(() => membershipList({ query: { limit: 100 } }));
+    return unwrap(res, 'Không tải được danh bạ thành viên');
   },
 
   async joinRequests(status?: JoinRequestStatus): Promise<JoinRequestRow[]> {

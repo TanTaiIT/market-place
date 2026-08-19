@@ -37,12 +37,12 @@ export default function AdminOrgUnits() {
   const units = data ?? [];
 
   /**
-   * Người phụ trách KHÔNG nằm trong danh bạ (vào tổ chức bằng đường khác) vẫn phải hiện là CÓ
-   * người — trả về "chưa có" ở ca đó là mời người khác gán đè lên một nhóm đã có chủ.
+   * Nhóm vẫn giữ `moderatorId` sau khi người đó rời tổ chức — họ rơi khỏi danh bạ nhưng nhóm
+   * thì vẫn có chủ. Trả "chưa có" ở ca đó là mời người khác gán đè lên một nhóm đang có người.
    */
   const moderatorLabel = (id: string | null) => {
     if (!id) return 'chưa có người phụ trách';
-    return roster.members.find((m) => m.userId === id)?.claimedName ?? 'đã có người phụ trách';
+    return roster.members.find((m) => m.userId === id)?.name ?? 'đã có người phụ trách';
   };
 
   const reset = () => {
@@ -145,7 +145,7 @@ export default function AdminOrgUnits() {
               label="Người phụ trách"
               title="Chọn người phụ trách"
               placeholder={roster.members.length ? 'Chưa chọn' : 'Danh bạ đang trống'}
-              items={roster.members.map((m) => ({ key: m.userId, label: m.claimedName }))}
+              items={roster.members.map((m) => ({ key: m.userId, label: m.name }))}
               loading={roster.isLoading}
               value={moderatorId}
               emptyLabel="Không có người phụ trách"

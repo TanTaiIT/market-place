@@ -75,6 +75,8 @@ export const qk = {
   joinRequestQueue: (orgSlug: string, status: string) =>
     ['join-requests', 'queue', orgSlug, status] as const,
   orgUnits: (orgSlug: string) => ['orgs', 'units', orgSlug] as const,
+  /** Danh bạ thành viên. Theo slug vì đổi tổ chức là đổi hẳn tập người, không phải lọc lại. */
+  orgMembers: (orgSlug: string) => ['orgs', 'members', orgSlug] as const,
   /** Mang cả slug đang gõ, cùng lý do với `orgLookup` — mỗi slug là một câu trả lời khác. */
   slugAvailability: (slug: string) => ['orgs', 'slug-check', slug] as const,
 

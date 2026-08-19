@@ -109,8 +109,10 @@ export function RoleGrantForm({
         placeholder={roster.members.length ? 'Chọn từ danh bạ' : 'Danh bạ đang trống'}
         items={roster.members.map((m) => ({
           key: m.userId,
-          label: m.claimedName,
-          note: m.claimedUnit ?? undefined,
+          label: m.name,
+          // Tên nhóm con tra từ `units`: danh bạ chỉ mang `unitId`, và nhóm là thứ đổi tên
+          // được — nhắc lại tên đã lưu ở chỗ khác là hai bản dễ lệch nhau.
+          note: units?.find((u) => u.id === m.unitId)?.name,
         }))}
         loading={roster.isLoading}
         value={form.userId}
@@ -195,11 +197,6 @@ export function RoleGrantForm({
           />
         </View>
       )}
-
-      <Text style={adminFormStyles.hint}>
-        Danh bạ dựng từ đơn xin gia nhập ĐÃ DUYỆT — BE chưa có route liệt kê thành viên, nên ai
-        vào tổ chức bằng đường khác sẽ không có ở đây.
-      </Text>
 
       <View style={{ marginTop: 16 }}>
         <PinButton label="Cấp quyền" loading={busy} onPress={submit} />

@@ -298,6 +298,17 @@ export type MyJoinRequest = {
     expiresAt: string;
 };
 
+export type Member = {
+    userId: string;
+    name: string;
+    avatar: string;
+    role: 'owner' | 'member' | 'alumni';
+    unitId: string | null;
+    joinedVia: 'request' | 'roster' | 'invite' | 'sso';
+    trustLevel: number;
+    joinedAt: string;
+};
+
 export type CreateRoleGrant = {
     userId: string;
     role: 'master' | 'manager' | 'staff';
@@ -1178,6 +1189,10 @@ export type FavoriteAddErrors = {
      * Không tìm thấy tin hoặc tin ngoài phạm vi của bạn
      */
     404: ErrorResponse;
+    /**
+     * Quá nhiều request
+     */
+    429: ErrorResponse;
 };
 
 export type FavoriteAddError = FavoriteAddErrors[keyof FavoriteAddErrors];
@@ -1723,6 +1738,50 @@ export type BulkApproveJoinRequestsResponses = {
 };
 
 export type BulkApproveJoinRequestsResponse = BulkApproveJoinRequestsResponses[keyof BulkApproveJoinRequestsResponses];
+
+export type MembershipListData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        limit?: number;
+    };
+    url: '/memberships';
+};
+
+export type MembershipListErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền owner hoặc moderator của tổ chức
+     */
+    403: ErrorResponse;
+};
+
+export type MembershipListError = MembershipListErrors[keyof MembershipListErrors];
+
+export type MembershipListResponses = {
+    /**
+     * Danh bạ thành viên
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<Member>;
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNextPage: boolean;
+            hasPrevPage: boolean;
+        };
+    };
+};
+
+export type MembershipListResponse = MembershipListResponses[keyof MembershipListResponses];
 
 export type CreateRoleGrantData = {
     body?: CreateRoleGrant;

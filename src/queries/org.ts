@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { orgApi } from '@/api/org';
 import type { JoinRequestStatus } from '@/api/org';
@@ -100,24 +99,27 @@ export function useOrgUnits() {
 }
 
 /**
- * Danh bạ thành viên của tổ chức, dựng từ đơn ĐÃ DUYỆT.
+ * Danh bạ thành viên của tổ chức — nguồn là `GET /memberships`.
  *
- * BE chưa có route liệt kê thành viên, mà cả `createRoleGrant` lẫn `updateOrgUnit` đều cần
- * `userId` — đơn đã duyệt là nguồn duy nhất trong app ghép được `userId` với một cái tên đọc
- * được. Hệ quả phải nói ra ở màn hình: ai vào tổ chức bằng đường khác (người chủ do master chỉ
- * định lúc tạo tổ chức) sẽ KHÔNG có trong danh bạ này.
+ * Bản trước suy roster từ đơn gia nhập đã duyệt vì BE chưa có route; cách đó bỏ sót đúng những
+ * người không đi qua đơn (chủ tổ chức do master chỉ định, người thêm thẳng vào roster) và giữ
+ * lại người đã rời tổ chức, vì đơn approved không bao giờ bị xoá.
  *
- * Gộp theo `userId` chứ không theo `id` của đơn: một người bị từ chối rồi nộp lại và được duyệt
- * sẽ có hai đơn, mà danh bạ thì phải hiện đúng một dòng.
+ * `enabled` chặn bằng GRANT chứ không chỉ bằng org, cùng lý do với `useJoinRequestQueue`:
+ * endpoint đòi quyền quản trị, thành viên thường gọi vào chỉ nhận 403.
  */
 export function useOrgRoster() {
-  const queue = useJoinRequestQueue('approved');
-  const rows = queue.data;
-  const members = useMemo(
-    () => Array.from(new Map((rows ?? []).map((r) => [r.userId, r])).values()),
-    [rows],
-  );
-  return { ...queue, members };
+  const orgSlug = useOrgSlug();
+  const { data: grants } = useMyGrants();
+
+  const query = useQuery({
+    queryKey: qk.orgMembers(orgSlug ?? '-'),
+    queryFn: orgApi.members,
+    enabled: Boolean(orgSlug) && canModerateOrg(grants),
+    staleTime: 5 * 60_000,
+  });
+
+  return { ...query, members: query.data ?? [] };
 }
 
 /**
@@ -148,16 +150,20 @@ export function useDeleteOrgUnit() {
 
 /**
  * Refetch contract của cả ba mutation dưới đây: invalidate `joinRequestsRoot()` (hàng đợi mọi
- * tab + "đơn của tôi" của chính người duyệt nếu họ cũng đang có đơn ở đâu đó) và `adminRoot()`
- * — duyệt một đơn là thêm một thành viên, mà số thành viên nằm trên thẻ tổng quan.
+ * tab + "đơn của tôi" của chính người duyệt nếu họ cũng đang có đơn ở đâu đó), `adminRoot()`
+ * — duyệt một đơn là thêm một thành viên, mà số thành viên nằm trên thẻ tổng quan — và
+ * `orgMembers()`: người vừa được duyệt phải xuất hiện ngay trong danh bạ, vì hai ô "chọn
+ * người phụ trách" và "cấp quyền" đọc thẳng từ đó.
  */
 function useJoinRequestMutation<TVars, TData>(fn: (v: TVars) => Promise<TData>) {
   const qc = useQueryClient();
+  const orgSlug = useOrgSlug();
   return useMutation({
     mutationFn: fn,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.joinRequestsRoot() });
       qc.invalidateQueries({ queryKey: qk.adminRoot() });
+      qc.invalidateQueries({ queryKey: qk.orgMembers(orgSlug ?? '-') });
     },
   });
 }

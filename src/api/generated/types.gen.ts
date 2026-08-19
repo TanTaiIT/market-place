@@ -229,6 +229,11 @@ export type Listing = {
     updatedAt: string;
 };
 
+export type FavoriteStatus = {
+    listingId: string;
+    favorited: boolean;
+};
+
 export type CreateOrgUnit = {
     name: string;
     moderatorId?: string | null;
@@ -767,6 +772,7 @@ export type ListingListData = {
         condition?: 'new' | 'like_new' | 'used';
         minPrice?: number | null;
         maxPrice?: number | null;
+        attrs?: string;
     };
     url: '/listings';
 };
@@ -851,6 +857,7 @@ export type ListingMineData = {
         condition?: 'new' | 'like_new' | 'used';
         minPrice?: number | null;
         maxPrice?: number | null;
+        attrs?: string;
     };
     url: '/listings/mine';
 };
@@ -1052,6 +1059,141 @@ export type ListingQuotaResponses = {
 };
 
 export type ListingQuotaResponse = ListingQuotaResponses[keyof ListingQuotaResponses];
+
+export type FavoriteListData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        limit?: number;
+    };
+    url: '/favorites';
+};
+
+export type FavoriteListErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+};
+
+export type FavoriteListError = FavoriteListErrors[keyof FavoriteListErrors];
+
+export type FavoriteListResponses = {
+    /**
+     * Tin đã lưu
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<Listing>;
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNextPage: boolean;
+            hasPrevPage: boolean;
+        };
+    };
+};
+
+export type FavoriteListResponse = FavoriteListResponses[keyof FavoriteListResponses];
+
+export type FavoriteIdsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/favorites/ids';
+};
+
+export type FavoriteIdsErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+};
+
+export type FavoriteIdsError = FavoriteIdsErrors[keyof FavoriteIdsErrors];
+
+export type FavoriteIdsResponses = {
+    /**
+     * Id tin đã lưu
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<string>;
+    };
+};
+
+export type FavoriteIdsResponse = FavoriteIdsResponses[keyof FavoriteIdsResponses];
+
+export type FavoriteRemoveData = {
+    body?: never;
+    path: {
+        listingId: string;
+    };
+    query?: never;
+    url: '/favorites/{listingId}';
+};
+
+export type FavoriteRemoveErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+};
+
+export type FavoriteRemoveError = FavoriteRemoveErrors[keyof FavoriteRemoveErrors];
+
+export type FavoriteRemoveResponses = {
+    /**
+     * Đã bỏ lưu
+     */
+    200: {
+        success: true;
+        message: string;
+        data: FavoriteStatus;
+    };
+};
+
+export type FavoriteRemoveResponse = FavoriteRemoveResponses[keyof FavoriteRemoveResponses];
+
+export type FavoriteAddData = {
+    body?: never;
+    path: {
+        listingId: string;
+    };
+    query?: never;
+    url: '/favorites/{listingId}';
+};
+
+export type FavoriteAddErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Không tìm thấy tin hoặc tin ngoài phạm vi của bạn
+     */
+    404: ErrorResponse;
+};
+
+export type FavoriteAddError = FavoriteAddErrors[keyof FavoriteAddErrors];
+
+export type FavoriteAddResponses = {
+    /**
+     * Đã lưu
+     */
+    201: {
+        success: true;
+        message: string;
+        data: FavoriteStatus;
+    };
+};
+
+export type FavoriteAddResponse = FavoriteAddResponses[keyof FavoriteAddResponses];
 
 export type MyOrganizationsData = {
     body?: never;

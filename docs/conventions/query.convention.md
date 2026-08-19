@@ -16,22 +16,20 @@ SoT cho: `src/api/**` + `src/queries/**` — key factory, read/write split, opti
 | `src/api/cloudinary.ts`  | Upload ảnh lên Cloudinary — dịch vụ ngoài **thật**                             | Chứa bất kỳ khoá bí mật nào (§9)    |
 | `src/queries/*.ts`       | Hook `useQuery`/`useMutation`, quản lý cache                                   | Chứa business rule của màn hình     |
 
-`client.ts` gọi **BE thật** qua SDK generated từ OpenAPI của repo `docs/Vue`. Chữ ký hàm giữ nguyên để
+`client.ts` gọi **BE thật** qua SDK generated từ OpenAPI của repo `docs/market`. Chữ ký hàm giữ nguyên để
 hook và màn hình không đổi; ngoại lệ duy nhất là `id` đã thành `string` (ObjectId 24 hex), không còn là số.
 
-Ba nhóm **vẫn là local** vì BE chưa có endpoint — đừng "sửa" chúng thành fetch khi chưa có route:
+**Không còn nhóm nào là local.** Bảng liệt kê ba ngoại lệ ở đây (tin đã lưu, chat, `createListing`)
+đã bị gỡ vì cả ba đều đã có route thật: `/favorites` (thêm sau cùng), `/chats`, `POST /listings`.
+Thứ duy nhất không đi qua OpenAPI là **realtime của chat** — nó đi socket, xem `src/api/socket.ts`.
 
-| Nhóm                          | Lý do                                                              |
-| ----------------------------- | ------------------------------------------------------------------ |
-| Tin đã lưu (`toggleSaved`…)    | Chưa có route favorite nào                                         |
-| Chat (`sendMessage`…)          | `POST /chats` trả 501; realtime thì đi socket, không qua OpenAPI    |
-| `createListing`               | `POST /listings` cần `location.coordinates` mà app chưa xin quyền vị trí |
+Hệ quả: một hàm mới trong `client.ts` mà không gọi SDK là dấu hiệu sai, không phải một ngoại lệ nữa.
 
 SDK **không throw**, nó trả `{ data, error }`. `unwrap()` trong `client.ts` là chỗ duy nhất đổi cả hai
 nhánh thành `Error` tiếng Việt — mọi hàm mới phải đi qua nó, đừng đọc `res.error` ở call-site.
 
-Regenerate: `npm run api:sync` (đọc `../Vue/openapi.json`, đổi chỗ thì set `OPENAPI_INPUT`).
-Bên `docs/Vue` phải chạy `npm run openapi:export` trước để file spec mới nhất.
+Regenerate: `npm run api:sync` (đọc `../market/openapi.json`, đổi chỗ thì set `OPENAPI_INPUT`).
+Bên `docs/market` phải chạy `npm run openapi:export` trước để file spec mới nhất.
 
 **Listing/notification bắt buộc có token**: BE lấy tenant từ JWT, gọi ẩn danh trả
 `400 Missing tenant context`. Mọi màn dùng chúng đều nằm sau auth guard nên đúng luồng thật.

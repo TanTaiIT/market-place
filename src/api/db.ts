@@ -2,11 +2,10 @@ import type { Grad } from '@/theme';
 import type { ProvinceName } from './location';
 
 /**
- * Domain type của app + phần state còn nằm trong bộ nhớ.
+ * Domain type của app.
  *
- * Tin đăng, hồ sơ và thông báo đã đọc từ BE thật (`client.ts` gọi SDK generated), nên fixture
- * của ba thứ đó đã bỏ. Chỉ còn **tin đã lưu** và **hội thoại** là local, vì BE chưa có endpoint
- * cho chúng: `/chats` trả 501 và favorite chưa có route nào (xem `client.ts`).
+ * Không còn state hay fixture nào ở đây: mọi dữ liệu — tin đăng, hồ sơ, thông báo, hội thoại
+ * và tin đã lưu — đều đọc từ BE thật qua SDK generated (`client.ts`).
  */
 
 export type Listing = {
@@ -224,7 +223,21 @@ export type SearchFilter = {
   categoryId: string | null;
   minPrice: number | null;
   maxPrice: number | null;
+  /**
+   * Lọc theo thuộc tính động, khoá là `key` của field trong template danh mục.
+   *
+   * Chỉ có nghĩa khi `categoryId` khác `null` — BE trả 400 nếu thiếu danh mục, vì không có
+   * template thì không có tập key hợp lệ nào để đối chiếu. Hệ quả: đổi danh mục phải xoá sạch
+   * nó, y như form đăng tin xoá `attributes` khi đổi danh mục.
+   */
+  attrs: ListingAttrFilter;
 };
+
+/** Ba dạng ràng buộc BE nhận: bằng đúng · thuộc tập · khoảng số. */
+export type ListingAttrFilter = Record<
+  string,
+  string | number | boolean | string[] | { gte?: number; lte?: number }
+>;
 
 export const EMPTY_SEARCH: SearchFilter = {
   q: '',
@@ -232,6 +245,7 @@ export const EMPTY_SEARCH: SearchFilter = {
   categoryId: null,
   minPrice: null,
   maxPrice: null,
+  attrs: {},
 };
 
 /**
@@ -244,17 +258,13 @@ export const hasSearchCriteria = (f: SearchFilter): boolean =>
   f.province !== null ||
   f.categoryId !== null ||
   f.minPrice !== null ||
-  f.maxPrice !== null;
+  f.maxPrice !== null ||
+  Object.keys(f.attrs).length > 0;
 
 /** Số bộ lọc đang bật, KHÔNG tính từ khoá — nó có ô riêng, không nằm trong ngăn lọc. */
 export const activeFilterCount = (f: SearchFilter): number =>
-  [f.province, f.categoryId, f.minPrice, f.maxPrice].filter((v) => v !== null).length;
-
-/** State local — mất khi tắt app, đúng bản chất "chưa có BE" chứ không phải cache. */
-export const db = {
-  /** ObjectId của tin đã lưu. Chưa có endpoint favorite nên không đồng bộ giữa hai thiết bị. */
-  savedIds: [] as string[],
-};
+  [f.province, f.categoryId, f.minPrice, f.maxPrice].filter((v) => v !== null).length +
+  Object.keys(f.attrs).length;
 
 export const CHAT_COLORS = ['#3F6B4A', '#D9A566', '#8C6539', '#6B7F8C', '#B98851'];
 

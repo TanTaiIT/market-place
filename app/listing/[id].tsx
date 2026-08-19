@@ -47,7 +47,7 @@ export default function ListingDetail() {
   const onToggleSave = () => {
     bounce.value = withSequence(withSpring(1.3, { damping: 6 }), withSpring(1));
     rot.value = withSequence(withSpring(-10, { damping: 6 }), withSpring(0));
-    toggleSaved.mutate(listingId, { onError: (e: Error) => toast(`⚠️ ${e.message}`) });
+    toggleSaved.mutate({ id: listingId, saved: !saved }, { onError: (e) => toast(`⚠️ ${e.message}`) });
   };
 
   const onMessage = () => {

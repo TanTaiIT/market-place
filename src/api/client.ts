@@ -10,6 +10,10 @@ import {
   chatMessages,
   chatOpen,
   chatSend,
+  favoriteAdd,
+  favoriteIds,
+  favoriteList,
+  favoriteRemove,
   listingCreate,
   listingGetById,
   listingList,
@@ -34,7 +38,7 @@ import type {
   PublicProfile as PublicProfileDto,
 } from './generated';
 import type { Province, ProvinceName } from './location';
-import { CHAT_COLORS, db, hasSearchCriteria, NEW_PHOTOS } from './db';
+import { CHAT_COLORS, hasSearchCriteria, NEW_PHOTOS } from './db';
 import type {
   AuthSession,
   Category,
@@ -51,8 +55,7 @@ import type {
 import { getCurrentUserId, withAuthRetry } from './http';
 
 /**
- * Lớp truy cập dữ liệu. Tin đăng / hồ sơ / thông báo đi qua SDK generated (BE `market` thật);
- * tin đã lưu và chat vẫn local vì BE chưa có endpoint (`/chats` trả 501, favorite chưa có route).
+ * Lớp truy cập dữ liệu — toàn bộ đi qua SDK generated (BE `market` thật), không còn stub local.
  *
  * Mọi hàm ném `Error` với thông điệp tiếng Việt khi thất bại — call-site hiện nó bằng một
  * `toast` duy nhất (query.convention §5), không hàm nào trả `null` im lặng.
@@ -270,9 +273,7 @@ export function messageFromSocket(payload: unknown): Message | null {
   return toMessage({ ...p, clientMsgId } as MessageDto);
 }
 
-// ── LOCAL HELPERS (phần chưa có BE) ─────────────────────────────────
-
-const delay = (ms = 300) => new Promise<void>((r) => setTimeout(r, ms));
+// ── HELPERS ─────────────────────────────────────────────────────────
 
 /**
  * Từ điển id → tên danh mục, đọc kèm mỗi lần lấy tin.
@@ -511,6 +512,11 @@ export const api = {
             ...(filter.categoryId ? { category: filter.categoryId } : {}),
             ...(filter.minPrice !== null ? { minPrice: filter.minPrice } : {}),
             ...(filter.maxPrice !== null ? { maxPrice: filter.maxPrice } : {}),
+            // JSON thô — SDK tự url-encode. Bỏ hẳn khi rỗng: `attrs={}` sẽ khiến BE đòi
+            // `category` (nó chỉ nhìn sự có mặt của tham số) và cả lượt tìm ăn 400.
+            ...(Object.keys(filter.attrs).length
+              ? { attrs: JSON.stringify(filter.attrs) }
+              : {}),
           },
         }),
       ),
@@ -595,30 +601,40 @@ export const api = {
   async deleteListing(id: string) {
     const res = await withAuthRetry(() => listingRemove({ path: { id } }));
     unwrap(res, 'Không xoá được tin này');
-    db.savedIds = db.savedIds.filter((s) => s !== id);
     return { id };
   },
 
-  /* ---------------- saved (local, chưa có endpoint) ---------------- */
+  /* ---------------- saved ---------------- */
+  /**
+   * Toàn bộ id đã lưu, không phân trang — mọi danh sách đang mở đều tô tim từ tập này, mà
+   * thiếu một cái tim thì người dùng tưởng vừa mất tin đã lưu.
+   */
   async getSavedIds(): Promise<string[]> {
-    await delay(120);
-    return [...db.savedIds];
+    const res = await withAuthRetry(() => favoriteIds());
+    return unwrap(res, 'Không tải được danh sách tin đã lưu');
   },
 
+  /**
+   * Tin đã lưu, mới lưu trước. BE trả nguyên tin nên không còn phải lấy từng cái như bản
+   * local; tin đã bị gỡ BE tự loại khỏi `data`.
+   */
   async getSavedListings(): Promise<Listing[]> {
-    // Chưa có `GET /listings?ids=` nên phải lấy từng tin; danh sách lưu vốn ngắn.
-    const found = await Promise.all(
-      db.savedIds.map((id) => api.getListing(id).catch(() => null)),
-    );
-    return found.filter((l): l is Listing => l !== null);
+    const [res, names] = await Promise.all([
+      withAuthRetry(() => favoriteList({ query: { limit: 50 } })),
+      categoryNames(),
+    ]);
+    return unwrap(res, 'Không tải được tin đã lưu').map((l) => toListing(l, names));
   },
 
-  async toggleSaved(id: string): Promise<string[]> {
-    await delay(150);
-    db.savedIds = db.savedIds.includes(id)
-      ? db.savedIds.filter((s) => s !== id)
-      : [...db.savedIds, id];
-    return [...db.savedIds];
+  /**
+   * Đặt trạng thái tim, KHÔNG lật nó: lưu và bỏ lưu là hai endpoint khác nhau, và nhận trạng
+   * thái ĐÍCH khiến hàm idempotent — bấm nhanh hai lần hay retry sau lỗi mạng đều ra cùng một
+   * kết quả, thay vì lật ngược đúng thứ người dùng vừa chọn.
+   */
+  async setSaved(id: string, saved: boolean): Promise<boolean> {
+    const call = saved ? favoriteAdd : favoriteRemove;
+    const res = await withAuthRetry(() => call({ path: { listingId: id } }));
+    return unwrap(res, saved ? 'Không lưu được tin này' : 'Không bỏ lưu được tin này').favorited;
   },
 
   /* ---------------- chat ---------------- */

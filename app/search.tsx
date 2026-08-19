@@ -49,32 +49,50 @@ export default function Search() {
         />
       </View>
 
-      <View style={styles.filterBar}>
-        <Pressable
-          onPress={() => setPanelOpen((v) => !v)}
-          style={({ pressed }) => [styles.filterBtn, filterCount > 0 && styles.filterBtnOn, pressed && { opacity: 0.7 }]}
-        >
-          <Text style={[styles.filterBtnText, filterCount > 0 && { color: C.paperWarm }]}>
-            {panelOpen ? '⌃' : '⌄'} Bộ lọc{filterCount > 0 ? ` · ${filterCount}` : ''}
-          </Text>
-        </Pressable>
-
-        {filterCount > 0 && (
-          // Xoá lọc giữ nguyên từ khoá: hai thứ độc lập, gộp lại thì người dùng mất luôn thứ
-          // họ vừa gõ chỉ vì muốn bỏ một cái chip.
-          <Pressable onPress={() => setDraft((f) => ({ ...EMPTY_SEARCH, q: f.q }))} hitSlop={6}>
-            <Text style={styles.clear}>Xoá lọc</Text>
-          </Pressable>
-        )}
-      </View>
-
-      {panelOpen && <SearchFilterPanel filter={draft} onChange={setDraft} />}
-
       <FlatList
         data={data ?? []}
         keyExtractor={(i) => String(i.id)}
         contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 24, gap: 10 }}
         keyboardShouldPersistTaps="handled"
+        /*
+          Ngăn lọc nằm TRONG danh sách, không phải anh em của nó.
+
+          Đặt ngoài thì nó là một khối cố định trong cột flex: bộ lọc của Xe cộ có 17 field nên
+          nó dài hơn màn hình, tràn ra ngoài và không có gì cuộn được. Nằm trong header của
+          `FlatList` thì lọc và kết quả cuộn chung một mạch.
+
+          Truyền PHẦN TỬ chứ không phải hàm (`{() => <X/>}`): hàm inline tạo một component type
+          mới ở mỗi lần render, `FlatList` remount cả header, và mọi `TextInput` trong ngăn lọc
+          (giá, khoảng số) mất focus sau từng ký tự.
+        */
+        ListHeaderComponent={
+          <>
+            <View style={styles.filterBar}>
+              <Pressable
+                onPress={() => setPanelOpen((v) => !v)}
+                style={({ pressed }) => [
+                  styles.filterBtn,
+                  filterCount > 0 && styles.filterBtnOn,
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <Text style={[styles.filterBtnText, filterCount > 0 && { color: C.paperWarm }]}>
+                  {panelOpen ? '⌃' : '⌄'} Bộ lọc{filterCount > 0 ? ` · ${filterCount}` : ''}
+                </Text>
+              </Pressable>
+
+              {filterCount > 0 && (
+                // Xoá lọc giữ nguyên từ khoá: hai thứ độc lập, gộp lại thì người dùng mất luôn
+                // thứ họ vừa gõ chỉ vì muốn bỏ một cái chip.
+                <Pressable onPress={() => setDraft((f) => ({ ...EMPTY_SEARCH, q: f.q }))} hitSlop={6}>
+                  <Text style={styles.clear}>Xoá lọc</Text>
+                </Pressable>
+              )}
+            </View>
+
+            {panelOpen && <SearchFilterPanel filter={draft} onChange={setDraft} />}
+          </>
+        }
         renderItem={({ item, index }) => (
           <Animated.View entering={FadeInDown.delay(index * 60).duration(320)}>
             <Pressable
@@ -130,13 +148,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 14,
   },
-  filterBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 18,
-    paddingBottom: 12,
-  },
+  // Không có `paddingHorizontal`: khối này giờ nằm trong `contentContainerStyle` của FlatList,
+  // vốn đã có 18 — thêm nữa là lề đôi.
+  filterBar: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 12 },
   filterBtn: {
     borderWidth: 1,
     borderColor: C.lineInput,

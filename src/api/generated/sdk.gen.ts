@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ApproveJoinRequestData, ApproveJoinRequestErrors, ApproveJoinRequestResponses, AuthLoginData, AuthLoginErrors, AuthLoginResponses, AuthRefreshData, AuthRefreshErrors, AuthRefreshResponses, AuthRegisterData, AuthRegisterErrors, AuthRegisterResponses, BulkApproveJoinRequestsData, BulkApproveJoinRequestsErrors, BulkApproveJoinRequestsResponses, CancelJoinRequestData, CancelJoinRequestErrors, CancelJoinRequestResponses, CategoryGetByIdData, CategoryGetByIdErrors, CategoryGetByIdResponses, CategoryGetTemplateData, CategoryGetTemplateErrors, CategoryGetTemplateResponses, CategoryListData, CategoryListErrors, CategoryListResponses, ChangeOrganizationSlugData, ChangeOrganizationSlugErrors, ChangeOrganizationSlugResponses, ChatGetByIdData, ChatGetByIdErrors, ChatGetByIdResponses, ChatListData, ChatListErrors, ChatListResponses, ChatMarkReadData, ChatMarkReadErrors, ChatMarkReadResponses, ChatMessagesData, ChatMessagesErrors, ChatMessagesResponses, ChatOpenData, ChatOpenErrors, ChatOpenResponses, ChatSendData, ChatSendErrors, ChatSendResponses, CreateCategoryData, CreateCategoryErrors, CreateCategoryResponses, CreateJoinRequestData, CreateJoinRequestErrors, CreateJoinRequestResponses, CreateOrganizationData, CreateOrganizationErrors, CreateOrganizationResponses, CreateOrgUnitData, CreateOrgUnitErrors, CreateOrgUnitResponses, CreateRoleGrantData, CreateRoleGrantErrors, CreateRoleGrantResponses, DeleteOrgUnitData, DeleteOrgUnitErrors, DeleteOrgUnitResponses, ListingCreateData, ListingCreateErrors, ListingCreateResponses, ListingGetByIdData, ListingGetByIdErrors, ListingGetByIdResponses, ListingListData, ListingListErrors, ListingListResponses, ListingMineData, ListingMineErrors, ListingMineResponses, ListingNearbyData, ListingNearbyErrors, ListingNearbyResponses, ListingQuotaData, ListingQuotaResponses, ListingRemoveData, ListingRemoveErrors, ListingRemoveResponses, ListingUpdateData, ListingUpdateErrors, ListingUpdateResponses, ListJoinRequestsData, ListJoinRequestsErrors, ListJoinRequestsResponses, ListOrgUnitsData, ListOrgUnitsResponses, LocationProvincesData, LocationProvincesResponses, LocationWardsData, LocationWardsErrors, LocationWardsResponses, ModerationActivityData, ModerationActivityErrors, ModerationActivityResponses, ModerationCoverageData, ModerationCoverageErrors, ModerationCoverageResponses, ModerationListingsData, ModerationListingsErrors, ModerationListingsResponses, ModerationOverviewData, ModerationOverviewErrors, ModerationOverviewResponses, ModerationPublicQueueData, ModerationPublicQueueErrors, ModerationPublicQueueResponses, ModerationRemoveListingData, ModerationRemoveListingErrors, ModerationRemoveListingResponses, ModerationRerouteListingData, ModerationRerouteListingErrors, ModerationRerouteListingResponses, ModerationSetListingStatusData, ModerationSetListingStatusErrors, ModerationSetListingStatusResponses, MyJoinRequestsData, MyJoinRequestsResponses, MyOrganizationsData, MyOrganizationsErrors, MyOrganizationsResponses, MyRoleGrantsData, MyRoleGrantsResponses, NotificationCreateData, NotificationCreateErrors, NotificationCreateResponses, NotificationListData, NotificationListErrors, NotificationListResponses, NotificationMarkReadData, NotificationMarkReadErrors, NotificationMarkReadResponses, OrganizationLookupData, OrganizationLookupErrors, OrganizationLookupResponses, OrganizationSlugAvailabilityData, OrganizationSlugAvailabilityErrors, OrganizationSlugAvailabilityResponses, RejectJoinRequestData, RejectJoinRequestErrors, RejectJoinRequestResponses, ReportCreateData, ReportCreateErrors, ReportCreateResponses, ReportListData, ReportListErrors, ReportListResponses, ReportResolveData, ReportResolveErrors, ReportResolveResponses, RevokeRoleGrantData, RevokeRoleGrantErrors, RevokeRoleGrantResponses, SetOrganizationStatusData, SetOrganizationStatusErrors, SetOrganizationStatusResponses, UpdateCategoryData, UpdateCategoryErrors, UpdateCategoryResponses, UpdateOrgUnitData, UpdateOrgUnitErrors, UpdateOrgUnitResponses, UserDeleteMeData, UserDeleteMeErrors, UserDeleteMeResponses, UserGetByIdData, UserGetByIdErrors, UserGetByIdResponses, UserGetMeData, UserGetMeErrors, UserGetMeResponses, UserUpdateMeData, UserUpdateMeErrors, UserUpdateMeResponses } from './types.gen';
+import type { ApproveJoinRequestData, ApproveJoinRequestErrors, ApproveJoinRequestResponses, AuthLoginData, AuthLoginErrors, AuthLoginResponses, AuthRefreshData, AuthRefreshErrors, AuthRefreshResponses, AuthRegisterData, AuthRegisterErrors, AuthRegisterResponses, BulkApproveJoinRequestsData, BulkApproveJoinRequestsErrors, BulkApproveJoinRequestsResponses, CancelJoinRequestData, CancelJoinRequestErrors, CancelJoinRequestResponses, CategoryGetByIdData, CategoryGetByIdErrors, CategoryGetByIdResponses, CategoryGetTemplateData, CategoryGetTemplateErrors, CategoryGetTemplateResponses, CategoryListData, CategoryListErrors, CategoryListResponses, ChangeOrganizationSlugData, ChangeOrganizationSlugErrors, ChangeOrganizationSlugResponses, ChatGetByIdData, ChatGetByIdErrors, ChatGetByIdResponses, ChatListData, ChatListErrors, ChatListResponses, ChatMarkReadData, ChatMarkReadErrors, ChatMarkReadResponses, ChatMessagesData, ChatMessagesErrors, ChatMessagesResponses, ChatOpenData, ChatOpenErrors, ChatOpenResponses, ChatSendData, ChatSendErrors, ChatSendResponses, CreateCategoryData, CreateCategoryErrors, CreateCategoryResponses, CreateJoinRequestData, CreateJoinRequestErrors, CreateJoinRequestResponses, CreateOrganizationData, CreateOrganizationErrors, CreateOrganizationResponses, CreateOrgUnitData, CreateOrgUnitErrors, CreateOrgUnitResponses, CreateRoleGrantData, CreateRoleGrantErrors, CreateRoleGrantResponses, DeleteOrgUnitData, DeleteOrgUnitErrors, DeleteOrgUnitResponses, FavoriteAddData, FavoriteAddErrors, FavoriteAddResponses, FavoriteIdsData, FavoriteIdsErrors, FavoriteIdsResponses, FavoriteListData, FavoriteListErrors, FavoriteListResponses, FavoriteRemoveData, FavoriteRemoveErrors, FavoriteRemoveResponses, ListingCreateData, ListingCreateErrors, ListingCreateResponses, ListingGetByIdData, ListingGetByIdErrors, ListingGetByIdResponses, ListingListData, ListingListErrors, ListingListResponses, ListingMineData, ListingMineErrors, ListingMineResponses, ListingNearbyData, ListingNearbyErrors, ListingNearbyResponses, ListingQuotaData, ListingQuotaResponses, ListingRemoveData, ListingRemoveErrors, ListingRemoveResponses, ListingUpdateData, ListingUpdateErrors, ListingUpdateResponses, ListJoinRequestsData, ListJoinRequestsErrors, ListJoinRequestsResponses, ListOrgUnitsData, ListOrgUnitsResponses, LocationProvincesData, LocationProvincesResponses, LocationWardsData, LocationWardsErrors, LocationWardsResponses, ModerationActivityData, ModerationActivityErrors, ModerationActivityResponses, ModerationCoverageData, ModerationCoverageErrors, ModerationCoverageResponses, ModerationListingsData, ModerationListingsErrors, ModerationListingsResponses, ModerationOverviewData, ModerationOverviewErrors, ModerationOverviewResponses, ModerationPublicQueueData, ModerationPublicQueueErrors, ModerationPublicQueueResponses, ModerationRemoveListingData, ModerationRemoveListingErrors, ModerationRemoveListingResponses, ModerationRerouteListingData, ModerationRerouteListingErrors, ModerationRerouteListingResponses, ModerationSetListingStatusData, ModerationSetListingStatusErrors, ModerationSetListingStatusResponses, MyJoinRequestsData, MyJoinRequestsResponses, MyOrganizationsData, MyOrganizationsErrors, MyOrganizationsResponses, MyRoleGrantsData, MyRoleGrantsResponses, NotificationCreateData, NotificationCreateErrors, NotificationCreateResponses, NotificationListData, NotificationListErrors, NotificationListResponses, NotificationMarkReadData, NotificationMarkReadErrors, NotificationMarkReadResponses, OrganizationLookupData, OrganizationLookupErrors, OrganizationLookupResponses, OrganizationSlugAvailabilityData, OrganizationSlugAvailabilityErrors, OrganizationSlugAvailabilityResponses, RejectJoinRequestData, RejectJoinRequestErrors, RejectJoinRequestResponses, ReportCreateData, ReportCreateErrors, ReportCreateResponses, ReportListData, ReportListErrors, ReportListResponses, ReportResolveData, ReportResolveErrors, ReportResolveResponses, RevokeRoleGrantData, RevokeRoleGrantErrors, RevokeRoleGrantResponses, SetOrganizationStatusData, SetOrganizationStatusErrors, SetOrganizationStatusResponses, UpdateCategoryData, UpdateCategoryErrors, UpdateCategoryResponses, UpdateOrgUnitData, UpdateOrgUnitErrors, UpdateOrgUnitResponses, UserDeleteMeData, UserDeleteMeErrors, UserDeleteMeResponses, UserGetByIdData, UserGetByIdErrors, UserGetByIdResponses, UserGetMeData, UserGetMeErrors, UserGetMeResponses, UserUpdateMeData, UserUpdateMeErrors, UserUpdateMeResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -165,6 +165,50 @@ export const listingUpdate = <ThrowOnError extends boolean = false>(options: Opt
 export const listingQuota = <ThrowOnError extends boolean = false>(options?: Options<ListingQuotaData, ThrowOnError>) => (options?.client ?? client).get<ListingQuotaResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/listings/quota',
+    ...options
+});
+
+/**
+ * Danh sách tin đã lưu (mới lưu trước)
+ *
+ * Chỉ trả tin còn đọc được: tin đã gỡ hoặc ngoài phạm vi của bạn bị loại khỏi `data`, nhưng `meta.total` vẫn đếm đủ bản ghi đã lưu — một trang có thể ngắn hơn `limit`.
+ */
+export const favoriteList = <ThrowOnError extends boolean = false>(options?: Options<FavoriteListData, ThrowOnError>) => (options?.client ?? client).get<FavoriteListResponses, FavoriteListErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/favorites',
+    ...options
+});
+
+/**
+ * Id các tin đã lưu
+ *
+ * Không phân trang: client cần đủ tập này để tô tim trên mọi danh sách đang mở, mà tô thiếu một cái tim thì người dùng tưởng đã mất tin đã lưu.
+ */
+export const favoriteIds = <ThrowOnError extends boolean = false>(options?: Options<FavoriteIdsData, ThrowOnError>) => (options?.client ?? client).get<FavoriteIdsResponses, FavoriteIdsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/favorites/ids',
+    ...options
+});
+
+/**
+ * Bỏ lưu một tin
+ *
+ * Idempotent, và KHÔNG kiểm tin còn tồn tại: tin đã bị gỡ vẫn bỏ tim được, nếu không người dùng kẹt vĩnh viễn với một bản ghi họ không xoá nổi.
+ */
+export const favoriteRemove = <ThrowOnError extends boolean = false>(options: Options<FavoriteRemoveData, ThrowOnError>) => (options.client ?? client).delete<FavoriteRemoveResponses, FavoriteRemoveErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/favorites/{listingId}',
+    ...options
+});
+
+/**
+ * Lưu một tin
+ *
+ * Idempotent: bấm lại lần hai vẫn 201 và vẫn `favorited: true`, không tạo thêm bản ghi và không cộng thêm `favoriteCount`.
+ */
+export const favoriteAdd = <ThrowOnError extends boolean = false>(options: Options<FavoriteAddData, ThrowOnError>) => (options.client ?? client).post<FavoriteAddResponses, FavoriteAddErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/favorites/{listingId}',
     ...options
 });
 

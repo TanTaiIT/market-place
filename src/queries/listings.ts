@@ -141,23 +141,28 @@ export function useUpdateListing() {
   });
 }
 
-/** Bỏ tim / thả tim với optimistic update — UI phản hồi ngay lập tức */
+/**
+ * Bỏ tim / thả tim, optimistic. Nhận trạng thái ĐÍCH chứ không tự lật: lưu và bỏ lưu là hai
+ * endpoint khác nhau, và nhờ vậy bấm nhanh hai lần không đảo ngược lựa chọn của người dùng.
+ */
 export function useToggleSaved() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.toggleSaved(id),
-    onMutate: async (id) => {
+    mutationFn: ({ id, saved }: { id: string; saved: boolean }) => api.setSaved(id, saved),
+    onMutate: async ({ id, saved }) => {
       await qc.cancelQueries({ queryKey: qk.savedIds() });
       const prev = qc.getQueryData<string[]>(qk.savedIds()) ?? [];
       qc.setQueryData<string[]>(
         qk.savedIds(),
-        prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+        saved ? [...new Set([...prev, id])] : prev.filter((s) => s !== id),
       );
       return { prev };
     },
-    onError: (_e, _id, ctx) => {
+    onError: (_e, _vars, ctx) => {
       if (ctx?.prev) qc.setQueryData(qk.savedIds(), ctx.prev);
     },
+    // Cả cụm `savedRoot()`: nhánh `['saved', 'listings']` cache nguyên `Listing`, bỏ qua nó là
+    // tab Đã lưu còn giữ tin vừa bỏ tim. Không đụng `listings()` — app không hiện `favoriteCount`.
     onSettled: () => {
       qc.invalidateQueries({ queryKey: qk.savedRoot() });
     },

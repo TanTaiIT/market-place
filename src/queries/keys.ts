@@ -26,7 +26,18 @@ export const qk = {
    * không có gì bảo đảm, và hai key khác chuỗi cho cùng một bộ lọc là hai lần gọi mạng.
    */
   search: (f: SearchFilter) =>
-    ['search', f.q, f.province ?? '', f.categoryId ?? '', f.minPrice ?? '', f.maxPrice ?? ''] as const,
+    [
+      'search',
+      f.q,
+      f.province ?? '',
+      f.categoryId ?? '',
+      f.minPrice ?? '',
+      f.maxPrice ?? '',
+      // Khoá động nên KHÔNG liệt kê tay được như các field trên. `JSON.stringify` ở đây an
+      // toàn vì thứ tự khoá của `attrs` do người dùng bấm theo thứ tự field trong template —
+      // ổn định trong một phiên, và có lệch thì hậu quả chỉ là một lần gọi mạng thừa.
+      JSON.stringify(f.attrs),
+    ] as const,
   /** Prefix thuần: không query nào dùng trực tiếp, chỉ để invalidate cả cụm `saved`. */
   savedRoot: () => ['saved'] as const,
   savedIds: () => ['saved', 'ids'] as const,

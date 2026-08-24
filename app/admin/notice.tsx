@@ -54,7 +54,7 @@ export default function AdminNotice() {
     );
 
   return (
-    <AdminScreen title="Gửi thông báo" note="cả tổ chức, hoặc một nhóm">
+    <AdminScreen title="Gửi thông báo" note="cả tổ chức, hoặc một nhóm" org>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}

@@ -72,6 +72,11 @@ const GROUPS: { label: string; org?: boolean; items: NavItem[] }[] = [
       { href: '/admin/categories', icon: '▩', label: 'Danh mục', gate: 'master' },
       { href: '/admin/category-templates', icon: '⛭', label: 'Mẫu thuộc tính', gate: 'master' },
       { href: '/admin/coverage', icon: '◰', label: 'Phủ sóng', gate: 'master' },
+      // Cụm cấm đứng ngay dưới nhóm nội dung vì nó cũng là một từ điển dùng chung — nhưng là
+      // từ điển CHẶN, áp trước cả phép tính uy tín.
+      { href: '/admin/banned-phrases', icon: '🚫', label: 'Cụm từ cấm', gate: 'master' },
+      { href: '/admin/listing-products', icon: '🎟', label: 'Gói tin', gate: 'master' },
+      { href: '/admin/posting-stats', icon: '📈', label: 'Số liệu đăng tin', gate: 'master' },
     ],
   },
 ];

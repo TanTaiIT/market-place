@@ -16,6 +16,6 @@ export function useCreateReport() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: reportApi.create,
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.adminReports() }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.adminReportsRoot() }),
   });
 }

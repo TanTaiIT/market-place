@@ -82,7 +82,7 @@ export default function AdminOrgUnits() {
   };
 
   return (
-    <AdminScreen title="Nhóm con" note="khoá, lớp, phòng ban">
+    <AdminScreen title="Nhóm con" note="khoá, lớp, phòng ban" org>
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         {isLoading ? (
           <Loading onDark />

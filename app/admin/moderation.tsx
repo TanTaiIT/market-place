@@ -49,7 +49,7 @@ export default function Moderation() {
   });
 
   return (
-    <AdminScreen title="Duyệt tin" note="giữ bảng tin sạch">
+    <AdminScreen title="Duyệt tin" note="giữ bảng tin sạch" org>
       <View style={styles.bar}>
         <View style={{ flex: 1 }}>
           <AdminFilter options={tabs} value={tab} onChange={(v) => setTab(v as ModStatus)} />

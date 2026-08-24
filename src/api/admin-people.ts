@@ -1,79 +1,146 @@
-/** Bộ lọc trường của fixture. Biến mất cùng lúc với fixture — BE không trả `school` cho user. */
-export const SCHOOLS = ['Hùng Vương', 'Cao Thắng'];
+import { userClearRejections, userListForAdmin, userSetStatus, walletAdjust } from './generated';
+import type { AdminUser as AdminUserDto } from './generated';
+import { relativeTime, unwrap } from './client';
+import { withAuthRetry } from './http';
 
 /**
- * Bảng người dùng của bàn quản trị. Tách khỏi `admin.ts` vì đó là hàng đợi kiểm duyệt — hai
- * thứ không dùng chung dữ liệu nào ngoài số đếm tin đăng.
+ * Bảng người dùng của bàn quản trị — **toàn hệ thống, chỉ master** (`GET /users` gác
+ * `requireMaster`). Tài khoản ở v2 là toàn cục, không thuộc tổ chức nào, nên màn này cố tình
+ * không có bộ lọc tổ chức: khoá một người là khoá ở mọi nơi, và đó chính là lý do quyền này
+ * không nằm trong tay admin org.
  *
- * ⚠️ CÒN LÀ FIXTURE IN-MEMORY, và giờ là fixture **có thể bỏ được**: BE đã mở
- * `GET /users`, `PATCH /users/{id}/status`, `POST /users/{id}/clear-rejections`.
+ * Trước đây file này là fixture in-memory (danh sách trường, `posts`/`sold`/`rating` bịa).
+ * Những field đó KHÔNG có ở BE và đã bỏ hẳn; thứ thay vào là `trustLevel` — con số quyết định
+ * tin của người này có tự lên bảng hay không, tức là thứ duy nhất ở đây thật sự đáng nhìn.
  *
- * Không đổi thẳng `queryFn` được vì hình dạng lệch nhau: BE trả
- * `{ id(string), name, email, avatar, isActive, isEmailVerified, trustLevel, lastLoginAt, createdAt }`
- * — KHÔNG có `school`/`phone`/`posts`/`sold`/`rating`, và `status` ba nhánh ở đây là hai cột
- * `isActive` + `isEmailVerified` bên kia. Riêng `verifyUser` KHÔNG có endpoint tương ứng: xác
- * thực email là việc của người dùng, thứ gần nhất BE cho phép là gỡ án phạt đăng tin.
- *
- * Phần "trường" (`getSchools`/`getSchoolLinks`) đã gỡ cùng màn `/admin/schools`: BE không có
- * route liệt kê tổ chức, và "liên kết hai trường" không phải khái niệm tồn tại ở BE.
+ * `verifyUser` cũng bỏ: xác thực email là việc của chính người dùng, BE không có endpoint nào
+ * cho quản trị bấm hộ. Thứ gần nhất là gỡ án phạt đăng tin (`clear-rejections`).
  */
 
 // ── TYPES ───────────────────────────────────────────────────────────
 
+/**
+ * Ba nhánh gộp từ hai cột của BE (`isActive` + `isEmailVerified`).
+ *
+ * `unverified` ở đây nghĩa là **chưa xác thực email**, không phải "chờ quản trị duyệt" như bản
+ * fixture — không có hàng đợi nào cho việc đó.
+ */
 export type UserStatus = 'ok' | 'unverified' | 'locked';
 
 export type AdminUser = {
-  id: number;
+  id: string;
   name: string;
+  email: string;
   avatar: string;
-  school: string;
-  phone: string;
-  posts: number;
-  sold: number;
-  /** `0` = chưa ai đánh giá; màn hiện `—` chứ không hiện 0 sao. */
-  rating: number;
   status: UserStatus;
+  /** Bậc uy tín: từ bậc 2 là tin tự lên bảng, chỉ hậu kiểm. Một số DUY NHẤT cho mọi trục. */
+  trustLevel: number;
   joined: string;
+  /** `null` = chưa đăng nhập lần nào kể từ khi BE bắt đầu ghi cột này. */
+  lastSeen: string | null;
 };
 
-// ── STATE ───────────────────────────────────────────────────────────
+/** Bộ lọc BE nhận. `status` chỉ có hai nhánh — "chưa xác thực email" không phải điều kiện lọc. */
+export type UserFilter = {
+  q?: string;
+  status?: 'active' | 'locked';
+};
 
-const users: AdminUser[] = [
-  { id: 1, name: 'Minh Vũ', avatar: 'MV', school: 'Hùng Vương', phone: '090 123 4567', posts: 6, sold: 3, rating: 4.9, status: 'ok', joined: '12/03/2026' },
-  { id: 2, name: 'Thu Hà', avatar: 'TH', school: 'Cao Thắng', phone: '091 222 3344', posts: 9, sold: 6, rating: 4.8, status: 'ok', joined: '02/02/2026' },
-  { id: 3, name: 'Đức Anh', avatar: 'ĐA', school: 'Hùng Vương', phone: '098 555 6677', posts: 5, sold: 1, rating: 3.6, status: 'locked', joined: '19/04/2026' },
-  { id: 4, name: 'Gia Bảo', avatar: 'GB', school: 'Cao Thắng', phone: '096 888 1122', posts: 4, sold: 4, rating: 5, status: 'ok', joined: '28/01/2026' },
-  { id: 5, name: 'Khánh Linh', avatar: 'KL', school: 'Cao Thắng', phone: '097 444 8899', posts: 3, sold: 0, rating: 0, status: 'unverified', joined: '11/08/2026' },
-  { id: 6, name: 'Hoàng Nam', avatar: 'HN', school: 'Hùng Vương', phone: '094 777 2211', posts: 0, sold: 0, rating: 0, status: 'unverified', joined: '12/08/2026' },
-];
+export type WalletAdjustInput = {
+  userId: string;
+  /** Số nguyên khác 0; âm = trừ Xu. */
+  amount: number;
+  note: string;
+  idempotencyKey: string;
+};
 
-const delay = (ms = 180) => new Promise<void>((r) => setTimeout(r, ms));
-const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
+const statusOf = (dto: AdminUserDto): UserStatus =>
+  !dto.isActive ? 'locked' : dto.isEmailVerified ? 'ok' : 'unverified';
+
+const toUser = (dto: AdminUserDto): AdminUser => ({
+  id: dto.id,
+  name: dto.name,
+  email: dto.email,
+  avatar: dto.avatar,
+  status: statusOf(dto),
+  trustLevel: dto.trustLevel,
+  joined: relativeTime(dto.createdAt),
+  lastSeen: dto.lastLoginAt ? relativeTime(dto.lastLoginAt) : null,
+});
 
 // ── API ─────────────────────────────────────────────────────────────
 
 export const adminPeopleApi = {
-  async getUsers(school: string): Promise<AdminUser[]> {
-    await delay();
-    return clone(users.filter((u) => school === 'all' || u.school === school));
+  /**
+   * `limit: 100` (trần của BE) và BỎ `meta`, y hệt `orgAdminApi.listAll`: quá 100 tài khoản thì
+   * bảng cắt im lặng, nên ô tìm là đường thu hẹp chính. Vượt mốc đó thì phân trang thật trước.
+   */
+  async getUsers(filter: UserFilter = {}): Promise<AdminUser[]> {
+    const res = await withAuthRetry(() =>
+      userListForAdmin({
+        query: { q: filter.q?.trim() || undefined, status: filter.status, limit: 100 },
+      }),
+    );
+    return unwrap(res, 'Không tải được danh sách người dùng').map(toUser);
   },
 
-  /** Xác nhận người dùng đúng là học sinh của trường — chỉ có nghĩa với `unverified`. */
-  async verifyUser(id: number): Promise<AdminUser> {
-    await delay(200);
-    const user = users.find((u) => u.id === id);
-    if (!user) throw new Error('Không tìm thấy người dùng này');
-    if (user.status !== 'unverified') throw new Error(`${user.name} đã được xác thực rồi`);
-    user.status = 'ok';
-    return clone(user);
+  /**
+   * Khoá / mở khoá. Lý do BẮT BUỘC khi khoá — BE trả 400 nếu thiếu, và đúng thế: khoá một tài
+   * khoản toàn cục mà không để lại câu nào là thứ không ai giải thích được sau ba tháng.
+   */
+  async setLock({
+    id,
+    isActive,
+    reason,
+  }: {
+    id: string;
+    isActive: boolean;
+    reason: string;
+  }): Promise<AdminUser> {
+    const note = reason.trim();
+    if (!isActive && !note) throw new Error('Nhập lý do khoá trước đã');
+    // BE nhận `reason` tối thiểu 5 ký tự, và bỏ trống thì nó phải VẮNG MẶT: gửi chuỗi rỗng là
+    // 400 ở nhánh mở khoá, nơi lý do vốn không bắt buộc.
+    if (note && note.length < 5) throw new Error('Lý do cần ít nhất 5 ký tự');
+    const res = await withAuthRetry(() =>
+      userSetStatus({ path: { id }, body: { isActive, ...(note ? { reason: note } : {}) } }),
+    );
+    return toUser(unwrap(res, 'Không đổi được trạng thái tài khoản'));
   },
 
-  /** Khoá / mở khoá. Người đang chờ xác thực mà bị khoá thì vẫn phải xác thực lại sau. */
-  async toggleLock(id: number): Promise<AdminUser> {
-    await delay(200);
-    const user = users.find((u) => u.id === id);
-    if (!user) throw new Error('Không tìm thấy người dùng này');
-    user.status = user.status === 'locked' ? 'ok' : 'locked';
-    return clone(user);
+  /**
+   * Gỡ án phạt đăng tin. Bị 3 tin từ chối trong 7 ngày là quyền đăng bị khoá cho tới hết cửa
+   * sổ — đây là đường DUY NHẤT gỡ sớm, và nó tồn tại vì oan sai của máy quét cũng rơi vào cùng
+   * bộ đếm đó.
+   */
+  async clearRejections({ id, reason }: { id: string; reason: string }): Promise<void> {
+    if (reason.trim().length < 3) throw new Error('Nhập lý do gỡ án phạt (ít nhất 3 ký tự)');
+    const res = await withAuthRetry(() =>
+      userClearRejections({ path: { id }, body: { reason: reason.trim() } }),
+    );
+    unwrap(res, 'Không gỡ được án phạt đăng tin');
+  },
+
+  /**
+   * Cộng/trừ Xu cho một tài khoản.
+   *
+   * ⚠️ Master **không đọc được số dư của người khác** — BE cố ý chỉ có `GET /wallet` của chính
+   * chủ. Nên đây là thao tác mù: màn hình phải nói ra điều đó thay vì hiện một ô số dư bịa.
+   *
+   * `idempotencyKey` do màn hình sinh MỘT lần cho mỗi lần mở form: bấm nhầm hai lần với cùng
+   * khoá chỉ ra một dòng sổ, và đó là thứ duy nhất ngăn cộng đôi Xu.
+   */
+  async adjustWallet({ userId, amount, note, idempotencyKey }: WalletAdjustInput): Promise<void> {
+    if (!Number.isInteger(amount) || amount === 0) {
+      throw new Error('Số Xu phải là số nguyên khác 0');
+    }
+    if (!note.trim()) throw new Error('Nhập lý do điều chỉnh trước đã');
+    const res = await withAuthRetry(() =>
+      walletAdjust({
+        path: { userId },
+        body: { amount, note: note.trim(), idempotencyKey },
+      }),
+    );
+    unwrap(res, 'Không điều chỉnh được ví');
   },
 };

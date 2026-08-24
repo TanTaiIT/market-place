@@ -45,7 +45,7 @@ export default function AdminOverview() {
     );
 
   return (
-    <AdminScreen title="Bàn quản trị" note="việc hôm nay">
+    <AdminScreen title="Bàn quản trị" note="việc hôm nay" org>
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         {isLoading ? (
           <Loading onDark />

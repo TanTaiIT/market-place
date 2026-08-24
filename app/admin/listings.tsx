@@ -61,7 +61,7 @@ export default function AdminListings() {
     );
 
   return (
-    <AdminScreen title="Tin đăng" note="tất cả những gì trên bảng">
+    <AdminScreen title="Tin đăng" note="tất cả những gì trên bảng" org>
       <View style={styles.search}>
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput

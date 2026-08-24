@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { AdminNav } from './AdminNav';
 import { useToast } from './Toast';
+import { PinButton } from './ui';
+import { useOrgSlug } from '@/stores/auth';
 import { C, F } from '@/theme';
 
 /**
@@ -16,15 +19,28 @@ import { C, F } from '@/theme';
 export function AdminScreen({
   title,
   note,
+  org,
   children,
 }: {
   title: string;
   /** Câu viết tay trên tiêu đề, giữ đúng giọng của prototype. */
   note: string;
+  /**
+   * Màn này đọc `X-Org-Slug` — khớp đúng cờ `org: true` của `AdminNav.GROUPS`.
+   *
+   * Bật thì khi chưa chọn tổ chức, màn hiện lối đi tiếp thay vì ruột của nó. Master cố ý không
+   * thuộc tổ chức nào, nên đây là trạng thái BÌNH THƯỜNG của họ lúc mới vào, không phải lỗi:
+   * trước đó mọi màn trong nhóm này ném nguyên văn câu của `requireOrg` — "gửi header
+   * X-Org-Slug hoặc truy cập qua subdomain" — cho người vừa bấm một mục menu.
+   */
+  org?: boolean;
   children: React.ReactNode;
 }) {
   const toast = useToast();
+  const router = useRouter();
+  const orgSlug = useOrgSlug();
   const [navOpen, setNavOpen] = useState(false);
+  const needsOrg = Boolean(org) && !orgSlug;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -52,10 +68,30 @@ export function AdminScreen({
         </Pressable>
       </View>
 
-      {children}
+      {needsOrg ? <NoOrgPicked onPick={() => router.push('/admin/organizations')} /> : children}
 
       <AdminNav open={navOpen} onClose={() => setNavOpen(false)} />
     </SafeAreaView>
+  );
+}
+
+/**
+ * Màn org-scoped nhưng chưa có tổ chức nào được chọn.
+ *
+ * Nói bằng lời của người dùng và chỉ ra đúng một việc phải làm. Không gọi API nào — các hook
+ * query đã tự tắt bằng `enabled` khi thiếu slug (`queries/admin.ts`), nên tới đây là im lặng
+ * hoàn toàn chứ không phải hiện lối thoát trong lúc vẫn bắn request hỏng phía sau.
+ */
+function NoOrgPicked({ onPick }: { onPick: () => void }) {
+  return (
+    <View style={styles.noOrg}>
+      <Text style={styles.noOrgIcon}>🏫</Text>
+      <Text style={styles.noOrgTitle}>Chưa chọn tổ chức nào</Text>
+      <Text style={styles.noOrgText}>
+        Màn này hiện dữ liệu của một tổ chức cụ thể. Chọn tổ chức bạn muốn thao tác rồi quay lại.
+      </Text>
+      <PinButton label="Chọn tổ chức" onPress={onPick} style={{ marginTop: 18 }} />
+    </View>
   );
 }
 
@@ -134,6 +170,7 @@ export function AdminFilter({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={styles.filterBar}
       contentContainerStyle={styles.filterRow}
     >
       {options.map((opt) => {
@@ -199,6 +236,9 @@ const styles = StyleSheet.create({
   panelHead: {
     flexDirection: 'row',
     alignItems: 'baseline',
+    // Ghi chú viết tay dài hơn chỗ còn lại thì XUỐNG DÒNG. Thiếu `flexWrap` thì nó tràn ra và
+    // bị `overflow: hidden` của panel cắt cụt giữa chữ, không cả một dấu ba chấm.
+    flexWrap: 'wrap',
     gap: 10,
     paddingHorizontal: 16,
     paddingVertical: 13,
@@ -206,9 +246,17 @@ const styles = StyleSheet.create({
     borderBottomColor: C.deskLine,
   },
   panelTitle: { fontFamily: F.uiBold, fontSize: 14, color: C.paper },
-  panelNote: { fontFamily: F.hand, fontSize: 13, color: C.cork },
+  panelNote: { fontFamily: F.hand, fontSize: 13, color: C.cork, flexShrink: 1 },
   panelBody: { padding: 16 },
 
+  /*
+   * `flexGrow/flexShrink: 0` KHÔNG thừa: React Native gán sẵn `flexGrow: 1, flexShrink: 1` cho
+   * MỌI ScrollView (`ScrollView.js` → `baseHorizontal`). Hàng lọc này là con trực tiếp của cột
+   * màn hình nên nó tranh chiều dọc với ScrollView nội dung ngay dưới: màn nào nội dung dài thì
+   * nó bị BÓP lại — viên lọc mất nửa dưới của chữ; màn nào nội dung ngắn thì nó DÃN ra ăn hết
+   * chỗ trống. Chốt về 0 để nó cao đúng bằng ruột của nó, không thương lượng với ai.
+   */
+  filterBar: { flexGrow: 0, flexShrink: 0 },
   filterRow: { gap: 8, paddingHorizontal: 18, paddingBottom: 14 },
   pill: {
     flexDirection: 'row',
@@ -222,7 +270,9 @@ const styles = StyleSheet.create({
     borderColor: C.deskLine,
   },
   pillOn: { backgroundColor: C.deskHi, borderColor: C.cork },
-  pillText: { fontFamily: F.uiSemi, fontSize: 12.5, color: C.deskTxtSoft },
+  // `lineHeight` cố định: hộp chữ của viên lọc cao đúng một mức biết trước, không co giãn
+  // theo metric của font vừa nạp xong.
+  pillText: { fontFamily: F.uiSemi, fontSize: 12.5, lineHeight: 18, color: C.deskTxtSoft },
   pillTextOn: { color: C.paper },
   pillCount: { fontFamily: F.mono, fontSize: 10.5, color: C.deskTxtDim },
 
@@ -235,6 +285,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: C.deskLine,
   },
+  noOrg: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
+  noOrgIcon: { fontSize: 34, marginBottom: 12 },
+  noOrgTitle: { fontFamily: F.uiBold, fontSize: 16, color: C.paper, marginBottom: 8 },
+  noOrgText: {
+    fontFamily: F.ui,
+    fontSize: 13,
+    lineHeight: 20,
+    color: C.deskTxtSoft,
+    textAlign: 'center',
+  },
+
   setTitle: { fontFamily: F.uiBold, fontSize: 13.5, color: C.paper },
   setDesc: { fontFamily: F.ui, fontSize: 12, lineHeight: 18, color: C.deskTxtSoft, marginTop: 3 },
 });

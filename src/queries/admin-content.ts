@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminContentApi } from '@/api/admin-content';
+import { useOrgSlug } from '@/stores/auth';
 import { qk } from './keys';
 
 /**
@@ -43,7 +44,13 @@ export function useEditCategory() {
 /* ------------------------------- thông báo ------------------------------- */
 
 export function useSentNotices() {
-  return useQuery({ queryKey: qk.adminNotices(), queryFn: adminContentApi.getNotices });
+  const orgSlug = useOrgSlug();
+  return useQuery({
+    queryKey: qk.adminNotices(orgSlug ?? '-'),
+    queryFn: adminContentApi.getNotices,
+    // `scope=managed` đọc theo tổ chức đang thao tác — chưa chọn thì không có gì để hỏi.
+    enabled: Boolean(orgSlug),
+  });
 }
 
 export function useSendNotice() {
@@ -53,7 +60,7 @@ export function useSendNotice() {
     // Quét cả `notifications()`: người gửi cũng là người nhận, thông báo vừa gửi phải xuất
     // hiện ở tab Thông báo của chính họ chứ không phải chờ tới lần mở app sau.
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: qk.adminNotices() });
+      qc.invalidateQueries({ queryKey: qk.adminNoticesRoot() });
       qc.invalidateQueries({ queryKey: qk.notifications() });
     },
   });

@@ -92,19 +92,42 @@ export const qk = {
    * nên `adminRoot()` là prefix để quét cả cụm sau mỗi mutation thay vì liệt kê từng key.
    */
   adminRoot: () => ['admin'] as const,
-  adminOverview: () => ['admin', 'overview'] as const,
-  adminActivity: () => ['admin', 'activity'] as const,
-  adminListings: (status: string) => ['admin', 'listings', status] as const,
+  /*
+   * Bốn key dưới đây mang `orgSlug` vì dữ liệu của chúng scope theo `X-Org-Slug` — cùng lý do
+   * đã ghi ở `joinRequestQueue`/`orgUnits`. Thiếu slug thì master bấm "Thao tác trong" sang tổ
+   * chức khác vẫn đọc trúng cache của tổ chức cũ: thẻ số, hàng đợi và báo cáo của nơi khác hiện
+   * dưới tên nơi này, và không có gì trên màn hình nói ra điều đó.
+   */
+  adminOverview: (orgSlug: string) => ['admin', 'overview', orgSlug] as const,
+  adminActivity: (orgSlug: string) => ['admin', 'activity', orgSlug] as const,
+  adminListings: (orgSlug: string, status: string) =>
+    ['admin', 'listings', orgSlug, status] as const,
   adminPublicQueue: (status: string) => ['admin', 'public-queue', status] as const,
   adminCoverage: () => ['admin', 'coverage'] as const,
   // Ngoài cụm `admin` vì nó là quyền của NGƯỜI, không phải dữ liệu của bàn quản trị: một lượt
   // duyệt tin quét sạch `adminRoot()`, mà quyền thì không đổi theo lượt duyệt nào cả.
   myGrants: () => ['me', 'grants'] as const,
-  adminReports: () => ['admin', 'reports'] as const,
-  adminUsers: (school: string) => ['admin', 'users', school] as const,
+  adminReports: (orgSlug: string) => ['admin', 'reports', orgSlug] as const,
+  /** Prefix cho mutation đứng ngoài bàn quản trị (người dùng thường gửi báo cáo). */
+  adminReportsRoot: () => ['admin', 'reports'] as const,
+  /**
+   * Bảng người dùng toàn hệ thống. Mang cả bộ lọc trong key, cùng lý do với `allOrgs`: mỗi bộ
+   * lọc là một câu trả lời khác của BE, gộp một key thì gõ tìm xong sẽ thấy kết quả lượt trước.
+   */
+  adminUsers: (q: string, status: string) => ['admin', 'users', q, status] as const,
+  /** Prefix để mutation quét mọi bộ lọc mà không phải đoán người dùng đang mở tổ hợp nào. */
+  adminUsersRoot: () => ['admin', 'users'] as const,
   /** Không mang tên trường: danh mục là từ điển dùng chung toàn hệ thống, không thuộc tổ chức nào. */
   adminCategories: () => ['admin', 'categories'] as const,
-  adminNotices: () => ['admin', 'notices'] as const,
+  /** `scope=managed` đọc theo tổ chức đang thao tác, nên slug phải nằm trong key. */
+  adminNotices: (orgSlug: string) => ['admin', 'notices', orgSlug] as const,
+  adminNoticesRoot: () => ['admin', 'notices'] as const,
+  /** Cụm cấm: từ điển toàn hệ thống, không có tham số nào để lọc. */
+  adminBannedPhrases: () => ['admin', 'banned-phrases'] as const,
+  /** Catalog gói tin của master — gồm cả gói nháp, khác catalog công khai trên bảng tin. */
+  adminProducts: () => ['admin', 'listing-products'] as const,
+  /** `days` nằm trong key: đổi cửa sổ thống kê là hỏi BE một câu khác, không phải lọc lại. */
+  adminPostingStats: (days: number) => ['admin', 'posting-stats', days] as const,
   /** Từ điển field dùng chung — nguồn của bộ chọn field khi soạn template. */
   fieldDefinitions: () => ['admin', 'field-definitions'] as const,
 };

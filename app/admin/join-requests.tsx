@@ -69,7 +69,7 @@ export default function JoinRequests() {
     );
 
   return (
-    <AdminScreen title="Đơn xin gia nhập" note="Ai muốn vào tổ chức, và họ khai mình là ai">
+    <AdminScreen title="Đơn xin gia nhập" note="Ai muốn vào tổ chức, và họ khai mình là ai" org>
       <View style={styles.head}>
         <AdminFilter
           options={TABS.map((t) => ({ ...t, count: tab === t.value ? rows.length : undefined }))}

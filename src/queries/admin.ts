@@ -4,22 +4,42 @@ import { adminApi } from '@/api/admin';
 import type { AdminEvent, ModStatus } from '@/api/admin';
 import type { RerouteListing } from '@/api/generated';
 import { joinAdminRoom, leaveAdminRoom, onSocketEvent } from '@/api/socket';
+import { useOrgSlug } from '@/stores/auth';
 import { qk } from './keys';
 import { useCategories } from './listings';
 
 /**
- * Bàn quản trị của một trường. BE scope theo organization trong JWT nên không hook nào ở đây
- * nhận tham số trường — quản trị đăng nhập bằng tài khoản trường nào thì thấy trường đó.
+ * Bàn quản trị của MỘT tổ chức — tổ chức đang thao tác, không phải tổ chức trong token.
+ *
+ * BE v2 lấy org từ header `X-Org-Slug` (`api/http.ts`), nên không hook nào ở đây nhận tham số
+ * tổ chức. Hai hệ quả bắt buộc phải xử lý, và cả hai đều nằm ngay dưới:
+ *
+ * 1. `orgSlug` phải nằm TRONG KEY — nếu không, đổi tổ chức xong vẫn đọc trúng cache của tổ
+ *    chức cũ. Master là người duy nhất đổi tổ chức, và cũng là người ít có khả năng nhận ra
+ *    con số đang thuộc về nơi khác.
+ * 2. `enabled` phải chặn khi chưa chọn tổ chức. Master cố ý không thuộc tổ chức nào nên
+ *    `activeOrgSlug` khởi đầu là `null`; không chặn thì mọi màn quản trị bắn request rồi ăn
+ *    403 "Chưa xác định được tổ chức" từ `requireOrg`.
  */
 
 /* -------------------------------- queries -------------------------------- */
 
 export function useAdminOverview() {
-  return useQuery({ queryKey: qk.adminOverview(), queryFn: adminApi.getOverview });
+  const orgSlug = useOrgSlug();
+  return useQuery({
+    queryKey: qk.adminOverview(orgSlug ?? '-'),
+    queryFn: adminApi.getOverview,
+    enabled: Boolean(orgSlug),
+  });
 }
 
 export function useAdminActivity() {
-  return useQuery({ queryKey: qk.adminActivity(), queryFn: adminApi.getEvents });
+  const orgSlug = useOrgSlug();
+  return useQuery({
+    queryKey: qk.adminActivity(orgSlug ?? '-'),
+    queryFn: adminApi.getEvents,
+    enabled: Boolean(orgSlug),
+  });
 }
 
 /**
@@ -60,19 +80,25 @@ export function useCoverage() {
  * để mỗi lần đổi tab không kéo thêm một lượt `/categories`.
  */
 export function useAdminListings(status?: ModStatus) {
+  const orgSlug = useOrgSlug();
   const { data: categories } = useCategories();
 
   return useQuery({
-    queryKey: qk.adminListings(status ?? 'all'),
+    queryKey: qk.adminListings(orgSlug ?? '-', status ?? 'all'),
     queryFn: () =>
       adminApi.getListings(status, new Map((categories ?? []).map((c) => [c.id, c.name]))),
-    enabled: categories !== undefined,
+    enabled: Boolean(orgSlug) && categories !== undefined,
     placeholderData: keepPreviousData,
   });
 }
 
 export function useAdminReports() {
-  return useQuery({ queryKey: qk.adminReports(), queryFn: adminApi.getReports });
+  const orgSlug = useOrgSlug();
+  return useQuery({
+    queryKey: qk.adminReports(orgSlug ?? '-'),
+    queryFn: adminApi.getReports,
+    enabled: Boolean(orgSlug),
+  });
 }
 
 /* ------------------------------- mutations ------------------------------- */
@@ -137,18 +163,22 @@ export function useResolveReport() {
  */
 export function useAdminActivityStream(): void {
   const qc = useQueryClient();
+  const orgSlug = useOrgSlug();
 
   useEffect(() => {
+    // Không có tổ chức nào đang chọn thì không có dòng "Vừa diễn ra" nào để đẩy vào.
+    if (!orgSlug) return;
+
     const onActivity = (payload: unknown) => {
       const log = payload as { actorName?: string; summary?: string; createdAt?: string };
       if (!log?.summary || !log.actorName) return;
 
-      qc.setQueryData<AdminEvent[]>(qk.adminActivity(), (old = []) => [
+      qc.setQueryData<AdminEvent[]>(qk.adminActivity(orgSlug), (old = []) => [
         { tone: 'info', text: `${log.actorName} · ${log.summary}`, time: 'vừa xong' },
         ...old.slice(0, 19),
       ]);
       // Thẻ số đổi theo mỗi thao tác duyệt — để BE tính lại thay vì đoán ở client.
-      qc.invalidateQueries({ queryKey: qk.adminOverview() });
+      qc.invalidateQueries({ queryKey: qk.adminOverview(orgSlug) });
     };
 
     joinAdminRoom();
@@ -158,5 +188,5 @@ export function useAdminActivityStream(): void {
       leaveAdminRoom();
       off();
     };
-  }, [qc]);
+  }, [qc, orgSlug]);
 }

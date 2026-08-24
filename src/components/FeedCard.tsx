@@ -4,7 +4,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { Listing } from '@/api/db';
 import { ListingPhoto } from './ListingPhoto';
 import { Avatar } from './ui';
-import { C, F, shadow } from '@/theme';
+import { C, F } from '@/theme';
 
 /**
  * Thẻ tin của BẢNG TIN — một tờ giấy ghim khổ rộng, đọc hết được nội dung mà không phải mở tin.
@@ -46,11 +46,8 @@ export function FeedCard({
         .duration(380)
         .springify()
         .damping(16)}
-      style={styles.slot}
+      style={styles.card}
     >
-      <View style={styles.card}>
-        <View style={styles.pinhead} />
-
         {/* ── Người đăng ─────────────────────────────────────────── */}
         <View style={styles.head}>
           <Avatar text={item.avatar} url={item.avatarUrl} size={38} color={C.moss} />
@@ -112,7 +109,6 @@ export function FeedCard({
           {!item.mine && <Action label="Nhắn tin" glyph="💬" onPress={onMessage} />}
           <Action label="Chia sẻ" glyph="↗" onPress={share} last />
         </View>
-      </View>
     </Animated.View>
   );
 }
@@ -142,23 +138,15 @@ function Action({
 }
 
 const styles = StyleSheet.create({
-  slot: { paddingTop: 10 },
-  card: { backgroundColor: C.paperWarm, borderRadius: 8, overflow: 'visible', ...shadow },
-  pinhead: {
-    position: 'absolute',
-    top: -7,
-    alignSelf: 'center',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: C.pin,
-    borderTopWidth: 3,
-    borderTopColor: C.pinLight,
-    zIndex: 3,
-    ...shadow,
-  },
-
-  head: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 13, paddingBottom: 9 },
+  /*
+   * Tin chạy HẾT bề ngang màn hình, ảnh là phần chính — không còn là tờ giấy rời trên bảng bần.
+   *
+   * Vì thế bỏ cả ba thứ làm nên hình dáng thẻ: lề ngoài, bo góc và bóng đổ. Giữ lại một trong
+   * số đó chỉ tạo ra thứ lai giữa hai kiểu — dải trắng có bo góc mà không có lề thì góc bo
+   * chẳng dựa vào đâu để nhìn thấy.
+   */
+  card: { backgroundColor: C.paperWarm },
+  head: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, paddingBottom: 10 },
   seller: { fontFamily: F.uiBold, fontSize: 14, color: C.ink },
   subMeta: { fontFamily: F.ui, fontSize: 11.5, color: C.inkSoft, marginTop: 2 },
   pendingPill: {
@@ -169,7 +157,7 @@ const styles = StyleSheet.create({
   },
   pendingText: { fontFamily: F.monoBold, fontSize: 9, letterSpacing: 0.6, color: C.tapeInk },
 
-  body: { paddingHorizontal: 13, paddingBottom: 11, gap: 6 },
+  body: { paddingHorizontal: 14, paddingBottom: 12, gap: 6 },
   title: { fontFamily: F.uiBold, fontSize: 17, lineHeight: 23, color: C.ink },
   desc: { fontFamily: F.ui, fontSize: 13.5, lineHeight: 19, color: C.inkSoft },
   catPill: {
@@ -182,7 +170,15 @@ const styles = StyleSheet.create({
   },
   catText: { fontFamily: F.uiBold, fontSize: 11, color: C.tapeInk },
 
-  photo: { height: 210, justifyContent: 'flex-end' },
+  /*
+   * Vuông theo bề ngang màn hình chứ không phải chiều cao cố định: ảnh giờ là phần chính của
+   * tin, và `height: 210` cũ được chọn cho một thẻ hẹp hơn màn hình — giữ nguyên con số đó ở
+   * khổ rộng sẽ thành một dải ngang dẹt.
+   *
+   * Vuông chứ không cao hơn: dọc hơn nữa thì mỗi lần cuộn chỉ thấy đúng một tin, và phần chữ
+   * lẫn hàng nút bị đẩy khỏi màn hình.
+   */
+  photo: { width: '100%', aspectRatio: 1, justifyContent: 'flex-end' },
   priceTag: {
     position: 'absolute',
     bottom: 10,
@@ -197,8 +193,8 @@ const styles = StyleSheet.create({
   stats: {
     flexDirection: 'row',
     gap: 16,
-    paddingHorizontal: 13,
-    paddingVertical: 9,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: C.line,
   },

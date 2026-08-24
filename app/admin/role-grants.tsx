@@ -47,7 +47,7 @@ export default function AdminRoleGrants() {
     );
 
   return (
-    <AdminScreen title="Phân quyền" note="ai cầm chìa khoá nào">
+    <AdminScreen title="Phân quyền" note="ai cầm chìa khoá nào" org>
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <AdminPanel title="Quyền của tôi" note="chạm ✕ để thu hồi">
           {isLoading ? (

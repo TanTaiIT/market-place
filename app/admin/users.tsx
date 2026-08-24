@@ -1,29 +1,41 @@
 import React, { useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { RowAction } from '@/components/AdminListingRow';
 import { AdminFilter, AdminScreen } from '@/components/AdminScreen';
+import { UserActionSheet } from '@/components/UserActionSheet';
+import type { UserAction, UserActionInput } from '@/components/UserActionSheet';
 import { Avatar, EmptyState, Loading } from '@/components/ui';
 import { useToast } from '@/components/Toast';
-import { useAdminUsers, useToggleUserLock, useVerifyUser } from '@/queries/admin-people';
-import type { UserStatus } from '@/api/admin-people';
-import { SCHOOLS } from '@/api/admin-people';
-import { useAdminSchool, useSetAdminSchool } from '@/stores/admin';
+import {
+  useAdjustWallet,
+  useAdminUsers,
+  useClearRejections,
+  useSetUserLock,
+} from '@/queries/admin-people';
+import type { AdminUser, UserStatus } from '@/api/admin-people';
 import { C, F } from '@/theme';
 
-const SCHOOL_OPTIONS = [
-  { value: 'all', label: 'Tất cả trường' },
-  ...SCHOOLS.map((s) => ({ value: s, label: s })),
-];
+/**
+ * Bảng người dùng TOÀN HỆ THỐNG — chỉ master (`GET /users` gác `requireMaster`).
+ *
+ * Không có bộ lọc tổ chức, và đó là điểm chính: tài khoản ở v2 là toàn cục, không thuộc org
+ * nào. Một org khoá được tài khoản là với tay sang mọi org khác — nên quyền đó nằm ở đây chứ
+ * không nằm trong bàn quản trị của org.
+ *
+ * Ba con số bịa của bản fixture (tin đăng / đã bán / đánh giá) đã bỏ; thứ thay vào là bậc uy
+ * tín — con số quyết định tin của người này có tự lên bảng hay không.
+ */
 
-const TABS: { value: UserStatus | 'all'; label: string }[] = [
+/** Đúng hai nhánh BE lọc được. "Chưa xác thực email" là một BADGE, không phải bộ lọc. */
+const TABS = [
   { value: 'all', label: 'Tất cả' },
-  { value: 'unverified', label: 'Chờ xác thực' },
+  { value: 'active', label: 'Đang hoạt động' },
   { value: 'locked', label: 'Đang khoá' },
 ];
 
 const STATUS: Record<UserStatus, { label: string; fg: string; bg: string }> = {
   ok: { label: 'Bình thường', fg: C.okText, bg: C.okTint },
-  unverified: { label: 'Chờ xác thực', fg: C.tape, bg: C.warnTint },
+  unverified: { label: 'Chưa xác thực email', fg: C.tape, bg: C.warnTint },
   locked: { label: 'Đang khoá', fg: C.badText, bg: C.badTint },
 };
 
@@ -31,47 +43,89 @@ const AVATAR_COLORS = [C.mossBright, C.amber, C.cork, C.sky, C.corkDark, C.moss]
 const colorOf = (name: string) =>
   AVATAR_COLORS[[...name].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % AVATAR_COLORS.length];
 
-/**
- * Bảng người dùng. Bản web có 7 cột; ở đây ba con số (tin đăng / đã bán / đánh giá) gom thành
- * một dòng thống kê dưới tên, vì trên điện thoại tiêu đề cột chiếm nhiều chỗ hơn chính con số.
- */
 export default function AdminUsers() {
   const toast = useToast();
-  const school = useAdminSchool();
-  const setSchool = useSetAdminSchool();
-  const [tab, setTab] = useState<UserStatus | 'all'>('all');
+  const [term, setTerm] = useState('');
+  const [tab, setTab] = useState('all');
 
-  const { data, error, isLoading } = useAdminUsers(school);
-  const verify = useVerifyUser();
-  const lock = useToggleUserLock();
-
-  const all = data ?? [];
-  const rows = tab === 'all' ? all : all.filter((u) => u.status === tab);
-  const tabs = TABS.map((t) => ({
-    ...t,
-    count: t.value === 'all' ? all.length : all.filter((u) => u.status === t.value).length,
-  }));
-
-  const surface = (done: string) => ({
-    onSuccess: () => toast(done),
-    onError: (e: Error) => toast(`⚠️ ${e.message}`),
+  const { data, error, isPending } = useAdminUsers({
+    q: term,
+    status: tab === 'all' ? undefined : (tab as 'active' | 'locked'),
   });
+  const lock = useSetUserLock();
+  const clear = useClearRejections();
+  const adjust = useAdjustWallet();
+
+  /** Thao tác đang mở ngăn. Một state cho cả ba vì ngăn chỉ mở được một lần một. */
+  const [acting, setActing] = useState<{ action: UserAction; user: AdminUser } | null>(null);
+
+  const rows = data ?? [];
+  const fail = (e: Error) => toast(`⚠️ ${e.message}`);
+  const done = (message: string) => {
+    setActing(null);
+    toast(message);
+  };
+
+  const submit = ({ text, amount, idempotencyKey }: UserActionInput) => {
+    if (!acting) return;
+    const { action, user } = acting;
+
+    if (action === 'wallet') {
+      return adjust.mutate(
+        { userId: user.id, amount, note: text, idempotencyKey },
+        {
+          // Không nói "số dư còn X": BE không trả số dư về, và bịa một con số ở đúng màn tiền
+          // là kiểu nói dối tệ nhất.
+          onSuccess: () => done(`✓ Đã ghi ${amount > 0 ? '+' : ''}${amount} Xu cho ${user.name}`),
+          onError: fail,
+        },
+      );
+    }
+
+    if (action === 'clear') {
+      return clear.mutate(
+        { id: user.id, reason: text },
+        { onSuccess: () => done(`✓ Đã gỡ án phạt đăng tin cho ${user.name}`), onError: fail },
+      );
+    }
+
+    lock.mutate(
+      { id: user.id, isActive: action === 'unlock', reason: text },
+      {
+        // Trạng thái thật chỉ có trong response — nói lại đúng thứ BE vừa trả về, không đoán.
+        onSuccess: (u) =>
+          done(u.status === 'locked' ? `🔒 Đã khoá ${u.name}` : `🔓 Đã mở khoá ${u.name}`),
+        onError: fail,
+      },
+    );
+  };
 
   return (
-    <AdminScreen title="Người dùng" note="ai đang ở đây">
-      <AdminFilter options={SCHOOL_OPTIONS} value={school} onChange={setSchool} />
-      <AdminFilter
-        options={tabs}
-        value={tab}
-        onChange={(v) => setTab(v as UserStatus | 'all')}
-      />
+    <AdminScreen title="Người dùng" note="tài khoản là toàn cục">
+      <View style={styles.search}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          value={term}
+          onChangeText={setTerm}
+          placeholder="Tìm theo tên hoặc email…"
+          placeholderTextColor={C.deskTxtDim}
+          style={styles.searchInput}
+          autoCapitalize="none"
+          returnKeyType="search"
+        />
+        {rows.length > 0 && <Text style={styles.searchCount}>{rows.length}</Text>}
+      </View>
+
+      <AdminFilter options={TABS} value={tab} onChange={setTab} />
 
       <FlatList
         data={rows}
-        keyExtractor={(u) => String(u.id)}
+        keyExtractor={(u) => u.id}
         contentContainerStyle={styles.list}
+        keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => {
           const status = STATUS[item.status];
+          const locked = item.status === 'locked';
           return (
             <View style={styles.row}>
               <Avatar text={item.avatar} size={38} color={colorOf(item.name)} textColor={C.desk} />
@@ -80,19 +134,18 @@ export default function AdminUsers() {
                 <Text numberOfLines={1} style={styles.name}>
                   {item.name}
                 </Text>
-                <Text style={styles.phone}>
-                  {item.phone} · {item.school}
+                <Text numberOfLines={1} style={styles.email}>
+                  {item.email}
                 </Text>
                 <Text style={styles.stats}>
-                  {item.posts} tin · {item.sold} đã bán ·{' '}
-                  <Text
-                    style={{
-                      color: item.rating >= 4.5 ? C.okText : item.rating ? C.amber : C.deskTxtDim,
-                    }}
-                  >
-                    {item.rating ? item.rating.toFixed(1) : '—'}
-                  </Text>{' '}
-                  · vào {item.joined}
+                  {/* Bậc 2 là ngưỡng tự đăng — tô sáng đúng ngưỡng đó, vì nó là thứ khiến tin
+                      của người này lên bảng mà không ai nhìn qua. */}
+                  <Text style={{ color: item.trustLevel >= 2 ? C.okText : C.deskTxtDim }}>
+                    uy tín bậc {item.trustLevel}
+                  </Text>
+                  {' · vào '}
+                  {item.joined}
+                  {item.lastSeen ? ` · đăng nhập ${item.lastSeen}` : ' · chưa đăng nhập lại'}
                 </Text>
 
                 <View style={styles.foot}>
@@ -102,30 +155,18 @@ export default function AdminUsers() {
                   </View>
 
                   <View style={styles.acts}>
-                    {item.status === 'unverified' && (
-                      <RowAction
-                        glyph="✓"
-                        onPress={() =>
-                          verify.mutate(
-                            item.id,
-                            surface(`Đã xác thực ${item.name} thuộc ${item.school}`),
-                          )
-                        }
-                      />
-                    )}
                     <RowAction
-                      glyph={item.status === 'locked' ? '🔓' : '🔒'}
-                      tone={item.status === 'locked' ? undefined : 'danger'}
-                      onPress={() =>
-                        lock.mutate(
-                          item.id,
-                          surface(
-                            item.status === 'locked'
-                              ? `Đã mở khoá ${item.name}`
-                              : `Đã khoá tài khoản ${item.name}`,
-                          ),
-                        )
-                      }
+                      glyph="🪙"
+                      onPress={() => setActing({ action: 'wallet', user: item })}
+                    />
+                    <RowAction
+                      glyph="⏳"
+                      onPress={() => setActing({ action: 'clear', user: item })}
+                    />
+                    <RowAction
+                      glyph={locked ? '🔓' : '🔒'}
+                      tone={locked ? undefined : 'danger'}
+                      onPress={() => setActing({ action: locked ? 'unlock' : 'lock', user: item })}
                     />
                   </View>
                 </View>
@@ -134,20 +175,44 @@ export default function AdminUsers() {
           );
         }}
         ListEmptyComponent={
-          isLoading ? (
+          isPending ? (
             <Loading onDark />
           ) : error ? (
             <EmptyState icon="📡" onDark text={(error as Error).message} />
           ) : (
-            <EmptyState icon="◍" onDark text="Không có người dùng nào ở mục này" />
+            <EmptyState icon="◍" onDark text="Không có tài khoản nào khớp bộ lọc" />
           )
         }
+      />
+
+      <UserActionSheet
+        action={acting?.action ?? null}
+        user={acting?.user ?? null}
+        pending={lock.isPending || clear.isPending || adjust.isPending}
+        onSubmit={submit}
+        onClose={() => setActing(null)}
       />
     </AdminScreen>
   );
 }
 
 const styles = StyleSheet.create({
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    marginHorizontal: 18,
+    marginBottom: 12,
+    paddingHorizontal: 13,
+    borderRadius: 10,
+    backgroundColor: C.deskPanel,
+    borderWidth: 1,
+    borderColor: C.deskLine,
+  },
+  searchIcon: { fontSize: 13 },
+  searchInput: { flex: 1, paddingVertical: 10, fontFamily: F.ui, fontSize: 13, color: C.deskTxt },
+  searchCount: { fontFamily: F.mono, fontSize: 10.5, color: C.deskTxtDim },
+
   list: { paddingHorizontal: 18, paddingBottom: 24, gap: 10 },
   row: {
     flexDirection: 'row',
@@ -159,7 +224,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   name: { fontFamily: F.uiBold, fontSize: 13.5, color: C.paper },
-  phone: { fontFamily: F.mono, fontSize: 10.5, color: C.deskTxtSoft, marginTop: 3 },
+  email: { fontFamily: F.mono, fontSize: 10.5, color: C.deskTxtSoft, marginTop: 3 },
   stats: { fontFamily: F.ui, fontSize: 11, color: C.deskTxtDim, marginTop: 6 },
   foot: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
   acts: { flexDirection: 'row', gap: 6, marginLeft: 'auto' },

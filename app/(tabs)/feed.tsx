@@ -11,9 +11,12 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Corkboard } from '@/components/Corkboard';
-import { NoteCard } from '@/components/NoteCard';
+import { FeedCard } from '@/components/FeedCard';
 import { Avatar, EmptyState, Loading, TapeChip } from '@/components/ui';
-import { useCategories, useListings, useProfile } from '@/queries/listings';
+import { useCategories, useListings, useProfile, useSavedIds, useToggleSaved } from '@/queries/listings';
+import { useOpenConversation } from '@/queries/chat';
+import { useMyOrgs } from '@/queries/org';
+import { useToast } from '@/components/Toast';
 import { C, F, shadow } from '@/theme';
 
 export default function Feed() {
@@ -24,6 +27,26 @@ export default function Feed() {
   const { data: categories } = useCategories();
   const { data, error, isLoading, isRefetching, refetch } = useListings(categoryId);
   const { data: profile } = useProfile();
+  const { data: savedIds } = useSavedIds();
+  const toggleSaved = useToggleSaved();
+  const openChat = useOpenConversation();
+  const { data: myOrgs } = useMyOrgs();
+  const toast = useToast();
+
+  /*
+   * BE không snapshot tên tổ chức vào tin, chỉ có `organizationId`. Tra từ danh sách tổ
+   * chức của CHÍNH người đang xem là đủ và trung thực: tin nội bộ chỉ đến tay thành viên
+   * của tổ chức đó. Tra không ra (tin công khai, hoặc master không thuộc tổ chức nào) thì
+   * thẻ tự bỏ dòng đó — thà thiếu một dòng còn hơn bịa tên một tổ chức.
+   */
+  const orgNameById = new Map((myOrgs ?? []).map((o) => [o.id, o.name]));
+  const saved = new Set(savedIds ?? []);
+
+  const message = (listingId: string) =>
+    openChat.mutate(listingId, {
+      onSuccess: (c) => router.push(`/chat/${c.id}`),
+      onError: (e: Error) => toast(`⚠️ ${e.message}`),
+    });
 
   const activeCategory = categories?.find((c) => c.id === categoryId);
 
@@ -32,8 +55,6 @@ export default function Feed() {
       <FlatList
         data={data ?? []}
         keyExtractor={(item) => String(item.id)}
-        numColumns={2}
-        columnWrapperStyle={{ gap: 14 }}
         contentContainerStyle={{
           paddingTop: insets.top + 12,
           paddingHorizontal: 16,
@@ -91,7 +112,15 @@ export default function Feed() {
           </View>
         }
         renderItem={({ item, index }) => (
-          <NoteCard item={item} index={index} onPress={() => router.push(`/listing/${item.id}`)} />
+          <FeedCard
+            item={item}
+            index={index}
+            orgName={item.organizationId ? orgNameById.get(item.organizationId) : undefined}
+            saved={saved.has(item.id)}
+            onPress={() => router.push(`/listing/${item.id}`)}
+            onToggleSave={() => toggleSaved.mutate({ id: item.id, saved: !saved.has(item.id) })}
+            onMessage={() => message(item.id)}
+          />
         )}
         ListEmptyComponent={
           isLoading ? (

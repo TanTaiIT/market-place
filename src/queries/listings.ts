@@ -162,9 +162,14 @@ export function useToggleSaved() {
       if (ctx?.prev) qc.setQueryData(qk.savedIds(), ctx.prev);
     },
     // Cả cụm `savedRoot()`: nhánh `['saved', 'listings']` cache nguyên `Listing`, bỏ qua nó là
-    // tab Đã lưu còn giữ tin vừa bỏ tim. Không đụng `listings()` — app không hiện `favoriteCount`.
+    // tab Đã lưu còn giữ tin vừa bỏ tim.
+    //
+    // `listings()` cũng phải quét từ khi thẻ tin hiện "N người quan tâm": con số đó là
+    // `favoriteCount` nằm trong chính payload tin, nên bỏ tim mà không làm mới là để lại
+    // một con số sai ngay dưới nút vừa bấm.
     onSettled: () => {
       qc.invalidateQueries({ queryKey: qk.savedRoot() });
+      qc.invalidateQueries({ queryKey: qk.listings() });
     },
   });
 }

@@ -62,6 +62,18 @@ export type Listing = {
   templateVersion?: number;
   status: 'live' | 'pending';
   mine: boolean;
+  /** Lượt xem BE đếm, hiện trên thẻ tin. */
+  viewCount: number;
+  /** Số người đã lưu tin — "N người quan tâm" trên thẻ. */
+  favoriteCount: number;
+  /**
+   * Tổ chức tin thuộc về; `null` = tin ở trục công khai.
+   *
+   * Chỉ có ID vì BE không snapshot tên tổ chức vào tin. Thẻ tin tra tên từ `useMyOrgs()`:
+   * tin nội bộ chỉ hiện cho thành viên của chính tổ chức đó, nên người đang xem luôn có
+   * tên trong danh sách của mình. Tra không ra thì giấu dòng đó đi, không bịa.
+   */
+  organizationId: string | null;
 };
 
 /** `from` suy từ `senderId` so với người đang đăng nhập — UI chỉ cần biết bên nào. */

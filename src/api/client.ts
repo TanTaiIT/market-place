@@ -145,8 +145,8 @@ function toListing(dto: ListingDto, names: Map<string, string>): Listing {
     ward: dto.location?.ward,
     address: dto.location?.address,
     visibility: dto.visibility,
-    // BE không trả tên organization trong Listing, nên meta chỉ còn mốc thời gian.
     meta: relativeTime(dto.createdAt),
+    organizationId: dto.organizationId,
     photo: gradOf(dto._id),
     photoUrls: dto.images,
     seller: sellerName,
@@ -161,6 +161,8 @@ function toListing(dto: ListingDto, names: Map<string, string>): Listing {
     // UI chỉ có hai trạng thái; 5 trạng thái còn lại của BE đều là "chưa hiển thị".
     status: dto.status === 'active' ? 'live' : 'pending',
     mine: isMine,
+    viewCount: dto.viewCount,
+    favoriteCount: dto.favoriteCount,
   };
 }
 

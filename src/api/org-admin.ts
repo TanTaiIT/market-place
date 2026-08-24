@@ -2,6 +2,8 @@ import {
   changeOrganizationSlug,
   createOrganization,
   createRoleGrant,
+  listOrganizations,
+  organizationGrantAdmin,
   organizationSlugAvailability,
   revokeRoleGrant,
   setOrganizationStatus,
@@ -10,7 +12,7 @@ import type { CreateRoleGrant, Organization, RoleGrant, SlugAvailability } from 
 import type { ProvinceName } from './location';
 
 /** Cùng lý do với `OrgUnit` bên `org.ts`: màn hình đi qua `api/**`, không chạm `generated`. */
-export type { RoleGrant };
+export type { Organization, RoleGrant };
 import { unwrap } from './client';
 import { withAuthRetry } from './http';
 
@@ -18,14 +20,22 @@ import { withAuthRetry } from './http';
  * Quản trị bản thân TỔ CHỨC và ai được cầm quyền trong đó — khác hẳn `org.ts` vốn lo đường
  * NGƯỜI DÙNG đi vào tổ chức (tra cứu, đơn xin gia nhập, nhóm con).
  *
- * Hai giới hạn của BE mà mọi màn dùng file này phải nói ra thay vì che đi:
- *
- * 1. **Không có route liệt kê mọi tổ chức.** Chỉ `/organizations/mine` trả về `id`, mà
- *    `/organizations/lookup` (công khai) thì cố tình không trả — nó sẽ thành công cụ liệt kê
- *    khách hàng. Vậy nên khoá/đổi slug chỉ làm được với tổ chức mình đang là thành viên.
- * 2. **Không có route liệt kê grant của người khác.** `/role-grants/mine` là nguồn `id` duy
- *    nhất, nên cấp quyền xong thì chính người cấp cũng không thu hồi lại được từ trong app.
+ * Một giới hạn của BE mà mọi màn dùng file này phải nói ra thay vì che đi: **không có route liệt
+ * kê grant của người khác.** `/role-grants/mine` là nguồn `id` duy nhất, nên cấp quyền xong thì
+ * chính người cấp cũng không thu hồi lại được từ trong app.
  */
+
+export type OrgStatus = Organization['status'];
+
+/** Bộ lọc của bảng tổ chức. Cả hai bỏ trống = liệt kê tất cả, đúng nghĩa một bảng quản trị. */
+export type OrgListFilter = { q?: string; status?: OrgStatus };
+
+/** Trạng thái tổ chức, nhãn cho bảng quản trị — cùng lý do với `ROLE_LABEL`: màn không tự dịch. */
+export const STATUS_LABEL: Record<OrgStatus, string> = {
+  active: 'ĐANG MỞ',
+  suspended: 'ĐANG KHOÁ',
+  pending_admin: 'CHƯA CÓ NGƯỜI PHỤ TRÁCH',
+};
 
 export type OrgType = Organization['orgType'];
 
@@ -45,7 +55,8 @@ export type NewOrgInput = {
   name: string;
   slug: string;
   orgType: OrgType;
-  ownerEmail: string;
+  /** Người sẽ phụ trách tổ chức. BE gọi vai này là `admin` từ khi bỏ khái niệm chủ sở hữu. */
+  adminEmail: string;
   /** Tên tỉnh, không phải mã — cùng nguồn `ProvinceName` với tin đăng, khỏi cast ở form. */
   provinceCode: ProvinceName | null;
   district: string;
@@ -125,20 +136,40 @@ function scopeOf(input: NewGrantInput): Partial<CreateRoleGrant> {
 
 export const orgAdminApi = {
   /**
-   * Tạo tổ chức + chỉ định người chủ. Người chủ phải CÓ TÀI KHOẢN từ trước — BE tra theo email
-   * và trả 404 nếu không thấy, nên đây không phải đường mời người mới vào hệ thống.
+   * Mọi tổ chức trong hệ thống — nguồn `id` + `slug` duy nhất cho master.
    *
-   * Người tạo (master) KHÔNG tự thành thành viên, nên tổ chức vừa tạo sẽ không xuất hiện trong
-   * `/organizations/mine` — màn hình phải nói trước điều đó thay vì để danh sách trông như hỏng.
+   * Thay chỗ `/organizations/mine` ở bàn quản trị: master cố ý KHÔNG là thành viên của org nào
+   * (quyền của họ là grant `master/system`), nên `mine` luôn rỗng và bàn quản trị trước đây chỉ
+   * thao tác được với org mà chính master tình cờ tham gia. Khác `/organizations/lookup` ở chỗ
+   * route đó công khai nên cố tình giấu `id`.
+   *
+   * Trả cả org đang `suspended`/`pending_admin` — đó chính là phần việc của master.
+   *
+   * `limit: 100` (trần của BE) và BỎ `meta`: quá 100 tổ chức thì bảng cắt im lặng, nên ô tìm +
+   * bộ lọc trạng thái là đường thu hẹp chính. Vượt mốc đó thì phân trang thật trước, sửa hàm sau.
+   */
+  async listAll(filter: OrgListFilter = {}): Promise<Organization[]> {
+    const res = await withAuthRetry(() =>
+      listOrganizations({ query: { q: filter.q || undefined, status: filter.status, limit: 100 } }),
+    );
+    return unwrap(res, 'Không đọc được danh sách tổ chức');
+  },
+
+  /**
+   * Tạo tổ chức rồi trao quyền phụ trách — HAI lượt gọi BE, gộp lại sau một lần bấm.
+   *
+   * BE tách đôi vì tổ chức vừa tạo nằm ở `pending_admin` và cố tình chưa tồn tại với phần còn
+   * lại của hệ thống (`findActiveById` chỉ thấy `active`). Lượt trao quyền đầu tiên mới đẩy nó
+   * sang `active`. Người được trao phải CÓ TÀI KHOẢN từ trước — BE tra theo email và trả 404
+   * nếu không thấy, nên đây không phải đường mời người mới vào hệ thống.
    */
   async create(input: NewOrgInput): Promise<Organization> {
     // Bỏ hẳn field rỗng thay vì gửi chuỗi rỗng: `slug: ''` bị BE đọc là một slug và trả 409
     // "không hợp lệ", trong khi VẮNG MẶT mới đúng nghĩa "để BE tự sinh slug từ tên".
-    const res = await withAuthRetry(() =>
+    const created = await withAuthRetry(() =>
       createOrganization({
         body: {
           name: input.name.trim(),
-          ownerEmail: input.ownerEmail.trim(),
           orgType: input.orgType,
           ...(input.slug.trim() ? { slug: input.slug.trim() } : {}),
           ...(input.provinceCode ? { provinceCode: input.provinceCode } : {}),
@@ -146,7 +177,25 @@ export const orgAdminApi = {
         },
       }),
     );
-    return unwrap(res, 'Không tạo được tổ chức');
+    const org = unwrap(created, 'Không tạo được tổ chức');
+
+    /*
+     * Bước hai hỏng thì tổ chức đã nằm trong DB ở `pending_admin`. Nói rõ điều đó trong lỗi:
+     * người dùng thấy "không tạo được" sẽ bấm lại và ăn 409 trùng slug, không hiểu vì sao —
+     * trong khi việc cần làm là trao quyền cho tổ chức vừa hiện ra trong danh sách.
+     */
+    const granted = await withAuthRetry(() =>
+      organizationGrantAdmin({
+        path: { organizationId: org.id },
+        body: { email: input.adminEmail.trim() },
+      }),
+    );
+    unwrap(
+      granted,
+      `Đã tạo "${org.name}" nhưng chưa trao được quyền phụ trách — tổ chức đang chờ, trao lại từ danh sách`,
+    );
+
+    return org;
   },
 
   /** Khoá/mở có hiệu lực NGAY: BE đối chiếu `memberships` mỗi request, không đợi token hết hạn. */
@@ -167,7 +216,7 @@ export const orgAdminApi = {
 
   /**
    * Kiểm tra slug. Endpoint công khai và có rate limit, nên `organizationSlugAvailability` gọi
-   * trần (không `withAuthRetry`) như `organizationLookup` — cùng nhóm, cùng lý do.
+   * trần (không `withAuthRetry`) như `organizationByCode` — cùng nhóm, cùng lý do.
    */
   async checkSlug(slug: string): Promise<SlugAvailability> {
     const res = await organizationSlugAvailability({ query: { slug } });

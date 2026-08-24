@@ -80,14 +80,34 @@ export type MeProfile = PublicProfile & {
     isActive: boolean;
 };
 
+export type SetUserStatus = {
+    isActive: boolean;
+    reason?: string;
+};
+
+export type AdminUser = {
+    id: string;
+    name: string;
+    email: string;
+    avatar: string;
+    isActive: boolean;
+    isEmailVerified: boolean;
+    trustLevel: number;
+    lastLoginAt: string | null;
+    createdAt: string;
+};
+
 export type Organization = {
     id: string;
     name: string;
     slug: string;
+    joinCode: string;
+    avatarUrl: string | null;
+    description: string;
     orgType: 'school' | 'company' | 'community' | 'generic';
     verificationTier: 'unverified' | 'claimed' | 'verified';
     provinceCode: string | null;
-    status: string;
+    status: 'active' | 'suspended' | 'pending_admin';
 };
 
 export type OrganizationLookup = {
@@ -103,9 +123,29 @@ export type MyOrganization = {
     id: string;
     name: string;
     slug: string;
+    avatarUrl: string | null;
     provinceCode: string | null;
     role: string;
     unitId: string | null;
+};
+
+export type UpdateOrganization = {
+    name?: string;
+    description?: string;
+    avatarUrl?: string | null;
+    coverUrl?: string | null;
+    allowJoinRequests?: boolean;
+    allowOutsiderPosts?: boolean;
+};
+
+export type OrganizationCard = {
+    name: string;
+    avatarUrl: string | null;
+    description: string;
+    provinceCode: string | null;
+    district: string | null;
+    memberCount: number;
+    allowJoinRequests: boolean;
 };
 
 export type SlugAvailability = {
@@ -119,7 +159,6 @@ export type CreateOrganization = {
     name: string;
     slug?: string;
     orgType?: 'school' | 'company' | 'community' | 'generic';
-    ownerEmail: string;
     provinceCode?: string;
     district?: string;
 };
@@ -153,12 +192,44 @@ export type CreateListing = {
     orgSlug?: string;
 };
 
+export type PostingFee = {
+    amount: number;
+    currency: 'xu';
+};
+
+export type PostingStanding = {
+    /**
+     * Tin lên bảng ngay, không qua hàng đợi
+     */
+    canSelfPublish: boolean;
+    cleanApprovalsNeeded: number;
+    penalty: {
+        rejections: number;
+        until: string;
+    } | null;
+};
+
 export type QuotaStatus = {
     allowed: boolean;
     limit: number;
     pending: number;
     remaining: number;
     reason?: 'blocked_by_rejections' | 'quota_full';
+    fee: PostingFee;
+    standing: PostingStanding;
+};
+
+export type PostingStats = {
+    totalPosts: number;
+    distinctPosters: number;
+    byCategory: Array<{
+        _id: string;
+        count: number;
+    }>;
+    posterHistogram: Array<{
+        _id: number | string;
+        users: number;
+    }>;
 };
 
 export type UpdateListing = {
@@ -225,6 +296,8 @@ export type Listing = {
     viewCount: number;
     favoriteCount: number;
     expiresAt?: string;
+    rankAt?: string;
+    featuredUntil?: string | null;
     createdAt: string;
     updatedAt: string;
 };
@@ -254,7 +327,7 @@ export type OrgUnit = {
 };
 
 export type CreateJoinRequest = {
-    orgSlug: string;
+    code: string;
     claimedName: string;
     claimedUnit?: string;
     note?: string;
@@ -302,11 +375,52 @@ export type Member = {
     userId: string;
     name: string;
     avatar: string;
-    role: 'owner' | 'member' | 'alumni';
+    role: 'admin' | 'member' | 'alumni';
     unitId: string | null;
-    joinedVia: 'request' | 'roster' | 'invite' | 'sso';
-    trustLevel: number;
-    joinedAt: string;
+    joinedVia?: 'request' | 'roster' | 'invite' | 'sso';
+    trustLevel?: number;
+    joinedAt?: string;
+};
+
+export type CreateInvite = {
+    channel: 'email' | 'phone';
+    value: string;
+};
+
+export type Invite = {
+    id: string;
+    channel: 'email' | 'phone';
+    value: string;
+    kind: 'direct' | 'link';
+    status: 'pending' | 'accepted' | 'revoked' | 'expired';
+    createdAt: string;
+    expiresAt: string;
+};
+
+export type CreateInviteResult = {
+    invite: Invite;
+    token: string;
+    shareable: boolean;
+};
+
+export type MyInvite = {
+    id: string;
+    organizationName: string;
+    organizationAvatarUrl: string | null;
+    createdAt: string;
+    expiresAt: string;
+};
+
+export type InvitePreview = {
+    organizationName: string;
+    organizationAvatarUrl: string | null;
+    description: string;
+    memberCount: number;
+    expiresAt: string;
+};
+
+export type AcceptInviteResult = {
+    organizationSlug: string;
 };
 
 export type CreateRoleGrant = {
@@ -330,32 +444,6 @@ export type RoleGrant = {
     provinceCodes: Array<string>;
     grantedBy: string | null;
     grantedAt: string;
-};
-
-export type CreateCategory = {
-    name: string;
-    slug?: string;
-    icon?: string;
-    order?: number;
-    requireManualReview?: boolean;
-};
-
-export type UpdateCategory = {
-    name?: string;
-    icon?: string;
-    order?: number;
-    isActive?: boolean;
-    requireManualReview?: boolean;
-};
-
-export type Category = {
-    id: string;
-    name: string;
-    slug: string;
-    icon: string;
-    order: number;
-    isActive: boolean;
-    requireManualReview: boolean;
 };
 
 export type FieldOption = {
@@ -394,6 +482,94 @@ export type CategoryTemplate = {
     version: number;
     isFallback: boolean;
     fields: Array<TemplateField>;
+};
+
+export type FieldDefinitionInput = {
+    label: string;
+    type: 'text' | 'textarea' | 'number' | 'select' | 'multiselect' | 'boolean' | 'year';
+    unit?: string;
+    min?: number;
+    max?: number;
+    filterable?: boolean;
+    options?: Array<FieldOption>;
+    placeholder?: string;
+    helpText?: string;
+};
+
+export type CreateFieldDefinition = {
+    label: string;
+    type: 'text' | 'textarea' | 'number' | 'select' | 'multiselect' | 'boolean' | 'year';
+    unit?: string;
+    min?: number;
+    max?: number;
+    filterable?: boolean;
+    options?: Array<FieldOption>;
+    placeholder?: string;
+    helpText?: string;
+    key: string;
+};
+
+export type TemplateFieldInput = {
+    key: string;
+    order: number;
+    required?: boolean;
+    filterable?: boolean;
+    group?: string;
+    showIf?: FieldShowIf;
+    override?: {
+        label?: string;
+        type?: 'text' | 'textarea' | 'number' | 'select' | 'multiselect' | 'boolean' | 'year';
+        options?: Array<FieldOption>;
+        placeholder?: string;
+        helpText?: string;
+    };
+    define?: FieldDefinitionInput;
+};
+
+export type TemplateFields = {
+    fields: Array<TemplateFieldInput>;
+};
+
+export type FieldDefinition = {
+    key: string;
+    label: string;
+    type: 'text' | 'textarea' | 'number' | 'select' | 'multiselect' | 'boolean' | 'year';
+    unit?: string;
+    min?: number;
+    max?: number;
+    filterable: boolean;
+    options: Array<FieldOption>;
+    placeholder?: string;
+    helpText?: string;
+};
+
+export type CreateCategory = {
+    name: string;
+    slug?: string;
+    icon?: string;
+    order?: number;
+    requireManualReview?: boolean;
+    template?: {
+        fields: Array<TemplateFieldInput>;
+    };
+};
+
+export type UpdateCategory = {
+    name?: string;
+    icon?: string;
+    order?: number;
+    isActive?: boolean;
+    requireManualReview?: boolean;
+};
+
+export type Category = {
+    id: string;
+    name: string;
+    slug: string;
+    icon: string;
+    order: number;
+    isActive: boolean;
+    requireManualReview: boolean;
 };
 
 export type OpenConversation = {
@@ -438,7 +614,7 @@ export type CreateNotification = {
 
 export type Notification = {
     id: string;
-    organizationId: string;
+    organizationId: string | null;
     unitId: string | null;
     title: string;
     body: string;
@@ -450,6 +626,7 @@ export type Notification = {
 export type SetListingStatus = {
     status: 'active' | 'rejected' | 'hidden';
     reason?: string;
+    severity?: 'quality' | 'violation';
 };
 
 export type RerouteListing = {
@@ -543,6 +720,94 @@ export type Province = {
 export type WardList = {
     province: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
     wards: Array<string>;
+};
+
+export type ClearRejections = {
+    reason: string;
+};
+
+export type ListingProduct = {
+    _id: string;
+    code: string;
+    name: string;
+    description: string;
+    effect: 'rank_to_top' | 'featured' | 'extend_expiry';
+    durationDays: number | null;
+    cooldownHours: number | null;
+    price: {
+        amount: number;
+        currency: 'xu';
+    } | null;
+    enabled: boolean;
+    order: number;
+    createdAt: string;
+};
+
+export type GrantOrganizationAdmin = {
+    email: string;
+};
+
+export type BannedPhrase = {
+    _id: string;
+    phrase: string;
+    addedBy: string;
+    createdAt: string;
+};
+
+export type CreateBannedPhrase = {
+    phrase: string;
+};
+
+export type CreateListingProduct = {
+    code: string;
+    name: string;
+    description?: string;
+    effect: 'rank_to_top' | 'featured' | 'extend_expiry';
+    durationDays?: number | null;
+    cooldownHours?: number | null;
+    price?: {
+        amount: number;
+    } | null;
+    enabled?: boolean;
+    order?: number;
+};
+
+export type UpdateListingProduct = {
+    name?: string;
+    description?: string;
+    effect?: 'rank_to_top' | 'featured' | 'extend_expiry';
+    durationDays?: number | null;
+    cooldownHours?: number | null;
+    price?: {
+        amount: number;
+    } | null;
+    enabled?: boolean;
+    order?: number;
+};
+
+export type Wallet = {
+    balance: number;
+    currency: 'xu';
+};
+
+export type XuTransaction = {
+    _id: string;
+    amount: number;
+    type: 'topup' | 'post_fee' | 'product_purchase' | 'refund' | 'promo_grant' | 'admin_adjust';
+    balanceAfter: number;
+    note: string;
+    refs?: {
+        listingId?: string;
+        paymentId?: string;
+        productCode?: string;
+    };
+    createdAt: string;
+};
+
+export type AdjustWallet = {
+    amount: number;
+    note: string;
+    idempotencyKey: string;
 };
 
 export type AuthRegisterData = {
@@ -770,6 +1035,136 @@ export type UserGetByIdResponses = {
 
 export type UserGetByIdResponse = UserGetByIdResponses[keyof UserGetByIdResponses];
 
+export type UserListForAdminData = {
+    body?: never;
+    path?: never;
+    query?: {
+        q?: string;
+        status?: 'active' | 'locked';
+        page?: number;
+        limit?: number;
+    };
+    url: '/users';
+};
+
+export type UserListForAdminErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+};
+
+export type UserListForAdminError = UserListForAdminErrors[keyof UserListForAdminErrors];
+
+export type UserListForAdminResponses = {
+    /**
+     * Danh sách người dùng
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<AdminUser>;
+    };
+};
+
+export type UserListForAdminResponse = UserListForAdminResponses[keyof UserListForAdminResponses];
+
+export type UserClearRejectionsData = {
+    body?: ClearRejections;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/users/{id}/clear-rejections';
+};
+
+export type UserClearRejectionsErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy người dùng
+     */
+    404: ErrorResponse;
+    /**
+     * Người này không có án phạt nào đang hiệu lực
+     */
+    409: ErrorResponse;
+};
+
+export type UserClearRejectionsError = UserClearRejectionsErrors[keyof UserClearRejectionsErrors];
+
+export type UserClearRejectionsResponses = {
+    /**
+     * Đã gỡ án
+     */
+    200: {
+        success: true;
+        message: string;
+        data: {
+            cleared: number;
+        };
+    };
+};
+
+export type UserClearRejectionsResponse = UserClearRejectionsResponses[keyof UserClearRejectionsResponses];
+
+export type UserSetStatusData = {
+    body?: SetUserStatus;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/users/{id}/status';
+};
+
+export type UserSetStatusErrors = {
+    /**
+     * Thiếu lý do khoá, hoặc tự khoá chính mình
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy người dùng
+     */
+    404: ErrorResponse;
+    /**
+     * Trạng thái không đổi, hoặc người này đang giữ quyền master
+     */
+    409: ErrorResponse;
+};
+
+export type UserSetStatusError = UserSetStatusErrors[keyof UserSetStatusErrors];
+
+export type UserSetStatusResponses = {
+    /**
+     * Trạng thái mới
+     */
+    200: {
+        success: true;
+        message: string;
+        data: AdminUser;
+    };
+};
+
+export type UserSetStatusResponse = UserSetStatusResponses[keyof UserSetStatusResponses];
+
 export type ListingListData = {
     body?: never;
     path?: never;
@@ -850,6 +1245,9 @@ export type ListingCreateResponses = {
         success: true;
         message: string;
         data: Listing;
+        meta: {
+            fee: PostingFee;
+        };
     };
 };
 
@@ -1071,6 +1469,61 @@ export type ListingQuotaResponses = {
 
 export type ListingQuotaResponse = ListingQuotaResponses[keyof ListingQuotaResponses];
 
+export type ListingProductsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/listings/products';
+};
+
+export type ListingProductsResponses = {
+    /**
+     * Catalog gói tin
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<ListingProduct>;
+    };
+};
+
+export type ListingProductsResponse = ListingProductsResponses[keyof ListingProductsResponses];
+
+export type ListingPostingStatsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        days?: number;
+    };
+    url: '/listings/posting-stats';
+};
+
+export type ListingPostingStatsErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+};
+
+export type ListingPostingStatsError = ListingPostingStatsErrors[keyof ListingPostingStatsErrors];
+
+export type ListingPostingStatsResponses = {
+    /**
+     * Số liệu đăng tin
+     */
+    200: {
+        success: true;
+        message: string;
+        data: PostingStats;
+    };
+};
+
+export type ListingPostingStatsResponse = ListingPostingStatsResponses[keyof ListingPostingStatsResponses];
+
 export type FavoriteListData = {
     body?: never;
     path?: never;
@@ -1239,6 +1692,157 @@ export type MyOrganizationsResponses = {
 
 export type MyOrganizationsResponse = MyOrganizationsResponses[keyof MyOrganizationsResponses];
 
+export type OrganizationUpdateData = {
+    body?: UpdateOrganization;
+    path?: never;
+    query?: never;
+    url: '/organizations/current';
+};
+
+export type OrganizationUpdateErrors = {
+    /**
+     * Dữ liệu không hợp lệ, hoặc ảnh không phải đường dẫn Cloudinary
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền quản lý tổ chức
+     */
+    403: ErrorResponse;
+};
+
+export type OrganizationUpdateError = OrganizationUpdateErrors[keyof OrganizationUpdateErrors];
+
+export type OrganizationUpdateResponses = {
+    /**
+     * Đã cập nhật
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Organization;
+    };
+};
+
+export type OrganizationUpdateResponse = OrganizationUpdateResponses[keyof OrganizationUpdateResponses];
+
+export type OrganizationRotateJoinCodeData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/organizations/current/join-code';
+};
+
+export type OrganizationRotateJoinCodeErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền quản lý tổ chức
+     */
+    403: ErrorResponse;
+};
+
+export type OrganizationRotateJoinCodeError = OrganizationRotateJoinCodeErrors[keyof OrganizationRotateJoinCodeErrors];
+
+export type OrganizationRotateJoinCodeResponses = {
+    /**
+     * Mã mới
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Organization;
+    };
+};
+
+export type OrganizationRotateJoinCodeResponse = OrganizationRotateJoinCodeResponses[keyof OrganizationRotateJoinCodeResponses];
+
+export type OrganizationByCodeData = {
+    body?: never;
+    path: {
+        code: string;
+    };
+    query?: never;
+    url: '/organizations/by-code/{code}';
+};
+
+export type OrganizationByCodeErrors = {
+    /**
+     * Không tìm thấy nhóm nào với mã này
+     */
+    404: ErrorResponse;
+    /**
+     * Quá nhiều request
+     */
+    429: ErrorResponse;
+};
+
+export type OrganizationByCodeError = OrganizationByCodeErrors[keyof OrganizationByCodeErrors];
+
+export type OrganizationByCodeResponses = {
+    /**
+     * Thẻ nhóm
+     */
+    200: {
+        success: true;
+        message: string;
+        data: OrganizationCard;
+    };
+};
+
+export type OrganizationByCodeResponse = OrganizationByCodeResponses[keyof OrganizationByCodeResponses];
+
+export type ListOrganizationsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        q?: string;
+        status?: 'active' | 'suspended' | 'pending_admin';
+        page?: number;
+        limit?: number;
+    };
+    url: '/organizations';
+};
+
+export type ListOrganizationsErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+};
+
+export type ListOrganizationsError = ListOrganizationsErrors[keyof ListOrganizationsErrors];
+
+export type ListOrganizationsResponses = {
+    /**
+     * Danh sách tổ chức
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<Organization>;
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNextPage: boolean;
+            hasPrevPage: boolean;
+        };
+    };
+};
+
+export type ListOrganizationsResponse = ListOrganizationsResponses[keyof ListOrganizationsResponses];
+
 export type CreateOrganizationData = {
     body?: CreateOrganization;
     path?: never;
@@ -1275,6 +1879,45 @@ export type CreateOrganizationResponses = {
 };
 
 export type CreateOrganizationResponse = CreateOrganizationResponses[keyof CreateOrganizationResponses];
+
+export type OrganizationGrantAdminData = {
+    body?: GrantOrganizationAdmin;
+    path: {
+        organizationId: string;
+    };
+    query?: never;
+    url: '/organizations/{organizationId}/admin';
+};
+
+export type OrganizationGrantAdminErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy tổ chức, hoặc email chưa có tài khoản
+     */
+    404: ErrorResponse;
+};
+
+export type OrganizationGrantAdminError = OrganizationGrantAdminErrors[keyof OrganizationGrantAdminErrors];
+
+export type OrganizationGrantAdminResponses = {
+    /**
+     * Đã trao quyền
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Organization;
+    };
+};
+
+export type OrganizationGrantAdminResponse = OrganizationGrantAdminResponses[keyof OrganizationGrantAdminResponses];
 
 export type SetOrganizationStatusData = {
     body?: SetOrganizationStatus;
@@ -1783,6 +2426,226 @@ export type MembershipListResponses = {
 
 export type MembershipListResponse = MembershipListResponses[keyof MembershipListResponses];
 
+export type InviteListData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/invites';
+};
+
+export type InviteListErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền quản lý tổ chức
+     */
+    403: ErrorResponse;
+};
+
+export type InviteListError = InviteListErrors[keyof InviteListErrors];
+
+export type InviteListResponses = {
+    /**
+     * Danh sách lời mời
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<Invite>;
+    };
+};
+
+export type InviteListResponse = InviteListResponses[keyof InviteListResponses];
+
+export type InviteCreateData = {
+    body?: CreateInvite;
+    path?: never;
+    query?: never;
+    url: '/invites';
+};
+
+export type InviteCreateErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền quản lý tổ chức
+     */
+    403: ErrorResponse;
+    /**
+     * Đã là thành viên, hoặc đã có lời mời đang chờ cho địa chỉ này
+     */
+    409: ErrorResponse;
+};
+
+export type InviteCreateError = InviteCreateErrors[keyof InviteCreateErrors];
+
+export type InviteCreateResponses = {
+    /**
+     * Đã tạo lời mời
+     */
+    201: {
+        success: true;
+        message: string;
+        data: CreateInviteResult;
+    };
+};
+
+export type InviteCreateResponse = InviteCreateResponses[keyof InviteCreateResponses];
+
+export type InviteRevokeData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/invites/{id}';
+};
+
+export type InviteRevokeErrors = {
+    /**
+     * Lời mời này đã được xử lý rồi
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền quản lý tổ chức
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy lời mời
+     */
+    404: ErrorResponse;
+};
+
+export type InviteRevokeError = InviteRevokeErrors[keyof InviteRevokeErrors];
+
+export type InviteRevokeResponses = {
+    /**
+     * Đã thu hồi
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Invite;
+    };
+};
+
+export type InviteRevokeResponse = InviteRevokeResponses[keyof InviteRevokeResponses];
+
+export type InviteMineData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/invites/mine';
+};
+
+export type InviteMineErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+};
+
+export type InviteMineError = InviteMineErrors[keyof InviteMineErrors];
+
+export type InviteMineResponses = {
+    /**
+     * Lời mời của tôi
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<MyInvite>;
+    };
+};
+
+export type InviteMineResponse = InviteMineResponses[keyof InviteMineResponses];
+
+export type InvitePreviewData = {
+    body?: never;
+    path: {
+        token: string;
+    };
+    query?: never;
+    url: '/invites/token/{token}';
+};
+
+export type InvitePreviewErrors = {
+    /**
+     * Lời mời đã dùng, đã bị thu hồi, hoặc đã hết hạn
+     */
+    400: ErrorResponse;
+    /**
+     * Lời mời không tồn tại
+     */
+    404: ErrorResponse;
+};
+
+export type InvitePreviewError = InvitePreviewErrors[keyof InvitePreviewErrors];
+
+export type InvitePreviewResponses = {
+    /**
+     * Thẻ lời mời
+     */
+    200: {
+        success: true;
+        message: string;
+        data: InvitePreview;
+    };
+};
+
+export type InvitePreviewResponse = InvitePreviewResponses[keyof InvitePreviewResponses];
+
+export type InviteAcceptData = {
+    body?: never;
+    path: {
+        token: string;
+    };
+    query?: never;
+    url: '/invites/token/{token}/accept';
+};
+
+export type InviteAcceptErrors = {
+    /**
+     * Lời mời đã dùng, đã bị thu hồi, hoặc đã hết hạn
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Lời mời này dành cho người khác
+     */
+    403: ErrorResponse;
+    /**
+     * Lời mời không tồn tại
+     */
+    404: ErrorResponse;
+};
+
+export type InviteAcceptError = InviteAcceptErrors[keyof InviteAcceptErrors];
+
+export type InviteAcceptResponses = {
+    /**
+     * Đã vào nhóm
+     */
+    200: {
+        success: true;
+        message: string;
+        data: AcceptInviteResult;
+    };
+};
+
+export type InviteAcceptResponse = InviteAcceptResponses[keyof InviteAcceptResponses];
+
 export type CreateRoleGrantData = {
     body?: CreateRoleGrant;
     path?: never;
@@ -1903,6 +2766,137 @@ export type CategoryGetTemplateResponses = {
 };
 
 export type CategoryGetTemplateResponse = CategoryGetTemplateResponses[keyof CategoryGetTemplateResponses];
+
+export type CategoryTemplateCreateDraftData = {
+    body?: TemplateFields;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/categories/{id}/template';
+};
+
+export type CategoryTemplateCreateDraftErrors = {
+    /**
+     * Field chưa có trong từ điển, trùng key/order, hoặc quá số field lọc
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy danh mục
+     */
+    404: ErrorResponse;
+};
+
+export type CategoryTemplateCreateDraftError = CategoryTemplateCreateDraftErrors[keyof CategoryTemplateCreateDraftErrors];
+
+export type CategoryTemplateCreateDraftResponses = {
+    /**
+     * Template
+     */
+    201: {
+        success: true;
+        message: string;
+        data: CategoryTemplate;
+    };
+};
+
+export type CategoryTemplateCreateDraftResponse = CategoryTemplateCreateDraftResponses[keyof CategoryTemplateCreateDraftResponses];
+
+export type CategoryTemplateUpdateDraftData = {
+    body?: TemplateFields;
+    path: {
+        id: string;
+        version: number;
+    };
+    query?: never;
+    url: '/categories/{id}/template/{version}';
+};
+
+export type CategoryTemplateUpdateDraftErrors = {
+    /**
+     * Bản đã phát hành, hoặc template không hợp lệ
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy template
+     */
+    404: ErrorResponse;
+};
+
+export type CategoryTemplateUpdateDraftError = CategoryTemplateUpdateDraftErrors[keyof CategoryTemplateUpdateDraftErrors];
+
+export type CategoryTemplateUpdateDraftResponses = {
+    /**
+     * Template
+     */
+    200: {
+        success: true;
+        message: string;
+        data: CategoryTemplate;
+    };
+};
+
+export type CategoryTemplateUpdateDraftResponse = CategoryTemplateUpdateDraftResponses[keyof CategoryTemplateUpdateDraftResponses];
+
+export type CategoryTemplatePublishData = {
+    body?: never;
+    path: {
+        id: string;
+        version: number;
+    };
+    query?: never;
+    url: '/categories/{id}/template/{version}/publish';
+};
+
+export type CategoryTemplatePublishErrors = {
+    /**
+     * Bản này đã phát hành rồi, hoặc template không còn hợp lệ
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy template
+     */
+    404: ErrorResponse;
+};
+
+export type CategoryTemplatePublishError = CategoryTemplatePublishErrors[keyof CategoryTemplatePublishErrors];
+
+export type CategoryTemplatePublishResponses = {
+    /**
+     * Template
+     */
+    200: {
+        success: true;
+        message: string;
+        data: CategoryTemplate;
+    };
+};
+
+export type CategoryTemplatePublishResponse = CategoryTemplatePublishResponses[keyof CategoryTemplatePublishResponses];
 
 export type CategoryListData = {
     body?: never;
@@ -2033,6 +3027,80 @@ export type UpdateCategoryResponses = {
 };
 
 export type UpdateCategoryResponse = UpdateCategoryResponses[keyof UpdateCategoryResponses];
+
+export type FieldDefinitionListData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/field-definitions';
+};
+
+export type FieldDefinitionListErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+};
+
+export type FieldDefinitionListError = FieldDefinitionListErrors[keyof FieldDefinitionListErrors];
+
+export type FieldDefinitionListResponses = {
+    /**
+     * Từ điển field
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<FieldDefinition>;
+    };
+};
+
+export type FieldDefinitionListResponse = FieldDefinitionListResponses[keyof FieldDefinitionListResponses];
+
+export type FieldDefinitionCreateData = {
+    body?: CreateFieldDefinition;
+    path?: never;
+    query?: never;
+    url: '/field-definitions';
+};
+
+export type FieldDefinitionCreateErrors = {
+    /**
+     * Dữ liệu không hợp lệ
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Key đã có trong từ điển
+     */
+    409: ErrorResponse;
+};
+
+export type FieldDefinitionCreateError = FieldDefinitionCreateErrors[keyof FieldDefinitionCreateErrors];
+
+export type FieldDefinitionCreateResponses = {
+    /**
+     * Đã thêm
+     */
+    201: {
+        success: true;
+        message: string;
+        data: FieldDefinition;
+    };
+};
+
+export type FieldDefinitionCreateResponse = FieldDefinitionCreateResponses[keyof FieldDefinitionCreateResponses];
 
 export type ChatListData = {
     body?: never;
@@ -2524,7 +3592,7 @@ export type ModerationRemoveListingErrors = {
      */
     401: ErrorResponse;
     /**
-     * Cần quyền owner hoặc moderator
+     * Không có quyền duyệt, hoặc tin thuộc trục bạn không phụ trách
      */
     403: ErrorResponse;
     /**
@@ -2567,7 +3635,7 @@ export type ModerationSetListingStatusErrors = {
      */
     401: ErrorResponse;
     /**
-     * Cần quyền owner hoặc moderator
+     * Không có quyền duyệt, hoặc tin thuộc trục bạn không phụ trách
      */
     403: ErrorResponse;
     /**
@@ -2863,3 +3931,376 @@ export type LocationWardsResponses = {
 };
 
 export type LocationWardsResponse = LocationWardsResponses[keyof LocationWardsResponses];
+
+export type BannedPhraseListData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/banned-phrases';
+};
+
+export type BannedPhraseListErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+};
+
+export type BannedPhraseListError = BannedPhraseListErrors[keyof BannedPhraseListErrors];
+
+export type BannedPhraseListResponses = {
+    /**
+     * Danh sách cụm cấm
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<BannedPhrase>;
+    };
+};
+
+export type BannedPhraseListResponse = BannedPhraseListResponses[keyof BannedPhraseListResponses];
+
+export type BannedPhraseCreateData = {
+    body?: CreateBannedPhrase;
+    path?: never;
+    query?: never;
+    url: '/banned-phrases';
+};
+
+export type BannedPhraseCreateErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Cụm này đã có trong danh sách
+     */
+    409: ErrorResponse;
+};
+
+export type BannedPhraseCreateError = BannedPhraseCreateErrors[keyof BannedPhraseCreateErrors];
+
+export type BannedPhraseCreateResponses = {
+    /**
+     * Đã thêm
+     */
+    201: {
+        success: true;
+        message: string;
+        data: BannedPhrase;
+    };
+};
+
+export type BannedPhraseCreateResponse = BannedPhraseCreateResponses[keyof BannedPhraseCreateResponses];
+
+export type BannedPhraseRemoveData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/banned-phrases/{id}';
+};
+
+export type BannedPhraseRemoveErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy cụm cấm
+     */
+    404: ErrorResponse;
+};
+
+export type BannedPhraseRemoveError = BannedPhraseRemoveErrors[keyof BannedPhraseRemoveErrors];
+
+export type BannedPhraseRemoveResponses = {
+    /**
+     * Đã gỡ
+     */
+    200: {
+        success: true;
+        message: string;
+        data: BannedPhrase;
+    };
+};
+
+export type BannedPhraseRemoveResponse = BannedPhraseRemoveResponses[keyof BannedPhraseRemoveResponses];
+
+export type ListingProductAdminListData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/listing-products';
+};
+
+export type ListingProductAdminListErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+};
+
+export type ListingProductAdminListError = ListingProductAdminListErrors[keyof ListingProductAdminListErrors];
+
+export type ListingProductAdminListResponses = {
+    /**
+     * Catalog đầy đủ
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<ListingProduct>;
+    };
+};
+
+export type ListingProductAdminListResponse = ListingProductAdminListResponses[keyof ListingProductAdminListResponses];
+
+export type ListingProductCreateData = {
+    body?: CreateListingProduct;
+    path?: never;
+    query?: never;
+    url: '/listing-products';
+};
+
+export type ListingProductCreateErrors = {
+    /**
+     * Vi phạm luật gói (mở bán thiếu giá, đẩy tin kèm thời hạn…)
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Đã có gói mang code này
+     */
+    409: ErrorResponse;
+};
+
+export type ListingProductCreateError = ListingProductCreateErrors[keyof ListingProductCreateErrors];
+
+export type ListingProductCreateResponses = {
+    /**
+     * Đã tạo gói
+     */
+    201: {
+        success: true;
+        message: string;
+        data: ListingProduct;
+    };
+};
+
+export type ListingProductCreateResponse = ListingProductCreateResponses[keyof ListingProductCreateResponses];
+
+export type ListingProductRemoveData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/listing-products/{id}';
+};
+
+export type ListingProductRemoveErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy gói
+     */
+    404: ErrorResponse;
+};
+
+export type ListingProductRemoveError = ListingProductRemoveErrors[keyof ListingProductRemoveErrors];
+
+export type ListingProductRemoveResponses = {
+    /**
+     * Đã xoá
+     */
+    200: {
+        success: true;
+        message: string;
+        data: ListingProduct;
+    };
+};
+
+export type ListingProductRemoveResponse = ListingProductRemoveResponses[keyof ListingProductRemoveResponses];
+
+export type ListingProductUpdateData = {
+    body?: UpdateListingProduct;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/listing-products/{id}';
+};
+
+export type ListingProductUpdateErrors = {
+    /**
+     * Vi phạm luật gói
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy gói
+     */
+    404: ErrorResponse;
+};
+
+export type ListingProductUpdateError = ListingProductUpdateErrors[keyof ListingProductUpdateErrors];
+
+export type ListingProductUpdateResponses = {
+    /**
+     * Đã cập nhật
+     */
+    200: {
+        success: true;
+        message: string;
+        data: ListingProduct;
+    };
+};
+
+export type ListingProductUpdateResponse = ListingProductUpdateResponses[keyof ListingProductUpdateResponses];
+
+export type WalletGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/wallet';
+};
+
+export type WalletGetErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+};
+
+export type WalletGetError = WalletGetErrors[keyof WalletGetErrors];
+
+export type WalletGetResponses = {
+    /**
+     * Số dư
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Wallet;
+    };
+};
+
+export type WalletGetResponse = WalletGetResponses[keyof WalletGetResponses];
+
+export type WalletHistoryData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        limit?: number;
+    };
+    url: '/wallet/transactions';
+};
+
+export type WalletHistoryErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+};
+
+export type WalletHistoryError = WalletHistoryErrors[keyof WalletHistoryErrors];
+
+export type WalletHistoryResponses = {
+    /**
+     * Lịch sử ví
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<XuTransaction>;
+    };
+};
+
+export type WalletHistoryResponse = WalletHistoryResponses[keyof WalletHistoryResponses];
+
+export type WalletAdjustData = {
+    body?: AdjustWallet;
+    path: {
+        userId: string;
+    };
+    query?: never;
+    url: '/wallet/{userId}/adjust';
+};
+
+export type WalletAdjustErrors = {
+    /**
+     * Số Xu phải là số nguyên khác 0
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Trừ quá số dư đang có
+     */
+    402: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy người dùng
+     */
+    404: ErrorResponse;
+};
+
+export type WalletAdjustError = WalletAdjustErrors[keyof WalletAdjustErrors];
+
+export type WalletAdjustResponses = {
+    /**
+     * Đã ghi sổ
+     */
+    200: {
+        success: true;
+        message: string;
+        data: XuTransaction;
+    };
+};
+
+export type WalletAdjustResponse = WalletAdjustResponses[keyof WalletAdjustResponses];

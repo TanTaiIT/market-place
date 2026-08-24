@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { orgAdminApi } from '@/api/org-admin';
+import type { OrgListFilter } from '@/api/org-admin';
 import { qk } from './keys';
 
 /**
@@ -45,15 +46,46 @@ export function useSlugAvailability(slug: string) {
 }
 
 /**
- * Tạo tổ chức. Chỉ invalidate `myOrgs()` cho đúng phép, dù tổ chức mới gần như chắc chắn KHÔNG
- * hiện ra ở đó: master không tự thành thành viên. Không tự vá thêm gì vào cache — bịa một dòng
- * mà `/organizations/mine` không trả về là dựng ra một tổ chức không tồn tại với app.
+ * Bảng tổ chức toàn hệ thống (chỉ master).
+ *
+ * KHÔNG gate bằng grant (giống `useAdminCategories`/`useCoverage`): call-site duy nhất là màn
+ * master-only. Gate rồi thì người không đủ quyền deep-link vào sẽ thấy query đứng im mãi ở
+ * `pending` thay vì đọc được "cần quyền master" — biến một câu 403 rõ ràng thành màn treo.
+ *
+ * Ô tìm debounce 300ms, cùng lý do với `useSlugAvailability`: mỗi prefix là một `queryKey` mới
+ * nên gõ thẳng sẽ bắn một request cho từng chữ cái.
+ *
+ * `keepPreviousData`: đổi bộ lọc mà để danh sách chớp về rỗng thì bảng nhảy chiều cao giữa
+ * lúc người dùng đang gõ.
+ */
+export function useAllOrgs(filter: OrgListFilter = {}) {
+  const term = (filter.q ?? '').trim();
+  const [settled, setSettled] = useState(term);
+  useEffect(() => {
+    const t = setTimeout(() => setSettled(term), 300);
+    return () => clearTimeout(t);
+  }, [term]);
+
+  const status = filter.status;
+
+  return useQuery({
+    queryKey: qk.allOrgs(settled, status ?? 'all'),
+    queryFn: () => orgAdminApi.listAll({ q: settled, status }),
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  });
+}
+
+/**
+ * Tạo tổ chức. Quét `allOrgsRoot()` chứ không `myOrgs()`: master KHÔNG tự thành thành viên, nên
+ * tổ chức vừa tạo không bao giờ xuất hiện ở `/organizations/mine` — nó chỉ hiện ở bảng toàn hệ
+ * thống, và đó mới là danh sách người bấm nút đang nhìn.
  */
 export function useCreateOrganization() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: orgAdminApi.create,
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.myOrgs() }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.allOrgsRoot() }),
   });
 }
 
@@ -62,20 +94,24 @@ export function useSetOrganizationStatus() {
   return useMutation({
     mutationFn: (v: { id: string; status: 'active' | 'suspended' }) =>
       orgAdminApi.setStatus(v.id, v.status),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.myOrgs() }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.allOrgsRoot() }),
   });
 }
 
 /**
- * Đổi slug. Ngoài `myOrgs()` phải quét luôn `adminRoot()`: slug là thứ `http.ts` gắn vào header
+ * Đổi slug. Ngoài bảng tổ chức phải quét luôn `adminRoot()`: slug là thứ `http.ts` gắn vào header
  * `X-Org-Slug`, nên mọi dữ liệu scope theo tổ chức đang nằm trong cache đều gắn với slug cũ.
+ *
+ * Hook KHÔNG đụng `activeOrgSlug`: nó không biết org vừa đổi có phải org đang thao tác hay
+ * không, mà master đổi slug của org khác là chuyện thường. Việc đó thuộc về call-site —
+ * `app/admin/organizations.tsx` so slug rồi mới đặt lại.
  */
 export function useChangeOrganizationSlug() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (v: { id: string; slug: string }) => orgAdminApi.changeSlug(v.id, v.slug),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.myOrgs() });
+      qc.invalidateQueries({ queryKey: qk.allOrgsRoot() });
       qc.invalidateQueries({ queryKey: qk.adminRoot() });
     },
   });

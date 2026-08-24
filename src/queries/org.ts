@@ -6,22 +6,23 @@ import { canModerateOrg } from '@/api/admin';
 import { useMyGrants } from './admin';
 import { qk } from './keys';
 
-/** Dưới ngưỡng này BE trả 400 — gọi rồi mới biết là phí một vòng và một dòng lỗi vô nghĩa. */
-const MIN_LOOKUP_CHARS = 2;
+/** Độ dài tối thiểu của mã tham gia theo schema BE — gõ ngắn hơn thì chắc chắn 400. */
+const MIN_CODE_CHARS = 4;
 
 /**
- * Tra cứu tổ chức cho dropdown.
+ * Xem trước tổ chức đứng sau một mã tham gia.
  *
  * `enabled` chứ không phải `if` ở call-site: hook luôn được gọi, còn TanStack quyết định có
- * bay hay không (query.convention §3). `staleTime` dài vì danh sách tổ chức gần như tĩnh, và
- * mỗi lần gõ lại là một request tới một endpoint có rate limit chặt.
+ * bay hay không (query.convention §3). `retry: false` vì mã sai trả 404 — thử lại ba lần một
+ * mã không tồn tại chỉ làm người đang gõ dở thấy màn hình treo.
  */
-export function useOrgLookup(q: string) {
-  const term = q.trim();
+export function useOrgByCode(code: string) {
+  const trimmed = code.trim();
   return useQuery({
-    queryKey: qk.orgLookup(term),
-    queryFn: () => orgApi.lookup(term),
-    enabled: term.length >= MIN_LOOKUP_CHARS,
+    queryKey: qk.orgByCode(trimmed),
+    queryFn: () => orgApi.byCode(trimmed),
+    enabled: trimmed.length >= MIN_CODE_CHARS,
+    retry: false,
     staleTime: 5 * 60_000,
   });
 }

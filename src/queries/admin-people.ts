@@ -18,14 +18,6 @@ export function useAdminUsers(school: string) {
   });
 }
 
-export function useAdminSchools() {
-  return useQuery({ queryKey: qk.adminSchools(), queryFn: adminPeopleApi.getSchools });
-}
-
-export function useSchoolLinks() {
-  return useQuery({ queryKey: qk.adminSchoolLinks(), queryFn: adminPeopleApi.getSchoolLinks });
-}
-
 export function useVerifyUser() {
   const qc = useQueryClient();
   return useMutation({
@@ -39,13 +31,5 @@ export function useToggleUserLock() {
   return useMutation({
     mutationFn: (id: number) => adminPeopleApi.toggleLock(id),
     onSettled: () => qc.invalidateQueries({ queryKey: qk.adminRoot() }),
-  });
-}
-
-export function useToggleSchoolLink() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => adminPeopleApi.toggleSchoolLink(id),
-    onSettled: () => qc.invalidateQueries({ queryKey: qk.adminSchoolLinks() }),
   });
 }

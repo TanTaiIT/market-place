@@ -5,10 +5,10 @@ import { useToast } from '@/components/Toast';
 import {
   useCancelJoinRequest,
   useMyJoinRequests,
-  useOrgLookup,
+  useOrgByCode,
   useRequestJoin,
 } from '@/queries/org';
-import type { MyJoinRequest, OrgSuggestion } from '@/api/org';
+import type { MyJoinRequest } from '@/api/org';
 import { C, F, shadow } from '@/theme';
 
 const STATUS_LABEL: Record<MyJoinRequest['status'], string> = {
@@ -21,32 +21,34 @@ const STATUS_LABEL: Record<MyJoinRequest['status'], string> = {
 
 export default function JoinOrg() {
   const toast = useToast();
-  const [term, setTerm] = useState('');
-  // Tổ chức đã XÁC NHẬN, tách khỏi chuỗi đang gõ: chừng nào chưa bấm chọn một dòng cụ thể thì
-  // chưa có tổ chức nào cả. Đây là chốt chống "gõ gần đúng rồi đơn chạy sang tổ chức khác".
-  const [picked, setPicked] = useState<OrgSuggestion | null>(null);
+  // Mã tham gia thay cho dropdown tra theo tên: BE đã bỏ `orgSlug` khỏi đơn, vì slug là địa chỉ
+  // công khai nên ai đoán được cũng gửi đơn được. Mã do tổ chức phát và xoay lại được.
+  const [code, setCode] = useState('');
   const [claimedName, setClaimedName] = useState('');
   const [claimedUnit, setClaimedUnit] = useState('');
 
-  const lookup = useOrgLookup(picked ? '' : term);
+  const preview = useOrgByCode(code);
+  const org = preview.data ?? null;
   const mine = useMyJoinRequests();
   const requestJoin = useRequestJoin();
   const cancel = useCancelJoinRequest();
 
   const submit = () => {
-    if (!picked) return toast('Chọn tổ chức từ danh sách gợi ý trước đã');
-    if (!claimedName.trim()) return toast('Điền họ tên để chủ tổ chức nhận ra bạn');
+    // Chốt trên THẺ ĐÃ TRA ĐƯỢC, không trên chuỗi đang gõ: gõ dở mà gửi thì đơn bay đi trước
+    // khi người dùng kịp nhìn tên tổ chức, đúng cái mà bước xem trước sinh ra để tránh.
+    if (!org) return toast('Nhập mã tham gia và đợi hiện tên tổ chức đã');
+    if (!org.allowJoinRequests) return toast('Tổ chức này đang không nhận đơn');
+    if (!claimedName.trim()) return toast('Điền họ tên để tổ chức nhận ra bạn');
 
     requestJoin.mutate(
       {
-        orgSlug: picked.slug,
+        code: code.trim(),
         claimedName: claimedName.trim(),
         claimedUnit: claimedUnit.trim() || undefined,
       },
       {
         onSuccess: () => {
-          setPicked(null);
-          setTerm('');
+          setCode('');
           setClaimedName('');
           setClaimedUnit('');
           toast('Đã gửi đơn, chờ tổ chức duyệt nhé');
@@ -63,49 +65,40 @@ export default function JoinOrg() {
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
           <Text style={styles.hint}>
-            Gõ tên hoặc mã tổ chức, rồi chọn đúng dòng trong danh sách. Nhiều tổ chức trùng tên
-            nhau nên phần địa bàn là thứ để phân biệt.
+            Xin mã tham gia từ tổ chức rồi dán vào đây. Tên tổ chức sẽ hiện ra để bạn đối chiếu
+            trước khi gửi đơn.
           </Text>
 
-          {picked ? (
-            <Pressable style={styles.pickedRow} onPress={() => setPicked(null)}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.pickedName}>{picked.name}</Text>
-                <Text style={styles.pickedWhere}>{picked.where || 'Không gắn địa bàn'}</Text>
-              </View>
-              <Text style={styles.change}>Đổi</Text>
-            </Pressable>
-          ) : (
-            <>
-              <Field
-                label="Tên hoặc mã tổ chức"
-                value={term}
-                onChangeText={setTerm}
-                placeholder="Lý Thường Kiệt"
-              />
-              {lookup.isFetching ? <Loading /> : null}
-              {lookup.data?.map((org) => (
-                <Pressable
-                  key={org.slug}
-                  style={styles.suggestion}
-                  onPress={() => {
-                    if (!org.allowJoinRequests) return toast('Tổ chức này đang không nhận đơn');
-                    setPicked(org);
-                  }}
-                >
-                  <Text style={styles.suggestionName}>{org.name}</Text>
-                  <Text style={styles.suggestionWhere}>
-                    {org.where || 'Không gắn địa bàn'} · {org.slug}
-                  </Text>
-                </Pressable>
-              ))}
-              {lookup.data?.length === 0 ? (
-                <Text style={styles.none}>Không có tổ chức nào khớp</Text>
-              ) : null}
-            </>
-          )}
+          <Field
+            label="Mã tham gia"
+            value={code}
+            onChangeText={setCode}
+            placeholder="VD: 7KQ2M9"
+            autoCapitalize="characters"
+            autoCorrect={false}
+          />
 
-          {picked ? (
+          {preview.isFetching ? <Loading /> : null}
+          {preview.isError ? (
+            <Text style={styles.none}>Không có tổ chức nào dùng mã này</Text>
+          ) : null}
+
+          {org ? (
+            <View style={styles.pickedRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.pickedName}>{org.name}</Text>
+                <Text style={styles.pickedWhere}>
+                  {org.where || 'Không gắn địa bàn'} · {org.memberCount} thành viên
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
+          {org && !org.allowJoinRequests ? (
+            <Text style={styles.none}>Tổ chức này đang tạm không nhận đơn</Text>
+          ) : null}
+
+          {org?.allowJoinRequests ? (
             <>
               <Field
                 label="Họ tên của bạn"
@@ -133,7 +126,7 @@ export default function JoinOrg() {
 
         {mine.isLoading ? <Loading /> : null}
         {mine.data?.length === 0 ? (
-          <EmptyState icon="📮" text="Chưa gửi đơn nào — tìm tổ chức ở trên để bắt đầu" />
+          <EmptyState icon="📮" text="Chưa gửi đơn nào — nhập mã tham gia ở trên để bắt đầu" />
         ) : null}
 
         {mine.data?.map((req) => (
@@ -164,9 +157,6 @@ const styles = StyleSheet.create({
   body: { padding: 18, paddingBottom: 40, gap: 14 },
   card: { backgroundColor: C.paperWarm, borderRadius: 10, padding: 18, gap: 4, ...shadow },
   hint: { fontFamily: F.ui, fontSize: 12.5, color: C.inkSoft, marginBottom: 10, lineHeight: 18 },
-  suggestion: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: C.line },
-  suggestionName: { fontFamily: F.uiBold, fontSize: 14, color: C.ink },
-  suggestionWhere: { fontFamily: F.ui, fontSize: 12, color: C.inkSoft, marginTop: 2 },
   none: { fontFamily: F.ui, fontSize: 12.5, color: C.inkSoft, paddingVertical: 10 },
   pickedRow: {
     flexDirection: 'row',
@@ -178,7 +168,6 @@ const styles = StyleSheet.create({
   },
   pickedName: { fontFamily: F.uiBold, fontSize: 14, color: C.ink },
   pickedWhere: { fontFamily: F.ui, fontSize: 12, color: C.inkSoft, marginTop: 2 },
-  change: { fontFamily: F.uiBold, fontSize: 12.5, color: C.pin },
   section: { fontFamily: F.hand, fontSize: 22, color: C.ink, marginTop: 8 },
   reqCard: { backgroundColor: C.paperWarm, borderRadius: 10, padding: 14, gap: 4, ...shadow },
   reqName: { fontFamily: F.uiBold, fontSize: 14, color: C.ink },

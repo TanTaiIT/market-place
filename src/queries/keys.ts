@@ -62,11 +62,18 @@ export const qk = {
   wards: (province: string | null) => ['locations', 'wards', province ?? ''] as const,
 
   /*
-   * Tổ chức. `orgLookup` mang cả từ khoá vì mỗi từ khoá là một tập kết quả khác — dùng chung
-   * một key sẽ khiến kết quả của lần gõ trước hiện ra dưới từ khoá sau.
+   * Tổ chức. `orgByCode` mang cả mã vì mỗi mã là một tổ chức khác — dùng chung một key sẽ khiến
+   * thẻ xem trước của mã gõ trước hiện ra dưới mã sau, đúng lúc người dùng cần chắc chắn nhất.
    */
   myOrgs: () => ['orgs', 'mine'] as const,
-  orgLookup: (q: string) => ['orgs', 'lookup', q] as const,
+  /**
+   * Bảng tổ chức của master (`GET /organizations`). Mang cả bộ lọc trong key: mỗi bộ lọc là một
+   * câu trả lời khác của BE, gộp chung một key thì gõ tìm xong sẽ thấy kết quả của lượt trước.
+   */
+  allOrgs: (q: string, status: string) => ['orgs', 'all', q, status] as const,
+  /** Prefix để mutation quét mọi bộ lọc — xem `useSetOrganizationStatus`. */
+  allOrgsRoot: () => ['orgs', 'all'] as const,
+  orgByCode: (code: string) => ['orgs', 'by-code', code] as const,
   /** Prefix của cụm đơn xin tham gia — quét cả "đơn của tôi" lẫn hàng đợi của người duyệt. */
   joinRequestsRoot: () => ['join-requests'] as const,
   myJoinRequests: () => ['join-requests', 'mine'] as const,
@@ -77,7 +84,7 @@ export const qk = {
   orgUnits: (orgSlug: string) => ['orgs', 'units', orgSlug] as const,
   /** Danh bạ thành viên. Theo slug vì đổi tổ chức là đổi hẳn tập người, không phải lọc lại. */
   orgMembers: (orgSlug: string) => ['orgs', 'members', orgSlug] as const,
-  /** Mang cả slug đang gõ, cùng lý do với `orgLookup` — mỗi slug là một câu trả lời khác. */
+  /** Mang cả slug đang gõ, cùng lý do với `orgByCode` — mỗi slug là một câu trả lời khác. */
   slugAvailability: (slug: string) => ['orgs', 'slug-check', slug] as const,
 
   /*
@@ -95,11 +102,9 @@ export const qk = {
   myGrants: () => ['me', 'grants'] as const,
   adminReports: () => ['admin', 'reports'] as const,
   adminUsers: (school: string) => ['admin', 'users', school] as const,
-  adminSchools: () => ['admin', 'schools'] as const,
-  adminSchoolLinks: () => ['admin', 'school-links'] as const,
   /** Không mang tên trường: danh mục là từ điển dùng chung toàn hệ thống, không thuộc tổ chức nào. */
   adminCategories: () => ['admin', 'categories'] as const,
   adminNotices: () => ['admin', 'notices'] as const,
-  adminRules: () => ['admin', 'rules'] as const,
-  adminLimits: () => ['admin', 'limits'] as const,
+  /** Từ điển field dùng chung — nguồn của bộ chọn field khi soạn template. */
+  fieldDefinitions: () => ['admin', 'field-definitions'] as const,
 };

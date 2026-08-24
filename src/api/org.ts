@@ -10,7 +10,7 @@ import {
   membershipList,
   myJoinRequests,
   myOrganizations,
-  organizationLookup,
+  organizationByCode,
   rejectJoinRequest,
   updateOrgUnit,
 } from './generated';
@@ -26,12 +26,17 @@ import { withAuthRetry } from './http';
  * đời riêng: nó chạy TRƯỚC khi người dùng thuộc tổ chức nào, tức là trước khi có `X-Org-Slug`.
  */
 
-/** Một dòng trong dropdown chọn tổ chức. */
-export type OrgSuggestion = {
-  slug: string;
+/**
+ * Thẻ xem trước tổ chức, tra bằng mã tham gia.
+ *
+ * Thay cho `OrgSuggestion` của dropdown tra-theo-tên cũ: BE đã bỏ `orgSlug` khỏi đơn xin gia
+ * nhập, nên tra theo tên không còn đường dẫn tới việc gửi đơn nữa.
+ */
+export type OrgCard = {
   name: string;
-  /** Đủ để phân biệt hai tổ chức trùng tên — thiếu nó thì dropdown là danh sách giống hệt nhau. */
+  /** Đủ để phân biệt hai tổ chức trùng tên — thiếu nó thì người dán mã không chắc mình vào đâu. */
   where: string;
+  memberCount: number;
   allowJoinRequests: boolean;
 };
 
@@ -169,18 +174,21 @@ export const orgApi = {
   },
 
   /**
-   * Tra cứu tổ chức cho dropdown. BE trần 10 dòng và chặn theo rate limit — đây là endpoint
-   * công khai, gọi dày là biến nó thành công cụ dò danh sách khách hàng.
+   * Xem trước tổ chức đứng sau một MÃ THAM GIA, trước khi gửi đơn.
+   *
+   * Không cần đăng nhập và cố tình không trả `id`/`slug`: mã là thứ người ta dán cho nhau, nên
+   * endpoint này phải cho xem đủ để nhận ra đúng nơi mình định vào (tên, địa bàn, số thành
+   * viên) mà không biến thành đường tra ngược ra định danh tổ chức.
    */
-  async lookup(q: string): Promise<OrgSuggestion[]> {
-    const res = await organizationLookup({ query: { q } });
-    const rows = unwrap(res, 'Không tra cứu được tổ chức');
-    return rows.map((o) => ({
-      slug: o.slug,
-      name: o.name,
-      where: whereOf(o.district, o.provinceCode),
-      allowJoinRequests: o.allowJoinRequests,
-    }));
+  async byCode(code: string): Promise<OrgCard> {
+    const res = await organizationByCode({ path: { code: code.trim() } });
+    const org = unwrap(res, 'Không tìm thấy tổ chức nào với mã này');
+    return {
+      name: org.name,
+      where: whereOf(org.district, org.provinceCode),
+      memberCount: org.memberCount,
+      allowJoinRequests: org.allowJoinRequests,
+    };
   },
 
   async myRequests(): Promise<MyJoinRequest[]> {
@@ -189,11 +197,16 @@ export const orgApi = {
   },
 
   /**
-   * Gửi đơn. `orgSlug` là slug người dùng vừa XÁC NHẬN trên dropdown, không phải chuỗi họ gõ:
-   * gõ gần đúng mà tự khớp là đơn chạy sang tổ chức khác mà không ai biết.
+   * Gửi đơn bằng MÃ THAM GIA, không còn bằng slug.
+   *
+   * BE đổi khoá tra sang `joinCode` vì slug là địa chỉ công khai: ai đoán ra slug cũng gửi được
+   * đơn, và hàng đợi duyệt trở thành bề mặt spam mở. Mã do tổ chức phát ra và xoay được
+   * (`organizationRotateJoinCode`), nên phát nhầm thì thu lại được — slug thì không.
+   *
+   * Muốn xem trước tên tổ chức trước khi gửi thì gọi `orgApi.byCode` — cùng mã, không cần đăng nhập.
    */
   async requestJoin(input: {
-    orgSlug: string;
+    code: string;
     claimedName: string;
     claimedUnit?: string;
     note?: string;
@@ -201,7 +214,7 @@ export const orgApi = {
     const res = await withAuthRetry(() =>
       createJoinRequest({
         body: {
-          orgSlug: input.orgSlug,
+          code: input.code.trim(),
           claimedName: input.claimedName,
           claimedUnit: input.claimedUnit || undefined,
           note: input.note || undefined,

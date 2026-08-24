@@ -1,6 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMyOrgs } from '@/queries/org';
+import { useMyGrants } from '@/queries/admin';
+import { isMaster } from '@/api/admin';
 import { useOrgSlug, useSetActiveOrg } from '@/stores/auth';
 import { C, F, shadow } from '@/theme';
 
@@ -19,12 +21,29 @@ export function OrgSwitcher() {
   const orgs = useMyOrgs();
   const active = useOrgSlug();
   const setActiveOrg = useSetActiveOrg();
+  const master = isMaster(useMyGrants().data);
 
   if (orgs.isLoading) return null;
 
   const rows = orgs.data ?? [];
 
   if (rows.length === 0) {
+    // Master không là thành viên ở đâu cả — đẩy họ tới bàn quản trị chứ không mời đi xin vào
+    // một tổ chức, thứ họ không cần và cũng không nên làm.
+    if (master) {
+      return (
+        <Pressable style={styles.card} onPress={() => router.push('/admin/organizations')}>
+          <Text style={styles.title}>{active ? 'Đang thao tác trong' : 'Chưa chọn tổ chức'}</Text>
+          <Text style={styles.hint}>
+            {active
+              ? `/${active}`
+              : 'Quyền master là quyền toàn hệ thống, không đi kèm thành viên ở tổ chức nào. Chọn một tổ chức để các màn nội bộ có chỗ mà đọc.'}
+          </Text>
+          <Text style={styles.action}>Bàn quản trị tổ chức →</Text>
+        </Pressable>
+      );
+    }
+
     return (
       <Pressable style={styles.card} onPress={() => router.push('/join-org')}>
         <Text style={styles.title}>Chưa thuộc tổ chức nào</Text>
@@ -59,8 +78,15 @@ export function OrgSwitcher() {
         );
       })}
 
-      <Pressable onPress={() => router.push('/join-org')}>
-        <Text style={styles.action}>Tham gia tổ chức khác →</Text>
+      {/* Master chọn được org mình KHÔNG thuộc về, nên nó không có dòng nào ở trên để đánh dấu ✓. */}
+      {master && active && !rows.some((o) => o.slug === active) ? (
+        <Text style={styles.meta}>Đang thao tác trong /{active}</Text>
+      ) : null}
+
+      <Pressable onPress={() => router.push(master ? '/admin/organizations' : '/join-org')}>
+        <Text style={styles.action}>
+          {master ? 'Chọn tổ chức khác →' : 'Tham gia tổ chức khác →'}
+        </Text>
       </Pressable>
     </View>
   );

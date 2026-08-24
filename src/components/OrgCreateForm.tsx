@@ -14,15 +14,15 @@ import { ORG_TYPES, type NewOrgInput, type OrgType } from '@/api/org-admin';
  *
  * Giữ state + luật hợp lệ, KHÔNG gọi mutation — submit đi ngược lên route (AGENTS §Kiến trúc).
  *
- * Chỉ `name` và `ownerEmail` là bắt buộc, đúng như BE khai. Bỏ trống slug là cố ý cho phép:
- * BE tự sinh từ tên, và với tổ chức tạo hàng loạt thì tự nghĩ slug cho từng cái là việc thừa.
+ * Chỉ `name` và `adminEmail` là bắt buộc. Bỏ trống slug là cố ý cho phép: BE tự sinh từ tên,
+ * và với tổ chức tạo hàng loạt thì tự nghĩ slug cho từng cái là việc thừa.
  */
 
 const EMPTY: NewOrgInput = {
   name: '',
   slug: '',
   orgType: 'school',
-  ownerEmail: '',
+  adminEmail: '',
   provinceCode: null,
   district: '',
 };
@@ -54,7 +54,7 @@ export function OrgCreateForm({
     if (!form.name.trim()) return toast('⚠️ Nhập tên tổ chức trước đã');
     // Chỉ chặn ca rõ ràng là chưa điền email — BE mới là nơi biết tài khoản đó có thật không, và
     // dựng một luật email riêng ở client chỉ tạo thêm một định nghĩa "email hợp lệ" để lệch nhau.
-    if (!form.ownerEmail.includes('@')) return toast('⚠️ Nhập email của người chủ tổ chức');
+    if (!form.adminEmail.includes('@')) return toast('⚠️ Nhập email người phụ trách tổ chức');
     onSubmit(form, () => setForm(EMPTY));
   };
 
@@ -91,10 +91,10 @@ export function OrgCreateForm({
       <View style={{ marginTop: 18 }}>
         <Field
           onDark
-          label="Email người chủ"
-          value={form.ownerEmail}
-          onChangeText={(ownerEmail) => patch({ ownerEmail })}
-          placeholder="nguoi.chu@example.com"
+          label="Email người phụ trách"
+          value={form.adminEmail}
+          onChangeText={(adminEmail) => patch({ adminEmail })}
+          placeholder="nguoi.phu.trach@example.com"
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}

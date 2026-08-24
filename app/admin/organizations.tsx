@@ -1,47 +1,67 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { AdminPanel, AdminScreen } from '@/components/AdminScreen';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AdminFilter, AdminPanel, AdminScreen } from '@/components/AdminScreen';
 import { AdminSmallBtn, adminFormStyles } from '@/components/AdminPicker';
 import { OrgCreateForm } from '@/components/OrgCreateForm';
 import { SlugField } from '@/components/SlugField';
 import { EmptyState, Loading, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
-import { useMyOrgs } from '@/queries/org';
 import {
+  useAllOrgs,
   useChangeOrganizationSlug,
   useCreateOrganization,
   useSetOrganizationStatus,
 } from '@/queries/org-admin';
-import type { MyOrg } from '@/api/org';
+import { STATUS_LABEL } from '@/api/org-admin';
+import type { Organization, OrgStatus } from '@/api/org-admin';
+import { useOrgSlug, useSetActiveOrg } from '@/stores/auth';
 import { C, F } from '@/theme';
 
 /**
  * Bàn quản trị tổ chức (master).
  *
- * Danh sách lấy từ `/organizations/mine` vì đó là route DUY NHẤT trả về `organizationId` —
- * `/organizations/lookup` cố tình không trả id để không thành công cụ liệt kê khách hàng. Hệ quả
- * nói thẳng trong panel: khoá / đổi slug chỉ làm được với tổ chức mình đang là thành viên.
+ * Danh sách là `GET /organizations` — mọi tổ chức, kể cả tổ chức master không tham gia. Bản
+ * trước đọc `/organizations/mine` vì đó là route duy nhất trả `id`, mà master cố ý KHÔNG là
+ * thành viên của org nào, nên bảng gần như luôn rỗng.
  *
- * Trạng thái (`active`/`suspended`) KHÔNG có trong `MyOrganization`, nên đây là hai HÀNH ĐỘNG
- * chứ không phải một công tắc: vẽ công tắc mặc định "đang mở" là bịa ra một trạng thái mà app
- * không hề biết, và người bấm sẽ tin vào nó.
+ * Vì thế màn này cũng là nơi master CHỌN tổ chức đang thao tác: mọi màn org-scoped đọc
+ * `X-Org-Slug`, mà `OrgSwitcher` trên hồ sơ thì dựng từ danh bạ thành viên.
  */
+
+const STATUS_FILTER: { value: string; label: string }[] = [
+  { value: 'all', label: 'Tất cả' },
+  { value: 'active', label: 'Đang mở' },
+  { value: 'suspended', label: 'Đang khoá' },
+  { value: 'pending_admin', label: 'Chờ người phụ trách' },
+];
+
 export default function AdminOrganizations() {
   const toast = useToast();
-  const { data, error, isLoading } = useMyOrgs();
+  const [term, setTerm] = useState('');
+  const [status, setStatus] = useState('all');
+
+  const { data, error, isPending } = useAllOrgs({
+    q: term,
+    status: status === 'all' ? undefined : (status as OrgStatus),
+  });
   const create = useCreateOrganization();
-  const setStatus = useSetOrganizationStatus();
+  const setOrgStatus = useSetOrganizationStatus();
   const changeSlug = useChangeOrganizationSlug();
 
+  const activeSlug = useOrgSlug();
+  const setActiveOrg = useSetActiveOrg();
+
   /** Tổ chức đang đổi slug; `null` = panel dưới đang ở chế độ tạo mới. */
-  const [editing, setEditing] = useState<MyOrg | null>(null);
+  const [editing, setEditing] = useState<Organization | null>(null);
   const [slug, setSlug] = useState('');
 
   const fail = (e: Error) => toast(`⚠️ ${e.message}`);
+  const rows = data ?? [];
 
-  const toggleStatus = (org: MyOrg, next: 'active' | 'suspended') => {
+  const toggleStatus = (org: Organization) => {
+    const next = org.status === 'suspended' ? 'active' : 'suspended';
     const run = () =>
-      setStatus.mutate(
+      setOrgStatus.mutate(
         { id: org.id, status: next },
         {
           // Trạng thái thật chỉ có trong response — nói lại đúng thứ BE vừa trả về, không đoán.
@@ -62,46 +82,73 @@ export default function AdminOrganizations() {
 
   return (
     <AdminScreen title="Tổ chức" note="ai đang mở, ai đang khoá">
+      <View style={styles.search}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          value={term}
+          onChangeText={setTerm}
+          placeholder="Tìm theo tên hoặc slug…"
+          placeholderTextColor={C.deskTxtDim}
+          style={styles.searchInput}
+          returnKeyType="search"
+        />
+        {rows.length > 0 && <Text style={styles.searchCount}>{rows.length}</Text>}
+      </View>
+
+      <AdminFilter options={STATUS_FILTER} value={status} onChange={setStatus} />
+
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        {isLoading ? (
+        {isPending ? (
           <Loading onDark />
         ) : error ? (
           <EmptyState icon="📡" onDark text={(error as Error).message} />
-        ) : (data ?? []).length === 0 ? (
-          <EmptyState icon="🏫" onDark text="Bạn chưa là thành viên của tổ chức nào" />
+        ) : rows.length === 0 ? (
+          <EmptyState icon="🏫" onDark text="Không có tổ chức nào khớp bộ lọc" />
         ) : (
           <View style={{ gap: 10 }}>
-            {(data ?? []).map((org) => (
-              <View key={org.id} style={styles.row}>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={styles.name}>{org.name}</Text>
-                  <Text style={styles.meta}>
-                    /{org.slug} · {org.role.toUpperCase()}
-                  </Text>
+            {rows.map((org) => {
+              const acting = org.slug === activeSlug;
+              return (
+                <View key={org.id} style={[styles.row, acting && styles.rowActing]}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.name}>{org.name}</Text>
+                    <Text style={styles.meta}>
+                      /{org.slug} · {STATUS_LABEL[org.status]}
+                    </Text>
+                  </View>
+                  <View style={styles.acts}>
+                    {/*
+                     * Chọn tổ chức đang thao tác — đường DUY NHẤT của master tới các màn
+                     * org-scoped: chúng đọc `X-Org-Slug`, mà bộ chuyển tổ chức trên hồ sơ thì
+                     * dựng từ danh bạ thành viên, nơi master không có dòng nào.
+                     */}
+                    <AdminSmallBtn
+                      label={acting ? '✓ Đang thao tác' : 'Thao tác trong'}
+                      onPress={() => setActiveOrg(acting ? null : org.slug)}
+                    />
+                    <AdminSmallBtn
+                      label="Đổi slug"
+                      onPress={() => {
+                        setEditing(org);
+                        // Mở ra ô TRỐNG chứ không nạp slug hiện tại: nạp vào thì lượt kiểm tra
+                        // đầu tiên báo "đã có tổ chức dùng slug này" — mà tổ chức đó chính là nó.
+                        setSlug('');
+                      }}
+                    />
+                    {/*
+                     * Một nút phản ánh trạng thái THẬT, không còn là cặp Khoá/Mở đoán mò:
+                     * `GET /organizations` trả `status`, thứ `/organizations/mine` không có.
+                     */}
+                    <AdminSmallBtn
+                      label={org.status === 'suspended' ? 'Mở lại' : 'Khoá'}
+                      onPress={() => toggleStatus(org)}
+                    />
+                  </View>
                 </View>
-                <View style={styles.acts}>
-                  <AdminSmallBtn
-                    label="Đổi slug"
-                    onPress={() => {
-                      setEditing(org);
-                      // Mở ra ô TRỐNG chứ không nạp slug hiện tại: nạp vào thì lượt kiểm tra đầu
-                      // tiên báo "đã có tổ chức dùng slug này" — mà tổ chức đó chính là nó.
-                      setSlug('');
-                    }}
-                  />
-                  <AdminSmallBtn label="Khoá" onPress={() => toggleStatus(org, 'suspended')} />
-                  <AdminSmallBtn label="Mở" onPress={() => toggleStatus(org, 'active')} />
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
-
-        <Text style={adminFormStyles.limit}>
-          BE chưa có route liệt kê mọi tổ chức, cũng không trả trạng thái trong
-          /organizations/mine — danh sách này chỉ gồm tổ chức bạn là thành viên, và hai nút
-          Khoá / Mở là hành động chứ không phải công tắc phản ánh trạng thái hiện tại.
-        </Text>
 
         <View style={{ marginTop: 18 }}>
           {editing ? (
@@ -120,6 +167,9 @@ export default function AdminOrganizations() {
                       { id: editing.id, slug: slug.trim() },
                       {
                         onSuccess: (o) => {
+                          // Tổ chức đang thao tác vừa đổi địa chỉ: giữ slug cũ trong store là
+                          // mọi request sau đó mang một `X-Org-Slug` không còn tồn tại.
+                          if (editing.slug === activeSlug) setActiveOrg(o.slug);
                           setEditing(null);
                           toast(`✓ ${o.name} giờ ở /${o.slug}`);
                         },
@@ -144,9 +194,7 @@ export default function AdminOrganizations() {
                   create.mutate(values, {
                     onSuccess: (o) => {
                       reset();
-                      // Nói trước điều người dùng sắp thắc mắc: master không tự thành thành viên
-                      // nên tổ chức vừa tạo sẽ KHÔNG hiện trong danh sách phía trên.
-                      toast(`✓ Đã tạo ${o.name} (/${o.slug}) — bạn không phải thành viên của nó`);
+                      toast(`✓ Đã tạo ${o.name} (/${o.slug})`);
                     },
                     onError: fail,
                   })
@@ -162,6 +210,21 @@ export default function AdminOrganizations() {
 
 const styles = StyleSheet.create({
   body: { paddingHorizontal: 18, paddingBottom: 32 },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    marginHorizontal: 18,
+    marginBottom: 12,
+    paddingHorizontal: 13,
+    borderRadius: 10,
+    backgroundColor: C.deskPanel,
+    borderWidth: 1,
+    borderColor: C.deskLine,
+  },
+  searchIcon: { fontSize: 13, opacity: 0.6 },
+  searchInput: { flex: 1, paddingVertical: 10, fontFamily: F.ui, fontSize: 13, color: C.deskTxt },
+  searchCount: { fontFamily: F.mono, fontSize: 10.5, color: C.deskTxtDim },
   row: {
     backgroundColor: C.deskPanel,
     borderWidth: 1,
@@ -170,7 +233,14 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 11,
   },
+  rowActing: { borderColor: C.pin, borderWidth: 1.5 },
   name: { fontFamily: F.uiBold, fontSize: 14, color: C.paper },
-  meta: { fontFamily: F.mono, fontSize: 10.5, letterSpacing: 0.4, color: C.deskTxtDim, marginTop: 3 },
+  meta: {
+    fontFamily: F.mono,
+    fontSize: 10.5,
+    letterSpacing: 0.4,
+    color: C.deskTxtDim,
+    marginTop: 3,
+  },
   acts: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
 });

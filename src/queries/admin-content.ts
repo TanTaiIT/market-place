@@ -1,10 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminContentApi } from '@/api/admin-content';
-import type { AdminLimits } from '@/api/admin-content';
 import { qk } from './keys';
 
 /**
- * Nhóm "Nội dung" + "Khác": danh mục, thông báo đẩy, luật của bảng tin.
+ * Nhóm "Nội dung": danh mục và thông báo đẩy.
  */
 
 /* -------------------------------- danh mục -------------------------------- */
@@ -60,28 +59,3 @@ export function useSendNotice() {
   });
 }
 
-/* --------------------------------- cài đặt -------------------------------- */
-
-export function useAdminRules() {
-  return useQuery({ queryKey: qk.adminRules(), queryFn: adminContentApi.getRules });
-}
-
-export function useToggleRule() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => adminContentApi.toggleRule(id),
-    onSettled: () => qc.invalidateQueries({ queryKey: qk.adminRules() }),
-  });
-}
-
-export function useAdminLimits() {
-  return useQuery({ queryKey: qk.adminLimits(), queryFn: adminContentApi.getLimits });
-}
-
-export function useSetAdminLimits() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (next: AdminLimits) => adminContentApi.setLimits(next),
-    onSettled: () => qc.invalidateQueries({ queryKey: qk.adminLimits() }),
-  });
-}

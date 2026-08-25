@@ -26,6 +26,9 @@ type HttpSession = {
  * Cố tình KHÔNG giữ refresh token ở đây: nó chỉ cần cho đúng một lời gọi và store đã là SoT,
  * nhân bản thêm một bản nữa chỉ tăng chỗ có thể lệch.
  */
+/** Tên header org, dùng chung để chỗ ghi đè và chỗ mặc định không lệch nhau. */
+export const ORG_HEADER = 'X-Org-Slug';
+
 let session: HttpSession | null = null;
 
 /**
@@ -190,8 +193,15 @@ export const createClientConfig: CreateClientConfig = (config) => ({
     // Kiểu khai của hey-api rộng hơn thực tế (`string | URL | Request`), nhưng client-fetch
     // luôn dựng sẵn `Request` trước khi gọi. Thu hẹp bằng `instanceof` thay vì ép kiểu: nếu
     // một bản sau đổi cách gọi, header chỉ đơn giản không được gắn thay vì nổ lúc chạy.
-    if (activeOrgSlug && request instanceof Request) {
-      request.headers.set('X-Org-Slug', activeOrgSlug);
+    /*
+     * KHÔNG ghi đè header người gọi đã tự đặt. Org hoạt động là mặc định của cả app, nhưng
+     * vài chỗ cần đọc dữ liệu của MỘT tổ chức khác mà không kéo cả app sang đó — hồ sơ nhóm
+     * hiện danh bạ và tin của chính nhóm đang mở, trong khi người dùng vẫn đang thao tác ở
+     * nhóm khác. BE vẫn đối chiếu membership với slug nhận được, nên đây không phải lối vòng
+     * qua phân quyền: gửi slug của nhóm mình không thuộc về thì vẫn 403 như thường.
+     */
+    if (activeOrgSlug && request instanceof Request && !request.headers.has(ORG_HEADER)) {
+      request.headers.set(ORG_HEADER, activeOrgSlug);
     }
     return globalThis.fetch(request);
   },

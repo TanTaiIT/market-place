@@ -52,7 +52,8 @@ import type {
   PublicProfile,
   SearchFilter,
 } from './db';
-import { getCurrentUserId, withAuthRetry } from './http';
+import {
+  ORG_HEADER, getCurrentUserId, withAuthRetry } from './http';
 
 /**
  * Lớp truy cập dữ liệu — toàn bộ đi qua SDK generated (BE `market` thật), không còn stub local.
@@ -454,6 +455,23 @@ export const api = {
       categoryNames(),
     ]);
     return unwrap(res, 'Không tải được bảng tin').map((l) => toListing(l, names));
+  },
+
+  /**
+   * Tin của MỘT nhóm cụ thể — khối "Tin trong nhóm" trên hồ sơ nhóm.
+   *
+   * Gắn `X-Org-Slug` riêng cho lượt gọi này: mở hồ sơ một nhóm không có nghĩa là chuyển
+   * cả app sang làm việc ở đó. BE vẫn đối chiếu membership với slug nhận được, nên gọi
+   * cho nhóm mình không thuộc về sẽ 403 — chỉ gọi khi hồ sơ trả `joined: true`.
+   */
+  async getOrgListings(slug: string, take: number): Promise<Listing[]> {
+    const [res, names] = await Promise.all([
+      withAuthRetry(() =>
+        listingList({ query: { limit: take }, headers: { [ORG_HEADER]: slug } }),
+      ),
+      categoryNames(),
+    ]);
+    return unwrap(res, 'Không tải được tin của nhóm').map((l) => toListing(l, names));
   },
 
   /**

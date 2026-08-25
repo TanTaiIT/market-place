@@ -21,9 +21,18 @@ export function OrgSwitcher() {
   const orgs = useMyOrgs();
   const active = useOrgSlug();
   const setActiveOrg = useSetActiveOrg();
-  const master = isMaster(useMyGrants().data);
+  const grants = useMyGrants();
+  const master = isMaster(grants.data);
 
-  if (orgs.isLoading) return null;
+  /*
+   * Chờ CẢ hai, không riêng danh sách tổ chức.
+   *
+   * `isMaster(undefined)` là `false`, nên trong lúc grants còn bay thì master rơi đúng vào
+   * nhánh người-thường: thẻ "Chưa thuộc tổ chức nào" với lối đi "Tìm tổ chức →" dẫn sang
+   * `/join-org` — màn đòi MÃ THAM GIA. Master gõ tên hay slug vào đó thì không ra gì, và
+   * không có gì trên màn nói cho họ biết là mình đang đứng nhầm chỗ.
+   */
+  if (orgs.isLoading || grants.isLoading) return null;
 
   const rows = orgs.data ?? [];
 

@@ -3,9 +3,13 @@ import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { AdminNav } from './AdminNav';
+import { AdminOrgPicker } from './AdminOrgPicker';
 import { useToast } from './Toast';
 import { PinButton } from './ui';
 import { useOrgSlug } from '@/stores/auth';
+import { useMyOrgs } from '@/queries/org';
+import { useMyGrants } from '@/queries/admin';
+import { isMaster } from '@/api/admin';
 import { C, F } from '@/theme';
 
 /**
@@ -20,6 +24,7 @@ export function AdminScreen({
   title,
   note,
   org,
+  masterReadsAll,
   children,
 }: {
   title: string;
@@ -34,13 +39,41 @@ export function AdminScreen({
    * X-Org-Slug hoặc truy cập qua subdomain" — cho người vừa bấm một mục menu.
    */
   org?: boolean;
+  /**
+   * Màn CHỈ ĐỌC mà BE đã mở xuyên tổ chức cho master (`requireOrgReadOrMaster`).
+   *
+   * Bật thì master không phải chọn org mới được nhìn — họ thấy mọi tổ chức, và bộ chọn
+   * trên tiêu đề chuyển thành bộ LỌC. Màn ghi (gửi thông báo, phân quyền) không bật được:
+   * ghi thì phải biết ghi vào đâu.
+   */
+  masterReadsAll?: boolean;
   children: React.ReactNode;
 }) {
   const toast = useToast();
   const router = useRouter();
   const orgSlug = useOrgSlug();
   const [navOpen, setNavOpen] = useState(false);
-  const needsOrg = Boolean(org) && !orgSlug;
+  const [pickOrg, setPickOrg] = useState(false);
+  const grants = useMyGrants();
+  const master = isMaster(grants.data);
+  const { data: myOrgs } = useMyOrgs();
+
+  /*
+   * BE tự suy ra tổ chức khi người dùng có ĐÚNG MỘT membership (`tenant.middleware`), nên
+   * "chưa bấm chọn" KHÔNG đồng nghĩa "chưa có tổ chức". Chặn bằng riêng `orgSlug` sẽ dựng
+   * một bức tường trước mặt đúng nhóm dùng bàn quản trị nhiều nhất: quản trị của một
+   * trường duy nhất, người chưa từng mở bộ chuyển tổ chức lần nào.
+   */
+  const needsOrg =
+    Boolean(org) && !orgSlug && (myOrgs ?? []).length !== 1 && !(master && masterReadsAll);
+
+  /*
+   * Chưa biết người này có phải master thì CHƯA vẽ lối thoát: `isMaster(undefined)` là
+   * `false`, nên vẽ sớm là đưa master cái nút dẫn sang `/join-org` — màn đòi mã tham gia,
+   * không phải chỗ họ cần tới. Chờ thêm một nhịp rẻ hơn nhiều so với một người bấm nhầm
+   * rồi ngồi gõ slug vào ô mã.
+   */
+  const decided = !grants.isLoading;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -54,7 +87,15 @@ export function AdminScreen({
         </Pressable>
 
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={styles.note}>{note}</Text>
+          {org && master ? (
+            <AdminOrgPicker
+              open={pickOrg}
+              onOpen={() => setPickOrg(true)}
+              onClose={() => setPickOrg(false)}
+            />
+          ) : (
+            <Text style={styles.note}>{note}</Text>
+          )}
           <Text style={styles.title}>{title}</Text>
         </View>
 
@@ -68,7 +109,14 @@ export function AdminScreen({
         </Pressable>
       </View>
 
-      {needsOrg ? <NoOrgPicked onPick={() => router.push('/admin/organizations')} /> : children}
+      {needsOrg && decided ? (
+        <NoOrgPicked
+          master={master}
+          onPick={() => (master ? setPickOrg(true) : router.push('/join-org'))}
+        />
+      ) : needsOrg ? null : (
+        children
+      )}
 
       <AdminNav open={navOpen} onClose={() => setNavOpen(false)} />
     </SafeAreaView>
@@ -82,15 +130,21 @@ export function AdminScreen({
  * query đã tự tắt bằng `enabled` khi thiếu slug (`queries/admin.ts`), nên tới đây là im lặng
  * hoàn toàn chứ không phải hiện lối thoát trong lúc vẫn bắn request hỏng phía sau.
  */
-function NoOrgPicked({ onPick }: { onPick: () => void }) {
+function NoOrgPicked({ master, onPick }: { master: boolean; onPick: () => void }) {
   return (
     <View style={styles.noOrg}>
       <Text style={styles.noOrgIcon}>🏫</Text>
       <Text style={styles.noOrgTitle}>Chưa chọn tổ chức nào</Text>
       <Text style={styles.noOrgText}>
-        Màn này hiện dữ liệu của một tổ chức cụ thể. Chọn tổ chức bạn muốn thao tác rồi quay lại.
+        {master
+          ? 'Màn này hiện dữ liệu của MỘT tổ chức — quyền của bạn không giới hạn, nhưng hàng đợi thì luôn thuộc về một nơi cụ thể. Chọn nơi bạn muốn xem; đổi lại bất cứ lúc nào ở dòng trên tiêu đề.'
+          : 'Màn này hiện dữ liệu của một tổ chức cụ thể. Bạn cần thuộc về một tổ chức trước đã.'}
       </Text>
-      <PinButton label="Chọn tổ chức" onPress={onPick} style={{ marginTop: 18 }} />
+      <PinButton
+        label={master ? 'Chọn tổ chức' : 'Tìm tổ chức'}
+        onPress={onPick}
+        style={{ marginTop: 18 }}
+      />
     </View>
   );
 }

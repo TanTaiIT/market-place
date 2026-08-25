@@ -11,15 +11,28 @@ import {
   myJoinRequests,
   myOrganizations,
   organizationByCode,
+  organizationLookup,
+  organizationPublicProfile,
   rejectJoinRequest,
   updateOrgUnit,
 } from './generated';
-import type { CreateOrgUnit, JoinRequest, Member, OrgUnit, UpdateOrgUnit } from './generated';
+import type {
+  CreateOrgUnit,
+  JoinRequest,
+  Member,
+  OrganizationLookup,
+  OrganizationProfile,
+  OrgUnit,
+  UpdateOrgUnit,
+} from './generated';
 
 /** Màn hình dùng nhóm con đi qua đây, không import thẳng `generated` — `app/**` chỉ biết tới `api/**`. */
 export type { Member, OrgUnit };
+/** Một thẻ nhóm trong danh sách khám phá, và hồ sơ đầy đủ của một nhóm. */
+export type OrgRow = OrganizationLookup;
+export type OrgProfile = OrganizationProfile;
 import { relativeTime, unwrap } from './client';
-import { withAuthRetry } from './http';
+import { ORG_HEADER, withAuthRetry } from './http';
 
 /**
  * Tổ chức + đơn xin tham gia. Tách khỏi `client.ts` vì file đó đã sát trần và cụm này có vòng
@@ -168,6 +181,40 @@ export const orgApi = {
     return unwrap(res, 'Không duyệt được lô đơn');
   },
 
+  /**
+   * Tìm nhóm CÔNG KHAI theo tên, hoặc lấy gợi ý khi bỏ trống từ khoá.
+   *
+   * Gọi trần, không `withAuthRetry`: route công khai, người chưa đăng nhập vẫn tìm được.
+   * Nhóm riêng tư không bao giờ nằm trong kết quả — BE lọc, client không phải biết.
+   */
+  async discover(keyword: string): Promise<OrgRow[]> {
+    const q = keyword.trim();
+    const res = await organizationLookup({ query: q ? { q } : {} });
+    return unwrap(res, 'Không tìm được nhóm nào');
+  },
+
+  /** Hồ sơ nhóm công khai. Nhóm riêng tư trả 404 — không phân biệt được với slug không có thật. */
+  async profile(slug: string): Promise<OrgProfile> {
+    const res = await organizationPublicProfile({ path: { slug } });
+    return unwrap(res, 'Không tìm thấy nhóm này');
+  },
+
+  /**
+   * Vài thành viên đầu của MỘT nhóm cụ thể — hàng avatar trên hồ sơ nhóm.
+   *
+   * Gắn `X-Org-Slug` cho riêng lượt gọi này thay vì đổi org đang thao tác của cả app: người
+   * dùng mở hồ sơ một nhóm khác không có nghĩa là họ muốn chuyển sang làm việc ở đó.
+   *
+   * `requireMembership` của BE vẫn đứng nguyên — gửi slug của nhóm mình không thuộc về thì
+   * nhận 403, nên chỉ gọi khi hồ sơ trả `joined: true`.
+   */
+  async memberPreview(slug: string, take: number): Promise<Member[]> {
+    const res = await withAuthRetry(() =>
+      membershipList({ query: { limit: take }, headers: { [ORG_HEADER]: slug } }),
+    );
+    return unwrap(res, 'Không đọc được danh bạ nhóm');
+  },
+
   async myOrgs(): Promise<MyOrg[]> {
     const res = await withAuthRetry(() => myOrganizations());
     return unwrap(res, 'Không đọc được danh sách tổ chức của bạn');
@@ -206,7 +253,8 @@ export const orgApi = {
    * Muốn xem trước tên tổ chức trước khi gửi thì gọi `orgApi.byCode` — cùng mã, không cần đăng nhập.
    */
   async requestJoin(input: {
-    code: string;
+    code?: string;
+    slug?: string;
     claimedName: string;
     claimedUnit?: string;
     note?: string;
@@ -214,7 +262,8 @@ export const orgApi = {
     const res = await withAuthRetry(() =>
       createJoinRequest({
         body: {
-          code: input.code.trim(),
+          // Đúng MỘT trong hai — BE `.refine()` từ chối nếu gửi cả hai hoặc không gửi gì.
+          ...(input.code ? { code: input.code.trim() } : { slug: input.slug }),
           claimedName: input.claimedName,
           claimedUnit: input.claimedUnit || undefined,
           note: input.note || undefined,

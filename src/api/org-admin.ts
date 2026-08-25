@@ -30,6 +30,14 @@ export type OrgStatus = Organization['status'];
 /** Bộ lọc của bảng tổ chức. Cả hai bỏ trống = liệt kê tất cả, đúng nghĩa một bảng quản trị. */
 export type OrgListFilter = { q?: string; status?: OrgStatus };
 
+/** Bộ lọc trạng thái của bảng tổ chức. `all` là mục của riêng UI, không phải giá trị BE. */
+export const STATUS_FILTER: { value: string; label: string }[] = [
+  { value: 'all', label: 'Tất cả' },
+  { value: 'active', label: 'Đang mở' },
+  { value: 'suspended', label: 'Đang khoá' },
+  { value: 'pending_admin', label: 'Chờ người phụ trách' },
+];
+
 /** Trạng thái tổ chức, nhãn cho bảng quản trị — cùng lý do với `ROLE_LABEL`: màn không tự dịch. */
 export const STATUS_LABEL: Record<OrgStatus, string> = {
   active: 'ĐANG MỞ',

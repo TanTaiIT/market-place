@@ -21,7 +21,7 @@ const COMBINING_MARKS = /[\u0300-\u036f]/g;
  * Bỏ dấu về ASCII để "ha noi" khớp "Hà Nội". `đ` phải xử riêng: nó không phải `d` + dấu phụ
  * nên NFD không tách ra được, thiếu dòng đó thì gõ "da nang" không ra "Đà Nẵng".
  */
-function normalizeVi(input: string): string {
+export function normalizeVi(input: string): string {
   return input
     .normalize('NFD')
     .replace(COMBINING_MARKS, '')

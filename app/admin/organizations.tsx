@@ -12,7 +12,7 @@ import {
   useCreateOrganization,
   useSetOrganizationStatus,
 } from '@/queries/org-admin';
-import { STATUS_LABEL } from '@/api/org-admin';
+import { STATUS_FILTER, STATUS_LABEL } from '@/api/org-admin';
 import type { Organization, OrgStatus } from '@/api/org-admin';
 import { useOrgSlug, useSetActiveOrg } from '@/stores/auth';
 import { C, F } from '@/theme';
@@ -27,13 +27,6 @@ import { C, F } from '@/theme';
  * Vì thế màn này cũng là nơi master CHỌN tổ chức đang thao tác: mọi màn org-scoped đọc
  * `X-Org-Slug`, mà `OrgSwitcher` trên hồ sơ thì dựng từ danh bạ thành viên.
  */
-
-const STATUS_FILTER: { value: string; label: string }[] = [
-  { value: 'all', label: 'Tất cả' },
-  { value: 'active', label: 'Đang mở' },
-  { value: 'suspended', label: 'Đang khoá' },
-  { value: 'pending_admin', label: 'Chờ người phụ trách' },
-];
 
 export default function AdminOrganizations() {
   const toast = useToast();
@@ -115,13 +108,16 @@ export default function AdminOrganizations() {
                     <Text style={styles.meta}>
                       /{org.slug} · {STATUS_LABEL[org.status]}
                     </Text>
+                    {/* Mã để phát cho người xin vào (`/join-org`). `selectable` thay vì nút
+                        Copy: repo không có `expo-clipboard`, thêm native module cho sáu ký tự
+                        là không đáng. */}
+                    <Text selectable style={styles.code}>
+                      Mã tham gia: {org.joinCode}
+                    </Text>
                   </View>
                   <View style={styles.acts}>
-                    {/*
-                     * Chọn tổ chức đang thao tác — đường DUY NHẤT của master tới các màn
-                     * org-scoped: chúng đọc `X-Org-Slug`, mà bộ chuyển tổ chức trên hồ sơ thì
-                     * dựng từ danh bạ thành viên, nơi master không có dòng nào.
-                     */}
+                    {/* Đổi nhanh từ bảng; bộ chọn trên tiêu đề mọi màn org-scoped làm việc
+                        tương tự (`AdminOrgPicker`). */}
                     <AdminSmallBtn
                       label={acting ? '✓ Đang thao tác' : 'Thao tác trong'}
                       onPress={() => setActiveOrg(acting ? null : org.slug)}
@@ -235,6 +231,13 @@ const styles = StyleSheet.create({
   },
   rowActing: { borderColor: C.pin, borderWidth: 1.5 },
   name: { fontFamily: F.uiBold, fontSize: 14, color: C.paper },
+  code: {
+    fontFamily: F.monoBold,
+    fontSize: 11.5,
+    letterSpacing: 1,
+    color: C.tape,
+    marginTop: 5,
+  },
   meta: {
     fontFamily: F.mono,
     fontSize: 10.5,

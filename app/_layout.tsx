@@ -137,6 +137,7 @@ export default function RootLayout() {
                   {/* Cần đăng nhập nhưng KHÔNG cần thuộc tổ chức nào — đây chính là đường vào
                       tổ chức đầu tiên của một tài khoản mới. */}
                   <Stack.Screen name="join-org" />
+                  <Stack.Screen name="org/[slug]" />
                   <Stack.Screen name="listing/[id]" />
                   <Stack.Screen name="listing/edit/[id]" />
                   <Stack.Screen name="user/[id]" />

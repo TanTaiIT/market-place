@@ -4,7 +4,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { Listing } from '@/api/db';
 import { ListingPhoto } from './ListingPhoto';
 import { Avatar } from './ui';
-import { C, F } from '@/theme';
+import { C, F, shadow } from '@/theme';
 
 /**
  * Thẻ tin của BẢNG TIN — một tờ giấy ghim khổ rộng, đọc hết được nội dung mà không phải mở tin.
@@ -48,67 +48,68 @@ export function FeedCard({
         .damping(16)}
       style={styles.card}
     >
-        {/* ── Người đăng ─────────────────────────────────────────── */}
-        <View style={styles.head}>
-          <Avatar text={item.avatar} url={item.avatarUrl} size={38} color={C.moss} />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text numberOfLines={1} style={styles.seller}>
-              {item.seller}
-            </Text>
-            <Text numberOfLines={1} style={styles.subMeta}>
-              {orgName ? `${orgName} · ${item.meta}` : item.meta}
-            </Text>
+      <View style={styles.pinhead} />
+      {/* ── Người đăng ─────────────────────────────────────────── */}
+      <View style={styles.head}>
+        <Avatar text={item.avatar} url={item.avatarUrl} size={38} color={C.moss} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text numberOfLines={1} style={styles.seller}>
+            {item.seller}
+          </Text>
+          <Text numberOfLines={1} style={styles.subMeta}>
+            {orgName ? `${orgName} · ${item.meta}` : item.meta}
+          </Text>
+        </View>
+        {item.status === 'pending' && (
+          <View style={styles.pendingPill}>
+            <Text style={styles.pendingText}>CHỜ DUYỆT</Text>
           </View>
-          {item.status === 'pending' && (
-            <View style={styles.pendingPill}>
-              <Text style={styles.pendingText}>CHỜ DUYỆT</Text>
+        )}
+      </View>
+
+      {/* ── Nội dung ───────────────────────────────────────────── */}
+      <Pressable onPress={onPress} style={({ pressed }) => pressed && { opacity: 0.85 }}>
+        <View style={styles.body}>
+          <Text numberOfLines={2} style={styles.title}>
+            {item.title}
+          </Text>
+          {!!item.desc && (
+            <Text numberOfLines={2} style={styles.desc}>
+              {item.desc}
+            </Text>
+          )}
+          {!!item.cat && (
+            <View style={styles.catPill}>
+              <Text style={styles.catText}>{item.cat}</Text>
             </View>
           )}
         </View>
 
-        {/* ── Nội dung ───────────────────────────────────────────── */}
-        <Pressable onPress={onPress} style={({ pressed }) => pressed && { opacity: 0.85 }}>
-          <View style={styles.body}>
-            <Text numberOfLines={2} style={styles.title}>
-              {item.title}
-            </Text>
-            {!!item.desc && (
-              <Text numberOfLines={2} style={styles.desc}>
-                {item.desc}
-              </Text>
-            )}
-            {!!item.cat && (
-              <View style={styles.catPill}>
-                <Text style={styles.catText}>{item.cat}</Text>
-              </View>
-            )}
+        <ListingPhoto photo={item.photo} photoUrl={item.photoUrls?.[0]} style={styles.photo}>
+          <View style={styles.priceTag}>
+            <Text style={styles.priceText}>{item.price}</Text>
           </View>
+        </ListingPhoto>
+      </Pressable>
 
-          <ListingPhoto photo={item.photo} photoUrl={item.photoUrls?.[0]} style={styles.photo}>
-            <View style={styles.priceTag}>
-              <Text style={styles.priceText}>{item.price}</Text>
-            </View>
-          </ListingPhoto>
-        </Pressable>
+      {/* ── Số liệu ────────────────────────────────────────────── */}
+      <View style={styles.stats}>
+        <Text style={styles.statText}>👁 {item.viewCount} lượt xem</Text>
+        <Text style={styles.statText}>📌 {item.favoriteCount} người quan tâm</Text>
+      </View>
 
-        {/* ── Số liệu ────────────────────────────────────────────── */}
-        <View style={styles.stats}>
-          <Text style={styles.statText}>👁 {item.viewCount} lượt xem</Text>
-          <Text style={styles.statText}>📌 {item.favoriteCount} người quan tâm</Text>
-        </View>
-
-        {/* ── Hành động ──────────────────────────────────────────── */}
-        <View style={styles.actions}>
-          <Action
-            label={saved ? 'Đã lưu' : 'Lưu tin'}
-            glyph={saved ? '❤️' : '🤍'}
-            tint={saved ? C.pin : undefined}
-            onPress={onToggleSave}
-          />
-          {/* Tin của chính mình thì không có ai để nhắn — chỗ đó thành nút xem lượt quan tâm. */}
-          {!item.mine && <Action label="Nhắn tin" glyph="💬" onPress={onMessage} />}
-          <Action label="Chia sẻ" glyph="↗" onPress={share} last />
-        </View>
+      {/* ── Hành động ──────────────────────────────────────────── */}
+      <View style={styles.actions}>
+        <Action
+          label={saved ? 'Đã lưu' : 'Lưu tin'}
+          glyph={saved ? '❤️' : '🤍'}
+          tint={saved ? C.pin : undefined}
+          onPress={onToggleSave}
+        />
+        {/* Tin của chính mình thì không có ai để nhắn — chỗ đó thành nút xem lượt quan tâm. */}
+        {!item.mine && <Action label="Nhắn tin" glyph="💬" onPress={onMessage} />}
+        <Action label="Chia sẻ" glyph="↗" onPress={share} last />
+      </View>
     </Animated.View>
   );
 }
@@ -139,13 +140,32 @@ function Action({
 
 const styles = StyleSheet.create({
   /*
-   * Tin chạy HẾT bề ngang màn hình, ảnh là phần chính — không còn là tờ giấy rời trên bảng bần.
+   * Tờ giấy GHIM LÊN BẢNG BẦN, không phải một dải trắng chạy hết màn hình. Bốn thứ làm nên
+   * hình dáng đó và phải đi cùng nhau: lề ngoài (do danh sách chừa), bo góc, bóng đổ và cái
+   * đinh. Bỏ một cái là ra thứ lai — bo góc mà không có lề thì góc bo chẳng dựa vào đâu để
+   * nhìn thấy.
    *
-   * Vì thế bỏ cả ba thứ làm nên hình dáng thẻ: lề ngoài, bo góc và bóng đổ. Giữ lại một trong
-   * số đó chỉ tạo ra thứ lai giữa hai kiểu — dải trắng có bo góc mà không có lề thì góc bo
-   * chẳng dựa vào đâu để nhìn thấy.
+   * `overflow: 'visible'` để đinh nhô lên trên mép; ảnh bên trong tự bo góc riêng.
    */
-  card: { backgroundColor: C.paperWarm },
+  card: {
+    backgroundColor: C.paperWarm,
+    borderRadius: 8,
+    overflow: 'visible',
+    ...shadow,
+  },
+  pinhead: {
+    position: 'absolute',
+    top: -7,
+    alignSelf: 'center',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: C.pin,
+    borderTopWidth: 3,
+    borderTopColor: C.pinLight,
+    zIndex: 3,
+    ...shadow,
+  },
   head: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, paddingBottom: 10 },
   seller: { fontFamily: F.uiBold, fontSize: 14, color: C.ink },
   subMeta: { fontFamily: F.ui, fontSize: 11.5, color: C.inkSoft, marginTop: 2 },
@@ -158,7 +178,8 @@ const styles = StyleSheet.create({
   pendingText: { fontFamily: F.monoBold, fontSize: 9, letterSpacing: 0.6, color: C.tapeInk },
 
   body: { paddingHorizontal: 14, paddingBottom: 12, gap: 6 },
-  title: { fontFamily: F.uiBold, fontSize: 17, lineHeight: 23, color: C.ink },
+  /** Kalam: tiêu đề tin là chữ người ta viết lên tờ giấy, không phải nhãn hệ thống. */
+  title: { fontFamily: F.hand, fontSize: 19, lineHeight: 25, color: C.ink },
   desc: { fontFamily: F.ui, fontSize: 13.5, lineHeight: 19, color: C.inkSoft },
   catPill: {
     alignSelf: 'flex-start',
@@ -167,18 +188,16 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 3,
     marginTop: 1,
+    transform: [{ rotate: '-1.2deg' }],
   },
   catText: { fontFamily: F.uiBold, fontSize: 11, color: C.tapeInk },
 
   /*
-   * Vuông theo bề ngang màn hình chứ không phải chiều cao cố định: ảnh giờ là phần chính của
-   * tin, và `height: 210` cũ được chọn cho một thẻ hẹp hơn màn hình — giữ nguyên con số đó ở
-   * khổ rộng sẽ thành một dải ngang dẹt.
-   *
-   * Vuông chứ không cao hơn: dọc hơn nữa thì mỗi lần cuộn chỉ thấy đúng một tin, và phần chữ
-   * lẫn hàng nút bị đẩy khỏi màn hình.
+   * Cao CỐ ĐỊNH 200, không phải vuông theo bề ngang. Thẻ đã có lề nên ảnh hẹp hơn màn hình;
+   * để vuông thì một tin chiếm gần hết chiều cao và mỗi lần cuộn chỉ thấy đúng một tin, phần
+   * chữ lẫn hàng nút bị đẩy ra ngoài.
    */
-  photo: { width: '100%', aspectRatio: 1, justifyContent: 'flex-end' },
+  photo: { height: 200, justifyContent: 'flex-end' },
   priceTag: {
     position: 'absolute',
     bottom: 10,
@@ -187,6 +206,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 4,
+    borderBottomLeftRadius: 0,
   },
   priceText: { color: C.paper, fontFamily: F.monoBold, fontSize: 14 },
 
@@ -195,12 +215,18 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: C.line,
+    borderTopWidth: 1.5,
+    borderTopColor: '#DFD6BC',
+    borderStyle: 'dashed',
   },
   statText: { fontFamily: F.ui, fontSize: 11.5, color: C.inkSoft },
 
-  actions: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: C.line },
+  actions: {
+    flexDirection: 'row',
+    borderTopWidth: 1.5,
+    borderTopColor: '#DFD6BC',
+    borderStyle: 'dashed',
+  },
   action: {
     flex: 1,
     flexDirection: 'row',
@@ -209,7 +235,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 11,
   },
-  actionSplit: { borderRightWidth: 1, borderRightColor: C.line },
+  actionSplit: { borderRightWidth: 1.5, borderRightColor: '#DFD6BC', borderStyle: 'dashed' },
   on: { backgroundColor: C.sand },
   actionGlyph: { fontSize: 13 },
   actionLabel: { fontFamily: F.uiSemi, fontSize: 12.5, color: C.inkSoft },

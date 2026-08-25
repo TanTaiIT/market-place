@@ -113,10 +113,29 @@ export type Organization = {
 export type OrganizationLookup = {
     name: string;
     slug: string;
+    joinCode: string;
+    avatarUrl: string | null;
+    memberCount: number;
     district: string | null;
     provinceCode: string | null;
     allowJoinRequests: boolean;
     allowOutsiderPosts: boolean;
+};
+
+export type OrganizationProfile = {
+    name: string;
+    slug: string;
+    joinCode: string;
+    avatarUrl: string | null;
+    coverUrl: string | null;
+    description: string;
+    provinceCode: string | null;
+    district: string | null;
+    memberCount: number;
+    postsThisWeek: number;
+    rules: Array<string>;
+    allowJoinRequests: boolean;
+    joined: boolean;
 };
 
 export type MyOrganization = {
@@ -327,7 +346,8 @@ export type OrgUnit = {
 };
 
 export type CreateJoinRequest = {
-    code: string;
+    code?: string;
+    slug?: string;
     claimedName: string;
     claimedUnit?: string;
     note?: string;
@@ -1985,11 +2005,46 @@ export type ChangeOrganizationSlugResponses = {
 
 export type ChangeOrganizationSlugResponse = ChangeOrganizationSlugResponses[keyof ChangeOrganizationSlugResponses];
 
+export type OrganizationPublicProfileData = {
+    body?: never;
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/organizations/profile/{slug}';
+};
+
+export type OrganizationPublicProfileErrors = {
+    /**
+     * Không tìm thấy nhóm công khai nào ở slug này
+     */
+    404: ErrorResponse;
+    /**
+     * Tra cứu quá nhiều lần
+     */
+    429: ErrorResponse;
+};
+
+export type OrganizationPublicProfileError = OrganizationPublicProfileErrors[keyof OrganizationPublicProfileErrors];
+
+export type OrganizationPublicProfileResponses = {
+    /**
+     * Hồ sơ nhóm
+     */
+    200: {
+        success: true;
+        message: string;
+        data: OrganizationProfile;
+    };
+};
+
+export type OrganizationPublicProfileResponse = OrganizationPublicProfileResponses[keyof OrganizationPublicProfileResponses];
+
 export type OrganizationLookupData = {
     body?: never;
     path?: never;
-    query: {
-        q: string;
+    query?: {
+        q?: string;
     };
     url: '/organizations/lookup';
 };

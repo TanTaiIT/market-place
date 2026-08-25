@@ -74,6 +74,11 @@ export const qk = {
   /** Prefix để mutation quét mọi bộ lọc — xem `useSetOrganizationStatus`. */
   allOrgsRoot: () => ['orgs', 'all'] as const,
   orgByCode: (code: string) => ['orgs', 'by-code', code] as const,
+  /** Tìm nhóm công khai. Từ khoá nằm trong key: mỗi từ khoá là một tập kết quả khác. */
+  orgDiscover: (q: string) => ['orgs', 'discover', q] as const,
+  orgProfile: (slug: string) => ['orgs', 'profile', slug] as const,
+  /** Danh bạ + tin của MỘT nhóm đang mở hồ sơ, tách khỏi cụm scope theo org đang thao tác. */
+  orgPeek: (slug: string) => ['orgs', 'peek', slug] as const,
   /** Prefix của cụm đơn xin tham gia — quét cả "đơn của tôi" lẫn hàng đợi của người duyệt. */
   joinRequestsRoot: () => ['join-requests'] as const,
   myJoinRequests: () => ['join-requests', 'mine'] as const,

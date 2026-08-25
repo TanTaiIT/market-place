@@ -53,6 +53,9 @@ export function useRequestJoin() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.joinRequestsRoot() });
       qc.invalidateQueries({ queryKey: qk.myOrgs() });
+      // Hồ sơ nhóm mang cờ `joined` và số thành viên — gửi đơn xong mà không quét thì nút
+      // vẫn mời người ta vào lại đúng nhóm họ vừa xin.
+      qc.invalidateQueries({ queryKey: ['orgs', 'profile'] });
     },
   });
 }

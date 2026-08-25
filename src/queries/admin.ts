@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { adminApi } from '@/api/admin';
+import { adminApi, isMaster } from '@/api/admin';
 import type { AdminEvent, ModStatus } from '@/api/admin';
 import type { RerouteListing } from '@/api/generated';
 import { joinAdminRoom, leaveAdminRoom, onSocketEvent } from '@/api/socket';
@@ -81,23 +81,28 @@ export function useCoverage() {
  */
 export function useAdminListings(status?: ModStatus) {
   const orgSlug = useOrgSlug();
+  const master = isMaster(useMyGrants().data);
   const { data: categories } = useCategories();
 
   return useQuery({
     queryKey: qk.adminListings(orgSlug ?? '-', status ?? 'all'),
     queryFn: () =>
       adminApi.getListings(status, new Map((categories ?? []).map((c) => [c.id, c.name]))),
-    enabled: Boolean(orgSlug) && categories !== undefined,
+    // `|| master`: BE mở các route ĐỌC này cho master chưa chọn org (`requireOrgReadOrMaster`),
+    // nên chặn ở client là tự khoá lại đúng thứ vừa mở.
+    enabled: (Boolean(orgSlug) || master) && categories !== undefined,
     placeholderData: keepPreviousData,
   });
 }
 
 export function useAdminReports() {
   const orgSlug = useOrgSlug();
+  const master = isMaster(useMyGrants().data);
   return useQuery({
     queryKey: qk.adminReports(orgSlug ?? '-'),
     queryFn: adminApi.getReports,
-    enabled: Boolean(orgSlug),
+    // Cùng lý do với `useAdminListings`: BE đã mở route đọc này cho master chưa chọn org.
+    enabled: Boolean(orgSlug) || master,
   });
 }
 

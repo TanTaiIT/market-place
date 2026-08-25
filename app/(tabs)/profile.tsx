@@ -31,6 +31,7 @@ export default function Profile() {
       ? [{ icon: '🗂', text: 'Bàn quản trị', admin: true, go: () => router.push('/admin') }]
       : []),
     { icon: '📌', text: 'Tin đã đăng', go: () => router.push('/mylistings') },
+    { icon: '👥', text: 'Nhóm của tôi', go: () => router.push('/join-org') },
     { icon: '🤍', text: 'Tin đã lưu', go: () => router.push('/saved') },
     { icon: '⚙️', text: 'Cài đặt tài khoản', go: () => router.push('/settings') },
     { icon: '❓', text: 'Trợ giúp & hỗ trợ', go: () => toast('Liên hệ: hotro@ghim.vn') },

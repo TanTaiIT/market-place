@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, StyleSheet } from 'react-native';
 import Animated, {
   useAnimatedScrollHandler,
   useAnimatedStyle,
@@ -9,13 +9,14 @@ import Animated, {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Corkboard } from '@/components/Corkboard';
+import { FeedBar } from '@/components/FeedBar';
 import { FeedCard } from '@/components/FeedCard';
-import { Avatar, EmptyState, Loading, TapeChip } from '@/components/ui';
+import { EmptyState, Loading } from '@/components/ui';
 import { useCategories, useListings, useProfile, useSavedIds, useToggleSaved } from '@/queries/listings';
 import { useOpenConversation } from '@/queries/chat';
 import { useMyOrgs } from '@/queries/org';
 import { useToast } from '@/components/Toast';
-import { C, F, shadow } from '@/theme';
+import { C } from '@/theme';
 
 /** Phải cuộn liên tục chừng này pixel theo một hướng thì thanh mới đổi trạng thái. */
 const SCROLL_SLOP = 12;
@@ -142,7 +143,9 @@ export default function Feed() {
           // xuống. `insets.top` đã nằm trong con số đo được, không cộng lại lần nữa.
           paddingTop: barHeight,
           paddingBottom: 32,
-          gap: 8,
+          paddingHorizontal: 16,
+          // 22 chứ không 8: đinh ghim nhô lên khỏi mép thẻ, thiếu chỗ thì nó đè lên thẻ trên.
+          gap: 22,
         }}
         refreshControl={
           // Bọc `refetch` chứ không truyền thẳng: RefreshControl gọi handler không tham số nhưng
@@ -194,44 +197,18 @@ export default function Feed() {
         onLayout={(e) => measureBar(e.nativeEvent.layout.height)}
         style={[styles.bar, { paddingTop: insets.top + 12 }, barStyle]}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>Bảng tin của bạn</Text>
-
-          <Pressable onPress={() => router.push('/(tabs)/profile')}>
-            <Avatar text={profile?.avatar ?? '·'} url={profile?.avatarUrl} ring />
-          </Pressable>
-        </View>
-
-        <Pressable style={styles.searchBar} onPress={() => router.push('/search')}>
-          <Text style={styles.searchText}>🔍  Tìm xe đạp, sách, laptop...</Text>
-        </Pressable>
-
-        {/* Chỉ hiện khi BE trả về danh mục — hỏng hoặc rỗng thì giấu hẳn hàng chip thay
-            vì để một hàng trơ ra không bấm được gì. */}
-        {!!categories?.length && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.chipBar}
-            contentContainerStyle={styles.chipRow}
-          >
-            <TapeChip
-              label="Tất cả"
-              index={0}
-              active={categoryId === ''}
-              onPress={() => setCategoryId('')}
-            />
-            {categories.map((c, i) => (
-              <TapeChip
-                key={c.id}
-                label={c.icon ? `${c.icon} ${c.name}` : c.name}
-                index={i + 1}
-                active={categoryId === c.id}
-                onPress={() => setCategoryId(c.id)}
-              />
-            ))}
-          </ScrollView>
-        )}
+        <FeedBar
+          avatar={profile?.avatar ?? '·'}
+          avatarUrl={profile?.avatarUrl}
+          myOrgs={myOrgs ?? []}
+          categories={categories ?? []}
+          categoryId={categoryId}
+          onCategory={setCategoryId}
+          onSearch={() => router.push('/search')}
+          onProfile={() => router.push('/(tabs)/profile')}
+          onOrg={(slug) => router.push(`/org/${slug}`)}
+          onFindOrg={() => router.push('/join-org')}
+        />
       </Animated.View>
     </Corkboard>
   );
@@ -254,33 +231,8 @@ const styles = StyleSheet.create({
     backgroundColor: C.cork,
     paddingBottom: 4,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-    // Lề riêng: danh sách đã bỏ lề chung để mỗi tin chạy hết bề ngang màn hình.
-    paddingHorizontal: 16,
-  },
-  title: { fontFamily: F.hand, fontSize: 26, color: C.ink },
-  searchBar: {
-    backgroundColor: C.paperWarm,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: C.corkDark,
-    borderRadius: 10,
-    paddingVertical: 11,
-    paddingHorizontal: 14,
-    marginBottom: 14,
-    marginHorizontal: 16,
-    ...shadow,
-  },
-  searchText: { fontFamily: F.ui, fontSize: 13.5, color: C.inkSoft },
   // Hàng chip là phần DUY NHẤT của khối đầu không lấy lề 16: nó phải cuộn tràn ra mép phải, nên lề
   // trái đặt ở đây còn mép phải để hở.
-  chipRow: { paddingBottom: 6, paddingLeft: 16, paddingRight: 8 },
   // Xem `filterBar` bên `AdminScreen`: RN gán sẵn `flexGrow/flexShrink: 1` cho mọi ScrollView,
   // và trong thanh nổi này nó sẽ co giãn tranh chỗ với hai hàng trên.
-  chipBar: { flexGrow: 0, flexShrink: 0 },
-
 });

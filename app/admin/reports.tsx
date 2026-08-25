@@ -26,7 +26,7 @@ export default function AdminReports() {
     );
 
   return (
-    <AdminScreen title="Báo cáo" note="xử lý trong 24 giờ" org>
+    <AdminScreen title="Báo cáo" note="xử lý trong 24 giờ" org masterReadsAll>
       <FlatList
         data={data ?? []}
         keyExtractor={(r) => r.id}

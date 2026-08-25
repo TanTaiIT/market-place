@@ -1,5 +1,6 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { initialsOf } from '@/api/client';
 import { Avatar } from './ui';
 import type { Member, OrgProfile } from '@/api/org';
 import { C, F, shadow } from '@/theme';
@@ -15,12 +16,15 @@ export function Header({
   members,
   onJoin,
   onInvite,
+  onEdit,
   busy,
 }: {
   org: OrgProfile;
   members: Member[];
   onJoin: () => void;
   onInvite: () => void;
+  /** Chỉ truyền khi người xem là quản trị nhóm — `undefined` thì hàng nút không dựng ô sửa. */
+  onEdit?: () => void;
   busy: boolean;
 }) {
   const where = [org.district, org.provinceCode].filter(Boolean).join(', ');
@@ -50,7 +54,13 @@ export function Header({
           <View style={styles.faces}>
             {members.map((m, i) => (
               <View key={m.userId} style={[styles.face, i > 0 && { marginLeft: -9 }]}>
-                <Avatar text={m.avatar} size={28} />
+                {/*
+                  `Member.avatar` của BE là URL Cloudinary, KHÔNG phải chữ viết tắt — nó lấy
+                  thẳng `User.avatar`. Trước đây chỗ này truyền nó vào `text`, nên ai đã đặt
+                  ảnh sẽ hiện hai ký tự đầu của đường dẫn thay vì mặt mình.
+                  Chữ viết tắt dựng từ `name`, đúng cách mọi DTO khác làm ở `client.ts`.
+                */}
+                <Avatar text={initialsOf(m.name)} url={m.avatar || undefined} size={28} />
               </View>
             ))}
             <Text style={styles.facesText}>
@@ -87,6 +97,24 @@ export function Header({
             <Text style={styles.inviteText}>Mời</Text>
           </Pressable>
         </View>
+
+        {/*
+          Quản trị nhóm. Nằm TRONG thẻ thông tin vì nó sửa đúng những gì thẻ này đang hiện —
+          tên, mô tả, ảnh bìa, nội quy. Tách ra thành thẻ riêng thì nó đọc như một mục lạ chen
+          giữa hồ sơ và danh sách tin.
+          Một dòng dưới vạch kẻ, KHÔNG phải nút thứ ba trong hàng trên: "Đã tham gia" và "Mời"
+          là việc của người xem nhóm, còn đây là việc của người quản nhóm — nhồi chung một hàng
+          thì trên máy 360dp cả ba đều bị bóp đến mức không đọc nổi.
+        */}
+        {!!onEdit && (
+          <Pressable
+            onPress={onEdit}
+            style={({ pressed }) => [styles.editRow, pressed && { opacity: 0.6 }]}
+          >
+            <Text style={styles.editText}>✎ Sửa thông tin nhóm</Text>
+            <Text style={styles.editHint}>ảnh bìa · giới thiệu · nội quy</Text>
+          </Pressable>
+        )}
       </View>
 
       {org.rules.length > 0 && (
@@ -107,7 +135,14 @@ export function Header({
 }
 
 const styles = StyleSheet.create({
-  cover: { height: 130, width: '100%' },
+  /*
+   * 16:9 theo bề ngang màn hình, không phải chiều cao cố định.
+   *
+   * `height: 130` cũ cho ra một dải dẹt trên máy nào cũng vậy, và nó KHÔNG khớp khổ ảnh mà
+   * màn sửa ép người dùng cắt (`aspect: [16, 9]`) — ảnh họ vừa canh xong bị cắt lại lần nữa.
+   * Tính theo tỉ lệ thì hai đầu nói cùng một khổ.
+   */
+  cover: { width: '100%', aspectRatio: 16 / 9 },
   card: { backgroundColor: C.paperWarm, borderRadius: 10, padding: 18, gap: 9, ...shadow },
   /** Đè lên mép dưới ảnh bìa, đúng cách thẻ nổi trên nền trong bản thiết kế. */
   overCover: { marginTop: -22 },
@@ -151,6 +186,21 @@ const styles = StyleSheet.create({
   },
   /** Khoảng cách giữa các khối của phần đầu — thay cho `gap` đã bỏ ở wrapper. */
   stack: { marginTop: 14 },
+  /*
+   * Vạch kẻ chỉ dài bằng phần nội dung thẻ (thẻ có `padding: 18`), đúng kiểu vạch phân mục
+   * bên trong một thẻ — kéo hết bề ngang sẽ trông như thẻ bị cắt làm hai.
+   */
+  editRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: C.line,
+    paddingTop: 13,
+    marginTop: 5,
+  },
+  editText: { fontFamily: F.uiBold, fontSize: 13, color: C.moss },
+  editHint: { fontFamily: F.mono, fontSize: 9.5, color: C.inkSoft },
   rule: { flexDirection: 'row', gap: 9, marginTop: 9 },
   rulePin: { fontSize: 10, marginTop: 3 },
   ruleText: { flex: 1, fontFamily: F.ui, fontSize: 12.5, lineHeight: 19, color: C.inkSoft },

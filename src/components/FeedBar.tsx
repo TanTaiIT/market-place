@@ -22,6 +22,7 @@ export function FeedBar({
   onProfile,
   onOrg,
   onFindOrg,
+  onTitleLayout,
 }: {
   avatar: string;
   avatarUrl?: string;
@@ -33,20 +34,42 @@ export function FeedBar({
   onProfile: () => void;
   onOrg: (slug: string) => void;
   onFindOrg: () => void;
+  /** Chiều cao dòng chữ tay, để màn hình biết cuộn bao nhiêu thì nó đi hết. */
+  onTitleLayout: (height: number) => void;
 }) {
   return (
     <>
-        <View style={styles.header}>
-          <Text style={styles.title}>Bảng tin của bạn</Text>
+        {/*
+          Dòng chữ tay: nó CUỘN ĐI như một phần nội dung, không phải ẩn hiện theo trạng thái.
 
-          <Pressable onPress={() => onProfile()}>
-            <Avatar text={avatar} url={avatarUrl} ring />
-          </Pressable>
+          Màn hình dịch cả thanh lên đúng bằng số pixel đã cuộn, tối đa bằng chiều cao dòng
+          này (xem `collapse` trong `feed.tsx`). Nhờ vậy mép dưới thanh bám sát mép trên nội
+          dung suốt quá trình — không có khe hở, và cũng không có cú nhảy ở thời điểm nó biến
+          mất. Ẩn nó bằng một cờ boolean thì đúng ở hai đầu nhưng hở một dải ở giữa.
+        */}
+        <View
+          style={styles.brandRow}
+          onLayout={(e) => onTitleLayout(e.nativeEvent.layout.height)}
+        >
+          <Text style={styles.brand}>Bảng tin của bạn</Text>
         </View>
 
-        <Pressable style={styles.searchBar} onPress={() => onSearch()}>
-          <Text style={styles.searchText}>🔍  Tìm trên bảng tin của bạn...</Text>
-        </Pressable>
+        {/*
+          Ô tìm và avatar CHUNG một hàng, và không còn tiêu đề lớn "Bảng tin của bạn".
+
+          Tiêu đề đó lặp lại thứ `TabBar` đã ghi ngay dưới đáy màn hình (🏠 Bảng tin) —
+          nó tốn gần 50dp chỉ để nói lại một điều người dùng đang nhìn thấy. Hai thao tác
+          THẬT của hàng này là tìm kiếm và mở hồ sơ, cả hai đều vừa một dòng.
+        */}
+        <View style={styles.topRow}>
+          <Pressable style={styles.searchBar} onPress={() => onSearch()}>
+            <Text style={styles.searchText}>🔍  Tìm trên bảng tin của bạn...</Text>
+          </Pressable>
+
+          <Pressable onPress={() => onProfile()}>
+            <Avatar text={avatar} url={avatarUrl} size={34} ring />
+          </Pressable>
+        </View>
 
         {/*
           Hàng nhóm của mình, đứng TRÊN hàng danh mục vì nó lọc ở mức khác: chọn nhóm là
@@ -56,6 +79,7 @@ export function FeedBar({
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.rail}
           contentContainerStyle={styles.orgRow}
           keyboardShouldPersistTaps="handled"
         >
@@ -85,7 +109,7 @@ export function FeedBar({
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            style={styles.chipBar}
+            style={styles.rail}
             contentContainerStyle={styles.chipRow}
           >
             <TapeChip
@@ -110,30 +134,32 @@ export function FeedBar({
 }
 
 const styles = StyleSheet.create({
-  chipBar: { flexGrow: 0, flexShrink: 0 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-    // Lề riêng: danh sách đã bỏ lề chung để mỗi tin chạy hết bề ngang màn hình.
-    paddingHorizontal: 16,
-  },
-  title: { fontFamily: F.hand, fontSize: 26, color: C.ink },
+  /*
+   * DÙNG CHUNG cho cả hai hàng cuộn ngang trong thanh này.
+   *
+   * React Native gán sẵn `flexGrow: 1, flexShrink: 1` cho MỌI ScrollView
+   * (`ScrollView.js` → `baseHorizontal`). Thanh đầu là một cột, nên thiếu dòng này thì hai
+   * hàng cuộn co giãn tranh chỗ với nhau và với hàng tìm kiếm — hàng nhóm từng thiếu nó.
+   */
+  rail: { flexGrow: 0, flexShrink: 0 },
+  brandRow: { paddingHorizontal: 16, paddingBottom: 10 },
+  brand: { fontFamily: F.hand, fontSize: 26, color: C.ink },
+  // Lề riêng: danh sách đã bỏ lề chung để mỗi tin chạy hết bề ngang màn hình.
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16 },
   searchBar: {
+    // `flex: 1` để ô tìm nuốt hết chỗ còn lại sau avatar — avatar giữ nguyên kích thước.
+    flex: 1,
     backgroundColor: C.paperWarm,
     borderWidth: 2,
     borderStyle: 'dashed',
     borderColor: C.corkDark,
     borderRadius: 10,
-    paddingVertical: 11,
+    paddingVertical: 9,
     paddingHorizontal: 14,
-    marginBottom: 14,
-    marginHorizontal: 16,
     ...shadow,
   },
   searchText: { fontFamily: F.ui, fontSize: 13.5, color: C.inkSoft },
-  orgRow: { flexDirection: 'row', gap: 8, paddingTop: 10, paddingRight: 4 },
+  orgRow: { flexDirection: 'row', gap: 8, paddingTop: 9, paddingRight: 4, paddingLeft: 16 },
   orgChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -141,12 +167,12 @@ const styles = StyleSheet.create({
     maxWidth: 175,
     backgroundColor: C.paperWarm,
     borderRadius: 20,
-    paddingVertical: 6,
-    paddingLeft: 6,
+    paddingVertical: 5,
+    paddingLeft: 5,
     paddingRight: 12,
     ...shadow,
   },
-  orgDot: { width: 22, height: 22, borderRadius: 11 },
+  orgDot: { width: 20, height: 20, borderRadius: 10 },
   orgChipText: { flexShrink: 1, fontFamily: F.uiBold, fontSize: 12, color: C.ink },
   orgFind: {
     borderRadius: 20,
@@ -158,5 +184,5 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(250,248,240,0.55)',
   },
   orgFindText: { fontFamily: F.uiBold, fontSize: 12, color: C.corkDark },
-  chipRow: { paddingBottom: 6, paddingLeft: 16, paddingRight: 8 },
+  chipRow: { paddingTop: 9, paddingBottom: 2, paddingLeft: 16, paddingRight: 8 },
 });

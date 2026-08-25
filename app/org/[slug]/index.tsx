@@ -1,12 +1,15 @@
 import { FlatList, Share, StyleSheet, Text, View } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
 import { FeedCard } from '@/components/FeedCard';
 import { Header } from '@/components/OrgProfileCard';
 import { useToast } from '@/components/Toast';
-import { useRequestJoin } from '@/queries/org';
+import { useMyOrgs, useRequestJoin } from '@/queries/org';
 import { useOrgPeek, useOrgProfile } from '@/queries/org-discover';
-import { useProfile } from '@/queries/listings';
+import { useMyGrants } from '@/queries/admin';
+import { canAdminOrg } from '@/api/admin';
+import { useProfile, useSavedIds, useToggleSaved } from '@/queries/listings';
+import { useOpenConversation } from '@/queries/chat';
 import type { OrgProfile } from '@/api/org';
 import { C, F } from '@/theme';
 
@@ -21,12 +24,29 @@ import { C, F } from '@/theme';
  */
 export default function OrgProfileScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
+  const router = useRouter();
   const toast = useToast();
 
   const { data: org, error, isPending } = useOrgProfile(slug ?? '');
   const { data: me } = useProfile();
   const join = useRequestJoin();
   const peek = useOrgPeek(slug ?? '', Boolean(org?.joined));
+  /*
+   * Ai được sửa: master, hoặc người giữ grant `manager` trên ĐÚNG nhóm này — xem `canAdminOrg`.
+   *
+   * Cần `orgId` để so, mà `OrganizationProfile` cố tình không mang `id` (nó là DTO công khai).
+   * `useMyOrgs` có cả `id` lẫn `slug` và đã cache sẵn, nên nó là bảng tra rẻ nhất. Master
+   * không thuộc nhóm nào thì `orgId` là `undefined` — `canAdminOrg` đã short-circuit trước đó.
+   */
+  const { data: grants } = useMyGrants();
+  const { data: myOrgs } = useMyOrgs();
+
+  // Cùng ba đường của bảng tin, không phải bản sao rút gọn: thẻ tin ở đây là CÙNG một
+  // `FeedCard`, nên ai đã học cách bấm ở bảng tin thì ở đây phải bấm ra cùng thứ.
+  const { data: savedIds } = useSavedIds();
+  const toggleSaved = useToggleSaved();
+  const openChat = useOpenConversation();
+  const saved = new Set(savedIds ?? []);
 
   if (isPending) return <Shell><Loading /></Shell>;
   if (error || !org) {
@@ -52,6 +72,12 @@ export default function OrgProfileScreen() {
       },
     );
 
+  const message = (listingId: string) =>
+    openChat.mutate(listingId, {
+      onSuccess: (c) => router.push(`/chat/${c.id}`),
+      onError: (e: Error) => toast(`⚠️ ${e.message}`),
+    });
+
   const invite = () =>
     void Share.share({
       message: `Vào nhóm "${org.name}" trên Ghim — mã tham gia: ${org.joinCode}`,
@@ -69,6 +95,11 @@ export default function OrgProfileScreen() {
             members={peek.data?.members ?? []}
             onJoin={requestJoin}
             onInvite={invite}
+            onEdit={
+              canAdminOrg(grants, myOrgs?.find((o) => o.slug === org.slug)?.id)
+                ? () => router.push(`/org/${org.slug}/edit`)
+                : undefined
+            }
             busy={join.isPending}
           />
         }
@@ -79,12 +110,10 @@ export default function OrgProfileScreen() {
               item={item}
               index={index}
               orgName={org.name}
-              // Hồ sơ nhóm là chỗ ĐỌC LƯỚT: lưu/nhắn/chia sẻ đã có đủ ở bảng tin và màn
-              // chi tiết, nhân bản vào đây chỉ thêm ba đường phải giữ đồng bộ.
-              saved={false}
-              onPress={() => {}}
-              onToggleSave={() => {}}
-              onMessage={() => {}}
+              saved={saved.has(item.id)}
+              onPress={() => router.push(`/listing/${item.id}`)}
+              onToggleSave={() => toggleSaved.mutate({ id: item.id, saved: !saved.has(item.id) })}
+              onMessage={() => message(item.id)}
             />
           </View>
         )}

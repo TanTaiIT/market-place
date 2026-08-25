@@ -137,7 +137,10 @@ export default function RootLayout() {
                   {/* Cần đăng nhập nhưng KHÔNG cần thuộc tổ chức nào — đây chính là đường vào
                       tổ chức đầu tiên của một tài khoản mới. */}
                   <Stack.Screen name="join-org" />
-                  <Stack.Screen name="org/[slug]" />
+                  {/* `org/[slug]/` là thư mục không có `_layout` riêng, nên hai file trong đó thành
+                      hai route NGANG HÀNG ở stack này — khai `org/[slug]` không còn khớp gì. */}
+                  <Stack.Screen name="org/[slug]/index" />
+                  <Stack.Screen name="org/[slug]/edit" />
                   <Stack.Screen name="listing/[id]" />
                   <Stack.Screen name="listing/edit/[id]" />
                   <Stack.Screen name="user/[id]" />

@@ -13,6 +13,7 @@ import {
   organizationByCode,
   organizationLookup,
   organizationPublicProfile,
+  organizationUpdate,
   rejectJoinRequest,
   updateOrgUnit,
 } from './generated';
@@ -23,11 +24,14 @@ import type {
   OrganizationLookup,
   OrganizationProfile,
   OrgUnit,
+  UpdateOrganization,
   UpdateOrgUnit,
 } from './generated';
 
 /** Màn hình dùng nhóm con đi qua đây, không import thẳng `generated` — `app/**` chỉ biết tới `api/**`. */
 export type { Member, OrgUnit };
+/** Phần hồ sơ nhóm mà quản trị sửa được — màn sửa dùng type này, không import `generated`. */
+export type { UpdateOrganization as OrgPatch };
 /** Một thẻ nhóm trong danh sách khám phá, và hồ sơ đầy đủ của một nhóm. */
 export type OrgRow = OrganizationLookup;
 export type OrgProfile = OrganizationProfile;
@@ -197,6 +201,25 @@ export const orgApi = {
   async profile(slug: string): Promise<OrgProfile> {
     const res = await organizationPublicProfile({ path: { slug } });
     return unwrap(res, 'Không tìm thấy nhóm này');
+  },
+
+  /**
+   * Sửa hồ sơ nhóm — ảnh bìa, mô tả, nội quy.
+   *
+   * BE lấy nhóm từ header `X-Org-Slug` chứ không từ đường dẫn (`PATCH /organizations/current`),
+   * nên phải gắn slug cho RIÊNG lượt gọi này: người đang sửa nhóm B không có nghĩa là họ muốn
+   * chuyển org đang thao tác của cả app sang B. Cùng lập luận với `memberPreview` ngay dưới.
+   *
+   * `requireOrgAdmin` của BE đứng nguyên — không phải thành viên quản trị thì nhận 403, phần
+   * ẩn nút trên giao diện chỉ là để đỡ mắt.
+   *
+   * Field không gửi = giữ nguyên. `rules: []` là XOÁ HẾT nội quy, khác hẳn với không gửi.
+   */
+  async update(slug: string, patch: UpdateOrganization): Promise<void> {
+    const res = await withAuthRetry(() =>
+      organizationUpdate({ body: patch, headers: { [ORG_HEADER]: slug } }),
+    );
+    unwrap(res, 'Không lưu được thông tin nhóm');
   },
 
   /**

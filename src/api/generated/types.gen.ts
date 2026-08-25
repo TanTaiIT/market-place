@@ -155,6 +155,7 @@ export type UpdateOrganization = {
     coverUrl?: string | null;
     allowJoinRequests?: boolean;
     allowOutsiderPosts?: boolean;
+    rules?: Array<string>;
 };
 
 export type OrganizationCard = {

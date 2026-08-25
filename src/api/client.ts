@@ -91,7 +91,8 @@ export function formatPrice(price: number): string {
   return `${String(Math.round(price)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}đ`;
 }
 
-function initialsOf(name: string): string {
+/** Chữ viết tắt vẽ trong vòng tròn khi người dùng chưa có ảnh thật — xem `Avatar`. */
+export function initialsOf(name: string): string {
   return name
     .trim()
     .split(/\s+/)

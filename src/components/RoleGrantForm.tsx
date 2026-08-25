@@ -6,6 +6,7 @@ import { useToast } from './Toast';
 import type { PickerSearch } from './PickerSheet';
 import { useMyOrgs, useOrgRoster, useOrgUnits } from '@/queries/org';
 import { useCategories } from '@/queries/listings';
+import { useAdminUsers } from '@/queries/admin-people';
 import { useProvinces } from '@/queries/location';
 import { filterProvinces, type ProvinceName } from '@/api/location';
 import {
@@ -51,7 +52,30 @@ export function RoleGrantForm({
   const orgSlug = useOrgSlug();
   const [form, setForm] = useState(EMPTY);
 
+  /*
+   * NGUỒN NGƯỜI NHẬN QUYỀN phụ thuộc người đang CẤP, không phụ thuộc tổ chức đang chọn.
+   *
+   * `GET /memberships` đòi `requireOrg` VÀ `requireMembership` — mà master cố ý không là
+   * thành viên tổ chức nào, nên với họ danh bạ luôn 403 dù đã chọn tổ chức. Trước bản sửa
+   * này, ô "Cấp cho ai" của master vĩnh viễn hiện "Danh bạ đang trống" và không có gì nói
+   * ra vì sao.
+   *
+   * Master cũng là người duy nhất cần nguồn RỘNG hơn danh bạ: grant `category_province`
+   * cấp cho người phụ trách danh mục, mà người đó thường chẳng thuộc tổ chức nào cả.
+   * `GET /users` là route master-only nên chỉ họ gọi được — đúng thứ họ cần.
+   */
   const roster = useOrgRoster();
+  const allUsers = useAdminUsers({}, master);
+  const people = master
+    ? (allUsers.data ?? []).map((u) => ({ key: u.id, label: u.name, note: u.email }))
+    : roster.members.map((m) => ({
+        key: m.userId,
+        label: m.name,
+        // Tên nhóm con tra từ `units`: danh bạ chỉ mang `unitId`, và nhóm là thứ đổi tên
+        // được — nhắc lại tên đã lưu ở chỗ khác là hai bản dễ lệch nhau.
+        note: units?.find((u) => u.id === m.unitId)?.name,
+      }));
+  const peopleLoading = master ? allUsers.isLoading : roster.isLoading;
   const { data: units } = useOrgUnits();
   const { data: orgs } = useMyOrgs();
   const { data: categories } = useCategories();
@@ -105,16 +129,12 @@ export function RoleGrantForm({
     <>
       <AdminPickerField
         label="Cấp cho ai"
-        title="Chọn thành viên"
-        placeholder={roster.members.length ? 'Chọn từ danh bạ' : 'Danh bạ đang trống'}
-        items={roster.members.map((m) => ({
-          key: m.userId,
-          label: m.name,
-          // Tên nhóm con tra từ `units`: danh bạ chỉ mang `unitId`, và nhóm là thứ đổi tên
-          // được — nhắc lại tên đã lưu ở chỗ khác là hai bản dễ lệch nhau.
-          note: units?.find((u) => u.id === m.unitId)?.name,
-        }))}
-        loading={roster.isLoading}
+        title={master ? 'Chọn người dùng' : 'Chọn thành viên'}
+        // Ô rỗng phải nói ĐÚNG vì sao rỗng: "danh bạ trống" là một câu trả lời sai với
+        // master chưa chọn tổ chức, và sai luôn với người chưa tải xong.
+        placeholder={emptyReason(master, people.length, orgSlug, peopleLoading)}
+        items={people}
+        loading={peopleLoading}
         value={form.userId}
         onChange={(userId) => patch({ userId })}
       />
@@ -216,3 +236,21 @@ const styles = StyleSheet.create({
   },
   provinceText: { fontFamily: F.uiSemi, fontSize: 12, color: C.paper },
 });
+/**
+ * Câu hiện trong ô "Cấp cho ai" khi chưa chọn ai.
+ *
+ * Bốn tình huống rỗng nhìn giống hệt nhau trên giao diện nhưng cần bốn hành động khác nhau —
+ * gộp chung một câu là để người dùng ngồi đoán xem mình phải làm gì.
+ */
+function emptyReason(
+  master: boolean,
+  count: number,
+  orgSlug: string | undefined,
+  loading: boolean,
+): string {
+  if (count > 0) return master ? 'Chọn người dùng' : 'Chọn từ danh bạ';
+  if (loading) return 'Đang tải…';
+  if (master) return 'Chưa có người dùng nào trong hệ thống';
+  if (!orgSlug) return 'Chọn tổ chức trước để thấy danh bạ';
+  return 'Danh bạ tổ chức này đang trống';
+}

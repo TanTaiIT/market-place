@@ -13,7 +13,7 @@ import {
 } from './generated';
 import type { Listing as ListingDto, RerouteListing, RoleGrant } from './generated';
 import { reportKindLabel } from './report';
-import { formatPrice, gradOf, relativeTime, unwrap } from './client';
+import { formatPrice, gradOf, initialsOf, relativeTime, unwrap } from './client';
 import { withAuthRetry } from './http';
 import type { Grad } from '@/theme';
 
@@ -97,14 +97,6 @@ const EVENT_TONE: Record<string, AdminEvent['tone']> = {
   'report.resolve': 'alert',
   'report.dismiss': 'muted',
 };
-
-const initialsOf = (name: string) =>
-  name
-    .trim()
-    .split(/\s+/)
-    .slice(-2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('');
 
 function toModListing(dto: ListingDto, categoryNames: Map<string, string>): ModListing {
   return {
@@ -291,6 +283,26 @@ export const canModeratePublicAxis = (grants: RoleGrant[] | undefined) =>
 export const canModerateOrg = (grants: RoleGrant[] | undefined) =>
   isMaster(grants) ||
   (grants ?? []).some((g) => g.scopeType === 'org' || g.scopeType === 'org_unit');
+
+/**
+ * Sửa được hồ sơ MỘT nhóm cụ thể không. Khớp `requireOrgAdmin` → `canAdminOrg` của BE:
+ * master, hoặc grant `manager` phạm vi `org` trỏ đúng nhóm đó.
+ *
+ * KHÔNG đọc `memberships.role`: `role: 'admin'` chỉ là THÂN PHẬN hiển thị trong nhóm
+ * (`MEMBERSHIP_ROLES` bên BE ghi rõ "quyền THẬT nằm ở role_grants"). Lấy nó làm cửa quyền thì
+ * sai cả hai chiều — master không thuộc nhóm nào sẽ mất nút dù BE cho phép, còn người mang
+ * nhãn admin mà không có grant sẽ thấy nút rồi ăn 403.
+ *
+ * Khác `canModerateOrg`: hàm kia cố tình KHÔNG so `orgId` vì nó chỉ quyết định có hiện mục
+ * menu. Ở đây thì có đúng một nhóm đang mở, nên phải so — không so là hiện nút sửa trên nhóm
+ * người ta chỉ ghé xem.
+ */
+export const canAdminOrg = (grants: RoleGrant[] | undefined, orgId: string | undefined) =>
+  isMaster(grants) ||
+  (!!orgId &&
+    (grants ?? []).some(
+      (g) => g.role === 'manager' && g.scopeType === 'org' && g.orgId === orgId,
+    ));
 
 /**
  * Cấp cao nhất đang giữ, để hiện cạnh cửa bàn quản trị. Một người có thể mang nhiều grant

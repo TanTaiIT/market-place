@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { orgApi } from '@/api/org';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { orgApi, type OrgPatch } from '@/api/org';
 import { api } from '@/api/client';
 import { qk } from './keys';
 
@@ -42,6 +42,27 @@ export function useOrgProfile(slug: string) {
     queryFn: () => orgApi.profile(slug),
     enabled: slug.length > 0,
     retry: false,
+  });
+}
+
+/**
+ * Sửa hồ sơ nhóm.
+ *
+ * Refetch contract: `onSuccess` quét `orgProfile(slug)` (ảnh bìa, mô tả, nội quy vừa đổi) và
+ * `myOrgs()` (tên nhóm hiện trong bộ chuyển tổ chức). KHÔNG quét `orgPeek`: danh bạ và tin
+ * trong nhóm không đổi vì một lượt sửa hồ sơ.
+ *
+ * Không optimistic: `PATCH /organizations/current` trả về DTO tóm tắt, không mang `coverUrl`
+ * lẫn `rules` — vá tay từ response sẽ ghi `undefined` lên đúng hai field vừa sửa.
+ */
+export function useUpdateOrg(slug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: OrgPatch) => orgApi.update(slug, patch),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.orgProfile(slug) });
+      void qc.invalidateQueries({ queryKey: qk.myOrgs() });
+    },
   });
 }
 

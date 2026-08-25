@@ -64,6 +64,14 @@ export default function Feed() {
    */
   /** Vị trí cuộn của khung hình TRƯỚC — chỉ để tính được đi lên hay đi xuống bao nhiêu. */
   const lastY = useSharedValue(0);
+  /**
+   * Chiều cao dòng chữ tay, và phần của nó đã bị cuộn đi.
+   *
+   * Đây là chuyển động THỨ HAI, độc lập với việc trốn/hiện: dòng chữ tay chỉ là nhãn, nó
+   * cuộn đi một lần rồi thôi. Ô tìm, hàng nhóm và hàng danh mục là công cụ nên chúng ở lại.
+   */
+  const titleH = useSharedValue(0);
+  const collapse = useSharedValue(0);
   /** Thanh đang bị đẩy lên bao nhiêu pixel: `0` = hiện hẳn, `barH` = trốn hẳn. */
   const shift = useSharedValue(0);
   /**
@@ -85,6 +93,10 @@ export default function Feed() {
       const y = e.contentOffset.y;
       const dy = y - lastY.value;
       lastY.value = y;
+
+      // Bám ĐÚNG vị trí cuộn (không phải delta): dòng chữ tay đi lên đúng bằng số pixel nội
+      // dung đã đi, nên mép dưới thanh luôn khớp mép trên nội dung cho tới khi nó khuất hẳn.
+      collapse.value = Math.min(Math.max(y, 0), titleH.value);
 
       // Sát đỉnh thì LUÔN mở. Không có nhánh này, cú kéo quá đà (bounce) ở iOS cho `dy` âm
       // liên tục và thanh sẽ nhảy ra giữa lúc người dùng còn đang thả tay.
@@ -119,7 +131,15 @@ export default function Feed() {
     },
   });
 
-  const barStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -shift.value }] }));
+  /*
+   * `max` chứ không phải cộng dồn: hai chuyển động cùng đẩy thanh lên, lấy cái xa hơn.
+   *
+   * Cộng lại thì lúc trốn hẳn thanh bị đẩy quá đà thêm một đoạn bằng dòng chữ tay — vô hình
+   * lúc đó, nhưng khi cuộn lên nó phải bò ngược qua đoạn thừa đó trước khi ló ra.
+   */
+  const barStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -Math.max(collapse.value, shift.value) }],
+  }));
 
   /** Đo thay vì đóng cứng con số: chiều cao đổi theo cỡ chữ hệ thống và theo việc có hàng chip hay không. */
   const measureBar = (h: number) => {
@@ -195,9 +215,12 @@ export default function Feed() {
       <Animated.View
         pointerEvents="box-none"
         onLayout={(e) => measureBar(e.nativeEvent.layout.height)}
-        style={[styles.bar, { paddingTop: insets.top + 12 }, barStyle]}
+        style={[styles.bar, { paddingTop: insets.top + 8 }, barStyle]}
       >
         <FeedBar
+          onTitleLayout={(h) => {
+            titleH.value = h;
+          }}
           avatar={profile?.avatar ?? '·'}
           avatarUrl={profile?.avatarUrl}
           myOrgs={myOrgs ?? []}

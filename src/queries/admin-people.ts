@@ -13,7 +13,11 @@ import { qk } from './keys';
  * sóng, hai thứ không đổi vì một lượt khoá tài khoản.
  */
 
-export function useAdminUsers(filter: UserFilter = {}) {
+/**
+ * @param enabled Tắt khi người xem KHÔNG phải master — `GET /users` là route master-only
+ *   (`requireMaster`), nên để nó tự chạy là một lượt 403 mỗi lần màn mount.
+ */
+export function useAdminUsers(filter: UserFilter = {}, enabled = true) {
   const term = (filter.q ?? '').trim();
   // Gõ tìm là gõ từng ký tự; không hoãn thì mỗi phím là một lượt gọi BE (xem `useAllOrgs`).
   const [settled, setSettled] = useState(term);
@@ -27,6 +31,7 @@ export function useAdminUsers(filter: UserFilter = {}) {
   return useQuery({
     queryKey: qk.adminUsers(settled, status ?? 'all'),
     queryFn: () => adminPeopleApi.getUsers({ q: settled, status }),
+    enabled,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
   });

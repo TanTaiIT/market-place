@@ -15,8 +15,8 @@ import { NoteCard } from '@/components/NoteCard';
 import { EmptyState, Loading } from '@/components/ui';
 import { useCategories, useListings, useProfile, useSavedIds, useToggleSaved } from '@/queries/listings';
 import { useOpenConversation } from '@/queries/chat';
-import { useOrgSlug } from '@/stores/auth';
 import { useMyOrgs } from '@/queries/org';
+import { useActiveOrg } from '@/queries/org-discover';
 import { useToast } from '@/components/Toast';
 import { C } from '@/theme';
 
@@ -37,7 +37,6 @@ export default function Feed() {
   const toggleSaved = useToggleSaved();
   const openChat = useOpenConversation();
   const { data: myOrgs } = useMyOrgs();
-  const activeSlug = useOrgSlug();
   const toast = useToast();
 
   /*
@@ -51,10 +50,11 @@ export default function Feed() {
   /*
    * Kiểu bày do QUẢN TRỊ NHÓM đặt (`PATCH /organizations/current`), không phải người xem.
    *
-   * Chưa chọn org — hoặc đang xem tin trục công khai — thì rơi về `feed`: đó là lựa chọn của
-   * một nhóm cụ thể, mà lúc này không có nhóm nào đang mở để hỏi.
+   * Qua `useActiveOrg` chứ không tự tra `myOrgs`: phép tra đó có hai luật ngầm (nhóm duy
+   * nhất thì BE tự suy, và master không nằm trong `myOrgs`) — viết lại tại chỗ là chép lại
+   * cả hai lỗi, đúng thứ đã xảy ra ở màn cấu hình cách bày.
    */
-  const layout = (myOrgs ?? []).find((o) => o.slug === activeSlug)?.feedLayout ?? 'feed';
+  const { layout } = useActiveOrg();
   const grid = layout === 'grid';
   const saved = new Set(savedIds ?? []);
 

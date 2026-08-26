@@ -3,9 +3,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AdminPanel, AdminScreen } from '@/components/AdminScreen';
 import { Loading } from '@/components/ui';
 import { useToast } from '@/components/Toast';
-import { useMyOrgs } from '@/queries/org';
+import { useActiveOrg } from '@/queries/org-discover';
 import { useUpdateOrgDisplay } from '@/queries/org-admin';
-import { useOrgSlug } from '@/stores/auth';
 import { C, F, shadow } from '@/theme';
 
 /**
@@ -33,15 +32,21 @@ const OPTIONS = [
 
 export default function AdminOrgDisplay() {
   const toast = useToast();
-  const activeSlug = useOrgSlug();
-  const { data: myOrgs, isPending } = useMyOrgs();
+  const org = useActiveOrg();
   const save = useUpdateOrgDisplay();
 
-  const org = (myOrgs ?? []).find((o) => o.slug === activeSlug);
-  const current = org?.feedLayout ?? 'feed';
+  /*
+   * Phép tra "nhóm nào đang mở, nó bày kiểu gì" nằm ở `useActiveOrg` — nó có hai luật ngầm
+   * (thuộc đúng một nhóm thì BE tự suy ra; master không nằm trong `/organizations/mine`) và
+   * cả hai từng bị viết sai ngay tại màn này, khiến mọi cú bấm rơi vào hư không.
+   */
+  const current = org.layout;
 
   const choose = (value: 'feed' | 'grid') => {
-    if (!org || value === current) return;
+    // Chốt bằng SLUG chứ không bằng bản ghi thành viên: slug là thứ duy nhất mutation cần
+    // (`orgApi.update` gắn nó vào header `X-Org-Slug`).
+    if (!org.slug) return toast('⚠️ Chọn tổ chức trước khi đổi cách bày bảng tin');
+    if (value === current) return;
     save.mutate(
       { slug: org.slug, feedLayout: value },
       {
@@ -54,10 +59,12 @@ export default function AdminOrgDisplay() {
   return (
     <AdminScreen title="Cách bày bảng tin" note="áp dụng cho cả nhóm" org>
       <ScrollView contentContainerStyle={styles.body}>
-        {isPending ? (
+        {/* `isLoading` chứ không `isPending`: query đang bị `enabled: false` (chưa có slug)
+            đứng mãi ở trạng thái `pending`, dùng nó là treo spinner vĩnh viễn. */}
+        {org.isLoading ? (
           <Loading onDark />
         ) : (
-          <AdminPanel title={org?.name ?? 'Nhóm'} note="mọi thành viên đều thấy giống nhau">
+          <AdminPanel title={org.name ?? 'Nhóm'} note="mọi thành viên đều thấy giống nhau">
             <View style={{ gap: 10 }}>
               {OPTIONS.map((opt) => {
                 const on = opt.value === current;

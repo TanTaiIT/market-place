@@ -7,6 +7,7 @@ import {
   organizationSlugAvailability,
   revokeRoleGrant,
   setOrganizationStatus,
+  setOrganizationVisibility,
 } from './generated';
 import type { CreateRoleGrant, Organization, RoleGrant, SlugAvailability } from './generated';
 import type { ProvinceName } from './location';
@@ -212,6 +213,19 @@ export const orgAdminApi = {
       setOrganizationStatus({ path: { organizationId: id }, body: { status } }),
     );
     return unwrap(res, 'Không đổi được trạng thái tổ chức');
+  },
+
+  /**
+   * Công khai ↔ riêng tư.
+   *
+   * Riêng tư có hiệu lực NGAY và có hậu quả thật: nhóm rơi khỏi tìm kiếm, hồ sơ trả 404 với
+   * người ngoài, và chỉ còn xin vào được bằng MÃ. Mọi link đã phát ra ngoài chết theo.
+   */
+  async setVisibility(id: string, isPublic: boolean): Promise<Organization> {
+    const res = await withAuthRetry(() =>
+      setOrganizationVisibility({ path: { organizationId: id }, body: { isPublic } }),
+    );
+    return unwrap(res, 'Không đổi được chế độ hiển thị');
   },
 
   /** Slug cũ tự thành alias redirect 301, nên đường link đã phát ra ngoài không chết. */

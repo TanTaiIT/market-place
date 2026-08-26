@@ -108,6 +108,7 @@ export type Organization = {
     verificationTier: 'unverified' | 'claimed' | 'verified';
     provinceCode: string | null;
     status: 'active' | 'suspended' | 'pending_admin';
+    isPublic: boolean;
 };
 
 export type OrganizationLookup = {
@@ -136,6 +137,7 @@ export type OrganizationProfile = {
     rules: Array<string>;
     feedLayout: 'feed' | 'grid';
     allowJoinRequests: boolean;
+    allowOutsiderPosts: boolean;
     joined: boolean;
 };
 
@@ -769,6 +771,10 @@ export type ListingProduct = {
 
 export type GrantOrganizationAdmin = {
     email: string;
+};
+
+export type SetOrgVisibility = {
+    isPublic: boolean;
 };
 
 export type BannedPhrase = {
@@ -1973,6 +1979,41 @@ export type SetOrganizationStatusResponses = {
 };
 
 export type SetOrganizationStatusResponse = SetOrganizationStatusResponses[keyof SetOrganizationStatusResponses];
+
+export type SetOrganizationVisibilityData = {
+    body?: SetOrgVisibility;
+    path: {
+        organizationId: string;
+    };
+    query?: never;
+    url: '/organizations/{organizationId}/visibility';
+};
+
+export type SetOrganizationVisibilityErrors = {
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy tổ chức
+     */
+    404: ErrorResponse;
+};
+
+export type SetOrganizationVisibilityError = SetOrganizationVisibilityErrors[keyof SetOrganizationVisibilityErrors];
+
+export type SetOrganizationVisibilityResponses = {
+    /**
+     * Đã cập nhật
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Organization;
+    };
+};
+
+export type SetOrganizationVisibilityResponse = SetOrganizationVisibilityResponses[keyof SetOrganizationVisibilityResponses];
 
 export type ChangeOrganizationSlugData = {
     body?: ChangeOrganizationSlug;

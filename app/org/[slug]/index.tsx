@@ -2,6 +2,7 @@ import { FlatList, Share, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
 import { FeedCard } from '@/components/FeedCard';
+import { NoteCard } from '@/components/NoteCard';
 import { Header } from '@/components/OrgProfileCard';
 import { useToast } from '@/components/Toast';
 import { useMyOrgs, useRequestJoin } from '@/queries/org';
@@ -30,7 +31,15 @@ export default function OrgProfileScreen() {
   const { data: org, error, isPending } = useOrgProfile(slug ?? '');
   const { data: me } = useProfile();
   const join = useRequestJoin();
-  const peek = useOrgPeek(slug ?? '', Boolean(org?.joined));
+  /*
+   * Bảng tin trong nhóm bày theo đúng thiết lập của NHÓM ĐÓ, không phải của org người xem
+   * đang thao tác: mở hồ sơ trường B thì thấy trường B bày như chủ nhóm B đã chọn.
+   *
+   * Rơi về `feed` trong lúc hồ sơ còn đang tải — `org` chưa có thì chưa biết hỏi ai.
+   */
+  const layout = org?.feedLayout ?? 'feed';
+  const grid = layout === 'grid';
+  const peek = useOrgPeek(slug ?? '', Boolean(org?.joined), layout);
   /*
    * Ai được sửa: master, hoặc người giữ grant `manager` trên ĐÚNG nhóm này — xem `canAdminOrg`.
    *
@@ -88,7 +97,11 @@ export default function OrgProfileScreen() {
       <FlatList
         data={peek.data?.listings ?? []}
         keyExtractor={(l) => l.id}
-        contentContainerStyle={styles.body}
+        // `numColumns` không đổi tại chỗ được: RN đòi dựng lại danh sách, `key` là đòn bẩy duy nhất.
+        key={layout}
+        numColumns={grid ? 2 : 1}
+        columnWrapperStyle={grid ? styles.gridRow : undefined}
+        contentContainerStyle={[styles.body, { gap: grid ? 14 : 22 }]}
         ListHeaderComponent={
           <Header
             org={org}
@@ -104,19 +117,24 @@ export default function OrgProfileScreen() {
           />
         }
         ListHeaderComponentStyle={{ marginBottom: 4 }}
-        renderItem={({ item, index }) => (
-          <View style={styles.post}>
-            <FeedCard
-              item={item}
-              index={index}
-              orgName={org.name}
-              saved={saved.has(item.id)}
-              onPress={() => router.push(`/listing/${item.id}`)}
-              onToggleSave={() => toggleSaved.mutate({ id: item.id, saved: !saved.has(item.id) })}
-              onMessage={() => message(item.id)}
-            />
-          </View>
-        )}
+        renderItem={({ item, index }) =>
+          grid ? (
+            // Cùng ô thumbnail mà bảng tin dùng ở chế độ lưới — một bộ layout cho cả hai màn.
+            <NoteCard item={item} index={index} onPress={() => router.push(`/listing/${item.id}`)} />
+          ) : (
+            <View style={styles.post}>
+              <FeedCard
+                item={item}
+                index={index}
+                orgName={org.name}
+                saved={saved.has(item.id)}
+                onPress={() => router.push(`/listing/${item.id}`)}
+                onToggleSave={() => toggleSaved.mutate({ id: item.id, saved: !saved.has(item.id) })}
+                onMessage={() => message(item.id)}
+              />
+            </View>
+          )
+        }
         ListEmptyComponent={<GroupFeed org={org} />}
       />
     </Shell>
@@ -155,10 +173,15 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 
 const styles = StyleSheet.create({
-  /* `gap: 22` chừa chỗ cho đinh ghim của thẻ tin nhô lên — giống bảng tin. */
-  body: { paddingBottom: 32, gap: 22 },
+  /*
+   * Khoảng cách hàng do call-site truyền vào: lưới xếp sát hơn, còn một-tin-một-dòng phải
+   * chừa chỗ cho đinh ghim nhô lên khỏi mép thẻ.
+   */
+  body: { paddingBottom: 32 },
   /** Lề NGOÀI cho thẻ tin, khớp với `inset` của khối hồ sơ phía trên. */
   post: { marginHorizontal: 14 },
+  /** Lưới cần lề ở hàng chứ không ở từng thẻ — `NoteCard` không tự mang lề. */
+  gridRow: { gap: 14, paddingHorizontal: 14 },
 
 
   section: { fontFamily: F.mono, fontSize: 10, letterSpacing: 1.2, color: C.sand, marginTop: 4 },

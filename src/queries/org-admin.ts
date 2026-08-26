@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { orgAdminApi } from '@/api/org-admin';
+import { orgApi } from '@/api/org';
 import type { OrgListFilter } from '@/api/org-admin';
 import { qk } from './keys';
 
@@ -129,6 +130,21 @@ function useGrantMutation<TVars, TData>(fn: (v: TVars) => Promise<TData>) {
   return useMutation({
     mutationFn: fn,
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.myGrants() }),
+  });
+}
+
+/**
+ * Đổi cách bày bảng tin của một nhóm.
+ *
+ * Refetch contract: quét `myOrgs()` vì chính nó mang `feedLayout` mà bảng tin đọc để chọn
+ * số cột — không quét thì đổi xong bảng tin vẫn bày kiểu cũ tới hết `staleTime` 5 phút.
+ */
+export function useUpdateOrgDisplay() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { slug: string; feedLayout: 'feed' | 'grid' }) =>
+      orgApi.update(v.slug, { feedLayout: v.feedLayout }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.myOrgs() }),
   });
 }
 

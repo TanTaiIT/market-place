@@ -76,7 +76,7 @@ export default function AdminOverview() {
                 <Text style={styles.evEmpty}>Chưa có thao tác quản trị nào được ghi lại.</Text>
               ) : (
                 (events ?? []).map((ev, i) => (
-                  <View key={`${ev.time}-${ev.text}`} style={[styles.ev, i > 0 && styles.evDivider]}>
+                  <View key={ev.id} style={[styles.ev, i > 0 && styles.evDivider]}>
                     <View style={[styles.evDot, { backgroundColor: EVENT_TONE[ev.tone] }]} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.evText}>{ev.text}</Text>

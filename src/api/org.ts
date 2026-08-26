@@ -89,6 +89,8 @@ export type MyOrg = {
   slug: string;
   role: string;
   unitId: string | null;
+  /** Bảng tin của nhóm này bày một cột hay hai — do quản trị nhóm đặt. */
+  feedLayout: 'feed' | 'grid';
 };
 
 /**

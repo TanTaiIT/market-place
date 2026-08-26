@@ -78,7 +78,7 @@ export const qk = {
   orgDiscover: (q: string) => ['orgs', 'discover', q] as const,
   orgProfile: (slug: string) => ['orgs', 'profile', slug] as const,
   /** Danh bạ + tin của MỘT nhóm đang mở hồ sơ, tách khỏi cụm scope theo org đang thao tác. */
-  orgPeek: (slug: string) => ['orgs', 'peek', slug] as const,
+  orgPeek: (slug: string, take: number) => ['orgs', 'peek', slug, take] as const,
   /** Prefix của cụm đơn xin tham gia — quét cả "đơn của tôi" lẫn hàng đợi của người duyệt. */
   joinRequestsRoot: () => ['join-requests'] as const,
   myJoinRequests: () => ['join-requests', 'mine'] as const,

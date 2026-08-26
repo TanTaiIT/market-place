@@ -175,12 +175,20 @@ export function useAdminActivityStream(): void {
     if (!orgSlug) return;
 
     const onActivity = (payload: unknown) => {
-      const log = payload as { actorName?: string; summary?: string; createdAt?: string };
-      if (!log?.summary || !log.actorName) return;
+      const log = payload as { id?: string; actorName?: string; summary?: string };
+      /*
+       * `id` nằm trong điều kiện chặn, không phải tuỳ chọn: nó là KHOÁ RENDER của dòng sự
+       * kiện. Bản cũ bỏ qua id và ghép khoá từ `time`+`text`, mà mọi dòng realtime đều mang
+       * `time: 'vừa xong'` — nên hai lượt duyệt giống nhau là hai khoá trùng khít, và React
+       * bỏ bớt dòng mà không báo gì ngoài một cảnh báo trong console.
+       */
+      if (!log?.id || !log.summary || !log.actorName) return;
 
       qc.setQueryData<AdminEvent[]>(qk.adminActivity(orgSlug), (old = []) => [
-        { tone: 'info', text: `${log.actorName} · ${log.summary}`, time: 'vừa xong' },
-        ...old.slice(0, 19),
+        { id: log.id!, tone: 'info', text: `${log.actorName} · ${log.summary}`, time: 'vừa xong' },
+        // Chốt trùng: cùng một sự kiện có thể tới hai lần (nối lại socket, hoặc một lượt
+        // refetch chạy xen giữa). Lọc theo id rẻ hơn nhiều so với đi tìm một dòng lặp.
+        ...old.filter((e) => e.id !== log.id).slice(0, 19),
       ]);
       // Thẻ số đổi theo mỗi thao tác duyệt — để BE tính lại thay vì đoán ở client.
       qc.invalidateQueries({ queryKey: qk.adminOverview(orgSlug) });

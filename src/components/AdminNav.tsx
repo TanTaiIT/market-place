@@ -54,6 +54,7 @@ const GROUPS: { label: string; org?: boolean; items: NavItem[] }[] = [
       { href: '/admin/join-requests', icon: '✋', label: 'Đơn xin gia nhập', badge: 'joins' },
       { href: '/admin/org-units', icon: '🗂', label: 'Nhóm con' },
       { href: '/admin/role-grants', icon: '🔑', label: 'Phân quyền' },
+      { href: '/admin/org-display', icon: '▦', label: 'Cách bày bảng tin' },
     ],
   },
   {

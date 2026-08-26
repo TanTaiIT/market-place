@@ -66,6 +66,12 @@ export type Report = {
 };
 
 export type AdminEvent = {
+  /**
+   * `_id` của dòng nhật ký. Bắt buộc mang theo vì đây là KHOÁ RENDER: hai lượt duyệt giống
+   * hệt nhau trong cùng một giờ cho ra `text` và `time` y như nhau, nên khoá ghép từ nội
+   * dung sẽ trùng — React bỏ bớt dòng hoặc vẽ nhầm dòng, im lặng.
+   */
+  id: string;
   tone: 'ok' | 'alert' | 'note' | 'info' | 'muted';
   text: string;
   time: string;
@@ -147,6 +153,7 @@ export const adminApi = {
   async getEvents(): Promise<AdminEvent[]> {
     const res = await withAuthRetry(() => moderationActivity({ query: { limit: 20 } }));
     return unwrap(res, 'Không tải được dòng hoạt động').map((log) => ({
+      id: log.id,
       tone: EVENT_TONE[log.action] ?? 'info',
       text: `${log.actorName} · ${log.summary}`,
       time: relativeTime(log.createdAt),

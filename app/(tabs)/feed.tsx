@@ -11,9 +11,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Corkboard } from '@/components/Corkboard';
 import { FeedBar } from '@/components/FeedBar';
 import { FeedCard } from '@/components/FeedCard';
+import { NoteCard } from '@/components/NoteCard';
 import { EmptyState, Loading } from '@/components/ui';
 import { useCategories, useListings, useProfile, useSavedIds, useToggleSaved } from '@/queries/listings';
 import { useOpenConversation } from '@/queries/chat';
+import { useOrgSlug } from '@/stores/auth';
 import { useMyOrgs } from '@/queries/org';
 import { useToast } from '@/components/Toast';
 import { C } from '@/theme';
@@ -35,6 +37,7 @@ export default function Feed() {
   const toggleSaved = useToggleSaved();
   const openChat = useOpenConversation();
   const { data: myOrgs } = useMyOrgs();
+  const activeSlug = useOrgSlug();
   const toast = useToast();
 
   /*
@@ -44,6 +47,15 @@ export default function Feed() {
    * thẻ tự bỏ dòng đó — thà thiếu một dòng còn hơn bịa tên một tổ chức.
    */
   const orgNameById = new Map((myOrgs ?? []).map((o) => [o.id, o.name]));
+
+  /*
+   * Kiểu bày do QUẢN TRỊ NHÓM đặt (`PATCH /organizations/current`), không phải người xem.
+   *
+   * Chưa chọn org — hoặc đang xem tin trục công khai — thì rơi về `feed`: đó là lựa chọn của
+   * một nhóm cụ thể, mà lúc này không có nhóm nào đang mở để hỏi.
+   */
+  const layout = (myOrgs ?? []).find((o) => o.slug === activeSlug)?.feedLayout ?? 'feed';
+  const grid = layout === 'grid';
   const saved = new Set(savedIds ?? []);
 
   const message = (listingId: string) =>
@@ -151,6 +163,11 @@ export default function Feed() {
   return (
     <Corkboard>
       <Animated.FlatList
+        // `numColumns` không đổi tại chỗ được: RN yêu cầu dựng lại danh sách, và `key` là
+        // đòn bẩy duy nhất làm việc đó.
+        key={layout}
+        numColumns={grid ? 2 : 1}
+        columnWrapperStyle={grid ? { gap: 14, paddingHorizontal: 16 } : undefined}
         data={data ?? []}
         keyExtractor={(item) => String(item.id)}
         onScroll={onScroll}
@@ -163,9 +180,9 @@ export default function Feed() {
           // xuống. `insets.top` đã nằm trong con số đo được, không cộng lại lần nữa.
           paddingTop: barHeight,
           paddingBottom: 32,
-          paddingHorizontal: 16,
+          ...(grid ? {} : { paddingHorizontal: 16 }),
           // 22 chứ không 8: đinh ghim nhô lên khỏi mép thẻ, thiếu chỗ thì nó đè lên thẻ trên.
-          gap: 22,
+          gap: grid ? 14 : 22,
         }}
         refreshControl={
           // Bọc `refetch` chứ không truyền thẳng: RefreshControl gọi handler không tham số nhưng
@@ -177,17 +194,23 @@ export default function Feed() {
             progressViewOffset={barHeight}
           />
         }
-        renderItem={({ item, index }) => (
-          <FeedCard
-            item={item}
-            index={index}
-            orgName={item.organizationId ? orgNameById.get(item.organizationId) : undefined}
-            saved={saved.has(item.id)}
-            onPress={() => router.push(`/listing/${item.id}`)}
-            onToggleSave={() => toggleSaved.mutate({ id: item.id, saved: !saved.has(item.id) })}
-            onMessage={() => message(item.id)}
-          />
-        )}
+        renderItem={({ item, index }) =>
+          grid ? (
+            // Ô thumbnail của lưới 2 cột — cùng component mà `/saved` và trang cá nhân dùng,
+            // nên hai kiểu bày không phải nuôi hai bản layout riêng.
+            <NoteCard item={item} index={index} onPress={() => router.push(`/listing/${item.id}`)} />
+          ) : (
+            <FeedCard
+              item={item}
+              index={index}
+              orgName={item.organizationId ? orgNameById.get(item.organizationId) : undefined}
+              saved={saved.has(item.id)}
+              onPress={() => router.push(`/listing/${item.id}`)}
+              onToggleSave={() => toggleSaved.mutate({ id: item.id, saved: !saved.has(item.id) })}
+              onMessage={() => message(item.id)}
+            />
+          )
+        }
         ListEmptyComponent={
           isLoading ? (
             <Loading onDark />

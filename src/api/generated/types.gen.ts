@@ -134,6 +134,7 @@ export type OrganizationProfile = {
     memberCount: number;
     postsThisWeek: number;
     rules: Array<string>;
+    feedLayout: 'feed' | 'grid';
     allowJoinRequests: boolean;
     joined: boolean;
 };
@@ -146,6 +147,7 @@ export type MyOrganization = {
     provinceCode: string | null;
     role: string;
     unitId: string | null;
+    feedLayout: 'feed' | 'grid';
 };
 
 export type UpdateOrganization = {
@@ -156,6 +158,7 @@ export type UpdateOrganization = {
     allowJoinRequests?: boolean;
     allowOutsiderPosts?: boolean;
     rules?: Array<string>;
+    feedLayout?: 'feed' | 'grid';
 };
 
 export type OrganizationCard = {

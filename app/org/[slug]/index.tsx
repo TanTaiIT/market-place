@@ -108,6 +108,18 @@ export default function OrgProfileScreen() {
             members={peek.data?.members ?? []}
             onJoin={requestJoin}
             onInvite={invite}
+            /*
+             * Nhóm nhận được tin từ người này không.
+             *
+             * Thành viên thì luôn được. Người ngoài chỉ khi nhóm bật `allowOutsiderPosts` —
+             * tắt thì `routeListing` trả 400, và một cái nút dẫn thẳng tới lỗi thì tệ hơn
+             * không có nút.
+             */
+            onPost={
+              org.joined || org.allowOutsiderPosts
+                ? () => router.push(`/post?org=${org.slug}`)
+                : undefined
+            }
             onEdit={
               canAdminOrg(grants, myOrgs?.find((o) => o.slug === org.slug)?.id)
                 ? () => router.push(`/org/${org.slug}/edit`)

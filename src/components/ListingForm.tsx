@@ -78,6 +78,7 @@ export function ListingForm({
   submitLabel,
   busyLabel,
   busy,
+  toGroup,
   onSubmit,
 }: {
   photos: ListingPhotosController;
@@ -89,6 +90,15 @@ export function ListingForm({
   submitLabel: string;
   busyLabel: string;
   busy: boolean;
+  /**
+   * Đăng thẳng vào MỘT nhóm — người dùng đi từ trang hồ sơ nhóm, không phải từ nút đăng chung.
+   *
+   * Có nó thì hiển thị bị KHOÁ ở `org_internal` và bộ chọn hiển thị biến mất. Đây không phải
+   * để cho gọn: `public` sẽ đưa tin sang hàng đợi của người phụ trách DANH MỤC, và quản trị
+   * nhóm không có lấy một lượt duyệt nào (`routeListing`). Người bấm "Đăng tin" trên trang
+   * một nhóm đang nói "gửi cho nhóm này duyệt" — để hở lựa chọn kia là phản bội đúng câu đó.
+   */
+  toGroup?: { slug: string; name: string };
   onSubmit: (values: ListingFormValues) => void;
 }) {
   const toast = useToast();
@@ -104,7 +114,7 @@ export function ListingForm({
   // Mặc định nội bộ: tin ở lại trong tổ chức cho tới khi người đăng chủ động đưa ra công khai.
   // Không thuộc tổ chức nào thì chỉ còn một lựa chọn, và nó đã đúng.
   const [visibility, setVisibility] = useState<PostVisibility>(
-    initial?.visibility ?? (activeOrg ? 'org_internal' : 'public'),
+    toGroup ? 'org_internal' : (initial?.visibility ?? (activeOrg ? 'org_internal' : 'public')),
   );
   /**
    * Tên tỉnh/xã, không phải mã — BE lưu và lọc bằng chính chuỗi này.
@@ -242,8 +252,18 @@ export function ListingForm({
                 style={styles.descInput}
               />
 
-              <FormSection title="Khu vực & hiển thị" />
-              <VisibilityPicker value={visibility} onChange={setVisibility} />
+              <FormSection title={toGroup ? 'Khu vực' : 'Khu vực & hiển thị'} />
+              {toGroup ? (
+                <View style={styles.toGroup}>
+                  <Text style={styles.toGroupLabel}>ĐĂNG VÀO NHÓM</Text>
+                  <Text style={styles.toGroupName}>{toGroup.name}</Text>
+                  <Text style={styles.toGroupHint}>
+                    Quản trị nhóm sẽ duyệt tin này. Tin chỉ hiện trong nhóm.
+                  </Text>
+                </View>
+              ) : (
+                <VisibilityPicker value={visibility} onChange={setVisibility} />
+              )}
               <LocationFields value={location} onChange={setLocation} />
             </>
           )}
@@ -295,6 +315,17 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   descInput: { minHeight: 84, textAlignVertical: 'top', lineHeight: 22, fontFamily: F.ui },
+  toGroup: {
+    backgroundColor: C.mossLight,
+    borderRadius: 8,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: C.moss,
+    marginBottom: 14,
+  },
+  toGroupLabel: { fontFamily: F.mono, fontSize: 9.5, letterSpacing: 1.2, color: C.moss },
+  toGroupName: { fontFamily: F.uiBold, fontSize: 15, color: C.ink, marginTop: 5 },
+  toGroupHint: { fontFamily: F.ui, fontSize: 12, lineHeight: 18, color: C.inkSoft, marginTop: 5 },
   // Nền đục + viền trên: nội dung cuộn qua bên dưới phải bị che hẳn, nếu không chữ sẽ chạy
   // lẫn vào nút và trông như lỗi render.
   bar: {

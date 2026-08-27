@@ -1,6 +1,6 @@
 import React from 'react';
 import { KeyboardAvoidingView, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Corkboard } from '@/components/Corkboard';
 import { ListingForm } from '@/components/ListingForm';
@@ -8,6 +8,7 @@ import { ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useCreateListing } from '@/queries/listings';
 import { useListingPhotos } from '@/queries/upload';
+import { useOrgProfile } from '@/queries/org-discover';
 
 /**
  * Ghim tin mới.
@@ -21,6 +22,16 @@ export default function Post() {
   const create = useCreateListing();
   const photos = useListingPhotos();
 
+  /*
+   * `?org=<slug>` — đăng thẳng vào một nhóm, đi từ nút trên trang hồ sơ nhóm.
+   *
+   * Slug đi theo ĐƯỜNG DẪN chứ không mượn `X-Org-Slug`: người thuộc nhiều nhóm không phải
+   * đổi "nhóm đang thao tác" chỉ để đăng một tin, và không đăng nhầm vào nhóm đang mở.
+   */
+  const { org: orgSlug } = useLocalSearchParams<{ org?: string }>();
+  const { data: org } = useOrgProfile(orgSlug ?? '');
+  const toGroup = orgSlug && org ? { slug: orgSlug, name: org.name } : undefined;
+
   return (
     <Corkboard>
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
@@ -28,15 +39,16 @@ export default function Post() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1 }}
         >
-          <ScreenHeader title="Ghim tin mới" />
+          <ScreenHeader title={toGroup ? `Đăng vào ${toGroup.name}` : 'Ghim tin mới'} />
           <ListingForm
             photos={photos}
+            toGroup={toGroup}
             submitLabel="📌 Ghim lên bảng"
             busyLabel="Đang ghim..."
             busy={create.isPending}
             onSubmit={({ location, ...values }) =>
               create.mutate(
-                { ...values, ...location, photoUrls: photos.photoUrls },
+                { ...values, ...location, photoUrls: photos.photoUrls, orgSlug },
                 {
                   onSuccess: () => {
                     // Tin vào BE ở trạng thái `pending`, feed chỉ hiện tin `active` — về feed là

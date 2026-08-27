@@ -90,7 +90,16 @@ export function AdminScreen({
         </Pressable>
 
         <View style={{ flex: 1, minWidth: 0 }}>
-          {org && master ? (
+          {/*
+            Bộ chọn phạm vi hiện cho master, VÀ cho người quản trị từ hai nhóm trở lên.
+
+            Vế thứ hai là bắt buộc từ khi bộ chuyển ở trang cá nhân thành master-only: thiếu
+            nó, người quản trị hai nhóm mà không phải master không còn đường nào đặt
+            `X-Org-Slug` — tức là không quản trị được nhóm nào cả.
+
+            Thuộc đúng một nhóm thì không dựng: BE tự suy ra org trong ca đó, không có gì để chọn.
+          */}
+          {org && (master || (myOrgs ?? []).length > 1) ? (
             <AdminOrgPicker
               open={pickOrg}
               onOpen={() => setPickOrg(true)}

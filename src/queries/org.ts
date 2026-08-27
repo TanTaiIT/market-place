@@ -1,7 +1,8 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { orgApi } from '@/api/org';
 import type { JoinRequestStatus } from '@/api/org';
-import { useOrgSlug } from '@/stores/auth';
+import { useEffect } from 'react';
+import { useOrgSlug, useSetActiveOrg } from '@/stores/auth';
 import { canModerateOrg } from '@/api/admin';
 import { useMyGrants } from './admin';
 import { qk } from './keys';
@@ -28,12 +29,39 @@ export function useOrgByCode(code: string) {
 }
 
 /** Danh sách tổ chức của tôi. Đổi rất ít nên giữ cache lâu, tránh gọi lại mỗi lần mở màn. */
+/**
+ * Các tổ chức mình LÀ THÀNH VIÊN.
+ *
+ * Kèm một tác dụng phụ có chủ ý: **thuộc đúng MỘT tổ chức thì tự chọn nó**.
+ *
+ * BE vốn tự suy ra org trong ca đó (`tenant.middleware`) nên request vẫn chạy đúng — nhưng
+ * phía client thì `activeOrgSlug` vẫn là `null`, và đó là một trạng thái ngầm đã đẻ ra một
+ * chuỗi lỗi cùng kiểu: khoá cache tính bằng `slug ?? '-'`, cổng `enabled: Boolean(slug)` tắt
+ * mọi query của bàn quản trị, và các phép tra `find(o => o.slug === slug)` không khớp ai.
+ * Mỗi chỗ lại phải tự nhớ luật "một nhóm thì suy ra" — và đã quên ở bốn chỗ khác nhau.
+ *
+ * Ghi thẳng vào store là biến luật ngầm thành một giá trị có thật. Từ đó `X-Org-Slug` được
+ * gửi TƯỜNG MINH, và mọi chỗ đọc `useOrgSlug()` đều nhận đúng một câu trả lời.
+ *
+ * Chỉ ghi khi CHƯA có lựa chọn nào: người đã tự chọn (hoặc master mượn slug nhóm khác) thì
+ * không bị ghi đè. Có từ hai nhóm trở lên thì im lặng — lúc đó phải để họ chọn.
+ */
 export function useMyOrgs() {
-  return useQuery({
+  const query = useQuery({
     queryKey: qk.myOrgs(),
     queryFn: orgApi.myOrgs,
     staleTime: 5 * 60_000,
   });
+
+  const activeSlug = useOrgSlug();
+  const setActiveOrg = useSetActiveOrg();
+  const only = query.data?.length === 1 ? query.data[0].slug : undefined;
+
+  useEffect(() => {
+    if (!activeSlug && only) setActiveOrg(only);
+  }, [activeSlug, only, setActiveOrg]);
+
+  return query;
 }
 
 export function useMyJoinRequests() {

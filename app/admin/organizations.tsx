@@ -10,6 +10,7 @@ import {
   useAllOrgs,
   useChangeOrganizationSlug,
   useCreateOrganization,
+  useSetOrgVisibility,
   useSetOrganizationStatus,
 } from '@/queries/org-admin';
 import { STATUS_FILTER, STATUS_LABEL } from '@/api/org-admin';
@@ -39,6 +40,7 @@ export default function AdminOrganizations() {
   });
   const create = useCreateOrganization();
   const setOrgStatus = useSetOrganizationStatus();
+  const setVisibility = useSetOrgVisibility();
   const changeSlug = useChangeOrganizationSlug();
 
   const activeSlug = useOrgSlug();
@@ -50,6 +52,34 @@ export default function AdminOrganizations() {
 
   const fail = (e: Error) => toast(`⚠️ ${e.message}`);
   const rows = data ?? [];
+
+  /*
+   * Gạt sang riêng tư là thao tác CÓ HẬU QUẢ RA NGOÀI: nhóm rơi khỏi tìm kiếm và mọi link
+   * đã phát chết theo, nên nó phải hỏi lại — cùng lập luận với nút khoá tổ chức ngay dưới.
+   * Chiều ngược lại (mở ra công khai) thì không: nó chỉ thêm đường vào, không cắt của ai.
+   */
+  const toggleVisibility = (org: Organization) => {
+    const next = !org.isPublic;
+    const run = () =>
+      setVisibility.mutate(
+        { id: org.id, isPublic: next },
+        {
+          onSuccess: (o) =>
+            toast(o.isPublic ? `🌐 ${o.name} đã công khai` : `🙈 ${o.name} đã thành riêng tư`),
+          onError: fail,
+        },
+      );
+
+    if (next) return run();
+    Alert.alert(
+      'Chuyển thành nhóm riêng tư?',
+      `${org.name} sẽ biến mất khỏi tìm kiếm. Người ngoài mở link nhóm sẽ nhận "không tìm thấy", và chỉ vào được bằng mã tham gia.`,
+      [
+        { text: 'Thôi', style: 'cancel' },
+        { text: 'Chuyển', style: 'destructive', onPress: run },
+      ],
+    );
+  };
 
   const toggleStatus = (org: Organization) => {
     const next = org.status === 'suspended' ? 'active' : 'suspended';
@@ -105,8 +135,10 @@ export default function AdminOrganizations() {
                 <View key={org.id} style={[styles.row, acting && styles.rowActing]}>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={styles.name}>{org.name}</Text>
+                    {/* Chỉ nói khi RIÊNG TƯ: công khai là mặc định, ghi ra chỉ làm loãng dòng. */}
                     <Text style={styles.meta}>
                       /{org.slug} · {STATUS_LABEL[org.status]}
+                      {org.isPublic ? '' : ' · 🙈 RIÊNG TƯ'}
                     </Text>
                     {/* Mã để phát cho người xin vào (`/join-org`). `selectable` thay vì nút
                         Copy: repo không có `expo-clipboard`, thêm native module cho sáu ký tự
@@ -135,6 +167,10 @@ export default function AdminOrganizations() {
                      * Một nút phản ánh trạng thái THẬT, không còn là cặp Khoá/Mở đoán mò:
                      * `GET /organizations` trả `status`, thứ `/organizations/mine` không có.
                      */}
+                    <AdminSmallBtn
+                      label={org.isPublic ? 'Chuyển riêng tư' : 'Mở công khai'}
+                      onPress={() => toggleVisibility(org)}
+                    />
                     <AdminSmallBtn
                       label={org.status === 'suspended' ? 'Mở lại' : 'Khoá'}
                       onPress={() => toggleStatus(org)}

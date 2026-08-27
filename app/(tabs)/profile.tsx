@@ -10,7 +10,7 @@ import { useToast } from '@/components/Toast';
 import { useSignOut } from '@/queries/auth';
 import { useProfile } from '@/queries/listings';
 import { useMyGrants } from '@/queries/admin';
-import { canOpenAdmin, topRole } from '@/api/admin';
+import { canOpenAdmin, isMaster, topRole } from '@/api/admin';
 import { C, F, shadow } from '@/theme';
 
 export default function Profile() {
@@ -19,6 +19,7 @@ export default function Profile() {
   const insets = useSafeAreaInsets();
   const { data: profile, error, isLoading } = useProfile();
   const { data: grants } = useMyGrants();
+  const master = isMaster(grants);
   const signOut = useSignOut();
 
   if (isLoading) return <Loading />;
@@ -52,11 +53,20 @@ export default function Profile() {
         </View>
       </LinearGradient>
 
-      {/* Đặt TRÊN menu: tổ chức đang chọn quyết định dữ liệu của mọi màn phía sau, nên nó phải
-          nhìn thấy ngay chứ không nằm lẫn trong danh sách tuỳ chọn. */}
-      <View style={styles.orgBlock}>
-        <OrgSwitcher />
-      </View>
+      {/*
+        CHỈ master. Với người thường, "nhóm đang thao tác" không còn là thứ họ phải nghĩ tới:
+        đọc tin của nhóm và đăng tin vào nhóm đều làm ngay trên trang hồ sơ nhóm
+        (`/org/[slug]`), nên một cái công tắc toàn cục ở trang cá nhân chỉ tạo ra một trạng
+        thái ẩn mà họ đổi nhầm rồi không hiểu vì sao bảng tin đổi theo.
+
+        Master thì ngược lại: họ không thuộc nhóm nào, và phạm vi thao tác là thứ họ PHẢI
+        chỉ ra. Quản trị nhóm chọn phạm vi ngay trong bàn quản trị (`AdminOrgPicker`).
+      */}
+      {master && (
+        <View style={styles.orgBlock}>
+          <OrgSwitcher />
+        </View>
+      )}
 
       <View style={styles.menu}>
         {menu.map((m, i) => (

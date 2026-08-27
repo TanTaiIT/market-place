@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { orgApi, type OrgPatch } from '@/api/org';
 import { api } from '@/api/client';
+import { useMyOrgs } from './org';
+import { useOrgSlug } from '@/stores/auth';
 import { qk } from './keys';
 
 /**
@@ -64,6 +66,41 @@ export function useUpdateOrg(slug: string) {
       void qc.invalidateQueries({ queryKey: qk.myOrgs() });
     },
   });
+}
+
+/**
+ * Tổ chức ĐANG THAO TÁC và cách nó bày bảng tin.
+ *
+ * Gộp về một chỗ vì việc tra ra nó có hai luật ngầm, và cả hai đều đã bị viết sai một lần:
+ *
+ * 1. **Thuộc đúng một nhóm thì không cần bấm chọn.** `tenant.middleware` bên BE tự suy ra
+ *    org trong ca đó, nên `activeOrgSlug` là `undefined` một cách bình thường. Tra `find`
+ *    theo một slug `undefined` sẽ không khớp ai.
+ * 2. **`/organizations/mine` chỉ có nhóm mình LÀ THÀNH VIÊN.** Master cố ý không thuộc
+ *    nhóm nào, nên với họ nguồn đó luôn rỗng. Hồ sơ nhóm công khai cũng trả `feedLayout`
+ *    — BE đã dọn sẵn đúng cho ca này.
+ *
+ * `layout` mặc định `'feed'` khi không có nhóm nào đang mở: kiểu bày là lựa chọn của MỘT
+ * nhóm cụ thể, mà lúc đó không có nhóm nào để hỏi.
+ */
+export function useActiveOrg() {
+  const activeSlug = useOrgSlug();
+  const { data: myOrgs, isPending: minePending } = useMyOrgs();
+
+  const only = (myOrgs ?? []).length === 1 ? myOrgs?.[0] : undefined;
+  const slug = activeSlug ?? only?.slug;
+
+  const mine = (myOrgs ?? []).find((o) => o.slug === slug);
+  const profile = useOrgProfile(slug ?? '');
+
+  return {
+    slug,
+    name: mine?.name ?? profile.data?.name,
+    layout: mine?.feedLayout ?? profile.data?.feedLayout ?? ('feed' as const),
+    // `isLoading` chứ không `isPending`: query đang `enabled: false` (chưa có slug) đứng
+    // mãi ở `pending`, dùng nó là treo spinner vĩnh viễn.
+    isLoading: minePending || profile.isLoading,
+  };
 }
 
 /** Bao nhiêu avatar xếp chồng trên hồ sơ trước khi đổi sang "+N" — quá 4 là hết chỗ trên một dòng. */

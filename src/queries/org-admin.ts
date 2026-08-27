@@ -59,7 +59,11 @@ export function useSlugAvailability(slug: string) {
  * `keepPreviousData`: đổi bộ lọc mà để danh sách chớp về rỗng thì bảng nhảy chiều cao giữa
  * lúc người dùng đang gõ.
  */
-export function useAllOrgs(filter: OrgListFilter = {}) {
+/**
+ * @param enabled Tắt khi người xem KHÔNG phải master — `GET /organizations` là route
+ *   master-only, để nó tự chạy là một lượt 403 mỗi lần màn mount.
+ */
+export function useAllOrgs(filter: OrgListFilter = {}, enabled = true) {
   const term = (filter.q ?? '').trim();
   const [settled, setSettled] = useState(term);
   useEffect(() => {
@@ -72,6 +76,7 @@ export function useAllOrgs(filter: OrgListFilter = {}) {
   return useQuery({
     queryKey: qk.allOrgs(settled, status ?? 'all'),
     queryFn: () => orgAdminApi.listAll({ q: settled, status }),
+    enabled,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
@@ -95,6 +100,22 @@ export function useSetOrganizationStatus() {
   return useMutation({
     mutationFn: (v: { id: string; status: 'active' | 'suspended' }) =>
       orgAdminApi.setStatus(v.id, v.status),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.allOrgsRoot() }),
+  });
+}
+
+/**
+ * Công khai ↔ riêng tư.
+ *
+ * Refetch contract: quét `allOrgsRoot()` như `useSetOrganizationStatus` — bảng tổ chức là
+ * chỗ duy nhất hiện cờ này. KHÔNG quét `adminRoot()`: đổi khả năng khám phá không đụng tới
+ * một dòng số liệu nào của bàn duyệt.
+ */
+export function useSetOrgVisibility() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: string; isPublic: boolean }) =>
+      orgAdminApi.setVisibility(v.id, v.isPublic),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.allOrgsRoot() }),
   });
 }
@@ -136,15 +157,22 @@ function useGrantMutation<TVars, TData>(fn: (v: TVars) => Promise<TData>) {
 /**
  * Đổi cách bày bảng tin của một nhóm.
  *
- * Refetch contract: quét `myOrgs()` vì chính nó mang `feedLayout` mà bảng tin đọc để chọn
- * số cột — không quét thì đổi xong bảng tin vẫn bày kiểu cũ tới hết `staleTime` 5 phút.
+ * Refetch contract: quét CẢ HAI nguồn mang `feedLayout`.
+ *
+ * `myOrgs()` — bảng tin đọc nó để chọn số cột; không quét thì đổi xong bảng tin vẫn bày
+ *   kiểu cũ tới hết `staleTime` 5 phút.
+ * `orgProfile(slug)` — nguồn của người KHÔNG phải thành viên (master). Thiếu nó thì màn
+ *   cấu hình vẫn tô đậm lựa chọn cũ sau khi lưu thành công, trông như bấm không ăn.
  */
 export function useUpdateOrgDisplay() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (v: { slug: string; feedLayout: 'feed' | 'grid' }) =>
       orgApi.update(v.slug, { feedLayout: v.feedLayout }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.myOrgs() }),
+    onSuccess: (_data, v) => {
+      void qc.invalidateQueries({ queryKey: qk.myOrgs() });
+      void qc.invalidateQueries({ queryKey: qk.orgProfile(v.slug) });
+    },
   });
 }
 

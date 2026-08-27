@@ -17,6 +17,7 @@ export function Header({
   onJoin,
   onInvite,
   onEdit,
+  onPost,
   busy,
 }: {
   org: OrgProfile;
@@ -25,6 +26,8 @@ export function Header({
   onInvite: () => void;
   /** Chỉ truyền khi người xem là quản trị nhóm — `undefined` thì hàng nút không dựng ô sửa. */
   onEdit?: () => void;
+  /** Chỉ truyền khi nhóm này NHẬN được tin từ người đang xem — xem `index.tsx`. */
+  onPost?: () => void;
   busy: boolean;
 }) {
   const where = [org.district, org.provinceCode].filter(Boolean).join(', ');
@@ -97,6 +100,20 @@ export function Header({
             <Text style={styles.inviteText}>Mời</Text>
           </Pressable>
         </View>
+
+        {/*
+          Đăng tin VÀO nhóm này. Đứng ngay dưới hàng tham gia vì đó là việc chính người ta
+          làm sau khi đã vào nhóm — và nó tránh hẳn đường vòng cũ: đổi "nhóm đang thao tác"
+          ở trang cá nhân rồi mới bấm nút đăng chung, một quy trình không ai đoán ra được.
+        */}
+        {!!onPost && (
+          <Pressable
+            onPress={onPost}
+            style={({ pressed }) => [styles.post, pressed && { opacity: 0.8 }]}
+          >
+            <Text style={styles.postText}>📌 Đăng tin vào nhóm này</Text>
+          </Pressable>
+        )}
 
         {/*
           Quản trị nhóm. Nằm TRONG thẻ thông tin vì nó sửa đúng những gì thẻ này đang hiện —
@@ -190,6 +207,14 @@ const styles = StyleSheet.create({
    * Vạch kẻ chỉ dài bằng phần nội dung thẻ (thẻ có `padding: 18`), đúng kiểu vạch phân mục
    * bên trong một thẻ — kéo hết bề ngang sẽ trông như thẻ bị cắt làm hai.
    */
+  post: {
+    marginTop: 10,
+    borderRadius: 8,
+    paddingVertical: 13,
+    alignItems: 'center',
+    backgroundColor: C.moss,
+  },
+  postText: { fontFamily: F.uiBold, fontSize: 13.5, color: C.paper },
   editRow: {
     flexDirection: 'row',
     alignItems: 'baseline',

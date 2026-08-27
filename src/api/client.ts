@@ -315,6 +315,18 @@ type ListingInput = {
    */
   visibility?: 'org_internal' | 'public';
   /**
+   * Nhóm đích, khi người đăng đi từ TRANG HỒ SƠ NHÓM thay vì từ nút đăng chung.
+   *
+   * Không gửi thì BE lấy nhóm đang thao tác (`X-Org-Slug`) — đường cũ, và nó buộc người
+   * thuộc nhiều nhóm phải chuyển nhóm đang thao tác trước khi đăng. Gửi slug thì tin vào
+   * ĐÚNG nhóm đó, bất kể họ đang đứng ở đâu.
+   *
+   * BE tự tra tư cách thành viên với slug này (`resolveTargetOrg`), nên đây KHÔNG phải
+   * đường vòng qua phân quyền: gửi slug của nhóm mình không thuộc thì tin rơi vào hàng đợi
+   * người-ngoài của nhóm đó, và nhóm đóng cửa thì 400.
+   */
+  orgSlug?: string;
+  /**
    * Thuộc tính động theo template của danh mục. Gửi thô — BE ép kiểu và loại key lạ ở
    * `validateAttributes`, app không đoán trước luật đó (nó nằm trong DB, không trong bundle).
    */
@@ -356,6 +368,7 @@ function toListingBody(input: ListingInput) {
     // được theo gì — thà vắng hẳn field.
     ...(Object.keys(location).length ? { location } : {}),
     ...(input.visibility ? { visibility: input.visibility } : {}),
+    ...(input.orgSlug ? { orgSlug: input.orgSlug } : {}),
     // Bỏ hẳn key khi rỗng, cùng lý do với `location`: `attributes: {}` qua được `.strict()`
     // của BE nhưng ghi ra một tin không lọc được theo gì.
     ...(input.attributes && Object.keys(input.attributes).length

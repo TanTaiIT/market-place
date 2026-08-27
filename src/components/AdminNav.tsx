@@ -27,11 +27,11 @@ type NavItem = {
   label: string;
   badge?: 'queue' | 'reports' | 'joins';
   /** Quyền BE đòi ở màn đó. Hiện mục mà người dùng chỉ có thể ăn 403 là hứa suông. */
-  gate?: 'master' | 'publicAxis';
+  gate?: 'master' | 'publicAxis' | 'anyAxis';
 };
 
 /**
- * Ba nhóm = ba TRỤC QUYỀN của BE, không phải ba loại công việc.
+ * Nhóm = TRỤC QUYỀN của BE, không phải loại công việc.
  *
  * Bản trước nhóm theo "việc hằng ngày của tôi" (Hằng ngày / Nội dung / Cộng đồng / Hệ thống) —
  * tư duy của người trông đúng một tổ chức. Cách đó cắt ngang các trục: "Nội dung" gộp Tin đăng
@@ -40,6 +40,8 @@ type NavItem = {
  * master, đó đúng là thứ quyết định họ đang thao tác lên dữ liệu của ai.
  *
  * `org: true` = màn đọc `X-Org-Slug`, tức nội dung đổi theo tổ chức đang chọn.
+ *
+ * Nhóm 'Quyền' là ngoại lệ có chủ ý — nó cắt ngang cả hai trục, xem gate `anyAxis`.
  */
 const GROUPS: { label: string; org?: boolean; items: NavItem[] }[] = [
   {
@@ -53,7 +55,6 @@ const GROUPS: { label: string; org?: boolean; items: NavItem[] }[] = [
       { href: '/admin/notice', icon: '◈', label: 'Gửi thông báo' },
       { href: '/admin/join-requests', icon: '✋', label: 'Đơn xin gia nhập', badge: 'joins' },
       { href: '/admin/org-units', icon: '🗂', label: 'Nhóm con' },
-      { href: '/admin/role-grants', icon: '🔑', label: 'Phân quyền' },
       { href: '/admin/org-display', icon: '▦', label: 'Cách bày bảng tin' },
     ],
   },
@@ -61,7 +62,23 @@ const GROUPS: { label: string; org?: boolean; items: NavItem[] }[] = [
     // Trục danh mục: hàng đợi riêng, không gộp vào 'Duyệt tin' — hai trục không giao nhau, và
     // tin ở đây không thuộc tổ chức nào nên nó KHÔNG nằm trong nhóm trên.
     label: 'Trục công khai',
-    items: [{ href: '/admin/public-queue', icon: '🌐', label: 'Hàng đợi công khai', gate: 'publicAxis' }],
+    items: [
+      { href: '/admin/public-overview', icon: '▦', label: 'Tổng quan trục', gate: 'publicAxis' },
+      {
+        href: '/admin/public-queue',
+        icon: '🌐',
+        label: 'Hàng đợi công khai',
+        gate: 'publicAxis',
+      },
+    ],
+  },
+  {
+    // Phân quyền cắt ngang cả hai trục: `canGrant` cho manager cấp staff TRONG scope của chính
+    // mình, kể cả scope (danh mục × tỉnh), còn `/role-grants/mine` thì ai có grant cũng đọc được.
+    // Treo nó trong nhóm org như trước là khoá manager danh mục ra khỏi màn duy nhất họ chia
+    // tải được — họ không thuộc tổ chức nào nên cả nhóm đó bị cắt.
+    label: 'Quyền',
+    items: [{ href: '/admin/role-grants', icon: '🔑', label: 'Phân quyền', gate: 'anyAxis' }],
   },
   {
     // Không mục nào ở đây đọc `X-Org-Slug`: đổi tổ chức đang chọn không đổi một dòng nào.
@@ -99,10 +116,15 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
     joins: joins?.length ?? 0,
   };
 
+  const orgModerator = canModerateOrg(grants);
+  const publicAxis = canModeratePublicAxis(grants);
+
   const allowed = {
     master: isMaster(grants),
-    publicAxis: canModeratePublicAxis(grants),
-    orgModerator: canModerateOrg(grants),
+    publicAxis,
+    orgModerator,
+    // Cửa của mục Phân quyền — xem nhóm 'Quyền' ở GROUPS: nó không thuộc riêng trục nào.
+    anyAxis: orgModerator || publicAxis,
   };
 
   /*

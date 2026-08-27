@@ -13,6 +13,7 @@ import type { ProvinceName } from './location';
 
 /** Cùng lý do với `OrgUnit` bên `org.ts`: màn hình đi qua `api/**`, không chạm `generated`. */
 export type { Organization, RoleGrant };
+import { isMaster } from './admin';
 import { unwrap } from './client';
 import { withAuthRetry } from './http';
 
@@ -81,39 +82,80 @@ export const SCOPE_LABEL: Record<RoleGrant['scopeType'], string> = {
   org: 'Cả tổ chức',
   org_unit: 'Một nhóm con',
   category_province: 'Danh mục × tỉnh',
+  category_ward: 'Danh mục × phường',
 };
 
 /**
  * Thứ form cấp quyền gõ ra. Bốn field phạm vi đứng cạnh nhau nhưng chỉ một nhóm có nghĩa với
  * `scopeType` đang chọn — `grantRole` là nơi cắt bớt, form chỉ việc giữ cả bốn.
+ *
+ * Người nhận: `userId` khi chọn được từ danh bạ, `userEmail` khi không có danh bạ nào để chọn
+ * (manager trục danh mục không thuộc tổ chức nào). BE nhận ĐÚNG một trong hai —
+ * `createRoleGrantSchema` refine, gửi cả hai là 400.
  */
 export type NewGrantInput = {
-  userId: string;
+  userId: string | null;
+  userEmail: string | null;
   role: RoleGrant['role'];
   scopeType: RoleGrant['scopeType'];
   orgId: string | null;
   unitId: string | null;
   categoryId: string | null;
   provinceCodes: string[];
+  /** Chỉ có nghĩa với `category_ward`; đi kèm ĐÚNG một tỉnh ở `provinceCodes`. */
+  wardCodes: string[];
 };
 
 /**
- * Vai trò một người cấp được cho người khác, khớp mô tả của `POST /role-grants`: master cấp
- * `manager` và `staff`, manager chỉ cấp được `staff` trong đúng scope của mình.
+ * Vai trò một người cấp được cho người khác, khớp `canGrant` của BE: master cấp `manager` và
+ * `staff`, manager chỉ cấp `staff` TRONG scope của chính mình, staff không cấp được cho ai.
  *
- * Cắt ở UI để không mời người ta bấm vào thứ chắc chắn ăn 403 — BE vẫn là nơi chốt thật.
+ * `master` không nằm trong danh sách của bất kỳ ai: `canGrant` chặn ngay dòng đầu
+ * (`role === MASTER` → false) vì hệ thống có đúng một master do migration dựng. Mời người ta
+ * bấm vào nó là hứa suông một cú 403.
+ *
+ * Nhận grants chứ không nhận cờ `master` — cùng lý do với `scopesForRole` ngay dưới.
  */
-export const rolesGrantableBy = (master: boolean): RoleGrant['role'][] =>
-  master ? ['master', 'manager', 'staff'] : ['staff'];
+export const rolesGrantableBy = (grants: RoleGrant[] | undefined): RoleGrant['role'][] => {
+  if (isMaster(grants)) return ['manager', 'staff'];
+  return (grants ?? []).some((g) => g.role === 'manager') ? ['staff'] : [];
+};
 
 /**
- * Phạm vi hợp lệ của một vai trò. `master` là quyền toàn hệ thống nên không có phạm vi nào
- * khác, còn trục (danh mục × tỉnh) chỉ master mới cấp được — nó quyết định ai duyệt tin công khai.
+ * Phạm vi hợp lệ của một vai trò = giao của HAI ràng buộc BE:
+ * 1. `ROLE_SCOPES` (`role-grant.model.ts`): master chỉ `system`, manager KHÔNG đi với
+ *    `org_unit`, staff đi được cả ba.
+ * 2. `covers()` (`policy.ts`): người cấp không phải master chỉ cấp được TRONG scope của mình —
+ *    grant `org` phủ `org`/`org_unit` của org đó, grant `category_province` phủ đúng
+ *    `category_province` cùng danh mục.
+ *
+ * Vế 2 là lý do hàm nhận grants: bản cũ đưa manager trục danh mục đúng hai phạm vi BE chắc
+ * chắn từ chối (`org`, `org_unit`) rồi ẩn mất phạm vi duy nhất họ cấp được, nên màn Phân quyền
+ * với họ không có đường nào đi tới thành công.
  */
-export function scopesForRole(role: RoleGrant['role'], master: boolean): RoleGrant['scopeType'][] {
+export function scopesForRole(
+  role: RoleGrant['role'],
+  grants: RoleGrant[] | undefined,
+): RoleGrant['scopeType'][] {
   if (role === 'master') return ['system'];
-  const base: RoleGrant['scopeType'][] = ['org', 'org_unit'];
-  return master && role === 'manager' ? [...base, 'category_province'] : base;
+  const byRole: RoleGrant['scopeType'][] =
+    role === 'manager'
+      ? ['org', 'category_province', 'category_ward']
+      : ['org', 'org_unit', 'category_province', 'category_ward'];
+  if (isMaster(grants)) return byRole;
+
+  const mine = (grants ?? []).filter((g) => g.role === 'manager');
+  return byRole.filter((scope) =>
+    mine.some((g) => {
+      // Tầng tỉnh phủ cả tầng phường: đó chính là cách người phụ trách tỉnh chia tải xuống từng
+      // phường trong tỉnh mình (§5.3 ở tầng dưới).
+      if (g.scopeType === 'category_province') {
+        return scope === 'category_province' || scope === 'category_ward';
+      }
+      if (g.scopeType === 'category_ward') return scope === 'category_ward';
+      return g.scopeType === 'org' && (scope === 'org' || scope === 'org_unit');
+    }),
+  );
 }
 
 /** Vì sao slug không dùng được — BE trả mã, người đọc cần câu chữ. */
@@ -136,6 +178,15 @@ export function slugReasonText(result: SlugAvailability): string {
 function scopeOf(input: NewGrantInput): Partial<CreateRoleGrant> {
   if (input.scopeType === 'org') return { orgId: input.orgId ?? undefined };
   if (input.scopeType === 'org_unit') return { unitId: input.unitId ?? undefined };
+  if (input.scopeType === 'category_ward') {
+    return {
+      categoryId: input.categoryId ?? undefined,
+      // BE đòi ĐÚNG một tỉnh cho phạm vi này: cặp (tỉnh, phường) mới định danh được ô, vì tên
+      // phường lặp giữa các tỉnh. Cắt ở đây để form không gửi đi một grant chắc chắn bị từ chối.
+      provinceCodes: input.provinceCodes.slice(0, 1),
+      wardCodes: input.wardCodes,
+    };
+  }
   if (input.scopeType === 'category_province') {
     return { categoryId: input.categoryId ?? undefined, provinceCodes: input.provinceCodes };
   }
@@ -238,7 +289,14 @@ export const orgAdminApi = {
   async grantRole(input: NewGrantInput): Promise<RoleGrant> {
     const res = await withAuthRetry(() =>
       createRoleGrant({
-        body: { userId: input.userId, role: input.role, scopeType: input.scopeType, ...scopeOf(input) },
+        body: {
+          // `?? undefined` chứ không `null`: `.strict()` của BE nhận field VẮNG MẶT, không nhận null.
+          userId: input.userId ?? undefined,
+          userEmail: input.userEmail ?? undefined,
+          role: input.role,
+          scopeType: input.scopeType,
+          ...scopeOf(input),
+        },
       }),
     );
     return unwrap(res, 'Không cấp được quyền');

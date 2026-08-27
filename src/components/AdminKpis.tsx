@@ -10,6 +10,8 @@ const ACCENT: Record<AdminKpi['key'], string> = {
   live: C.mossBright,
   users: C.cork,
   reports: C.amber,
+  hidden: C.tape,
+  rejected: C.pinLight,
 };
 
 /** Hermes không có Intl đầy đủ nên `toLocaleString` không tin được — chấm nghìn bằng tay. */

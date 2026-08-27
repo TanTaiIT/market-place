@@ -448,24 +448,27 @@ export type AcceptInviteResult = {
 };
 
 export type CreateRoleGrant = {
-    userId: string;
+    userId?: string;
+    userEmail?: string;
     role: 'master' | 'manager' | 'staff';
-    scopeType: 'system' | 'org' | 'org_unit' | 'category_province';
+    scopeType: 'system' | 'org' | 'org_unit' | 'category_province' | 'category_ward';
     orgId?: string;
     unitId?: string;
     categoryId?: string;
     provinceCodes?: Array<string>;
+    wardCodes?: Array<string>;
 };
 
 export type RoleGrant = {
     id: string;
     userId: string;
     role: 'master' | 'manager' | 'staff';
-    scopeType: 'system' | 'org' | 'org_unit' | 'category_province';
+    scopeType: 'system' | 'org' | 'org_unit' | 'category_province' | 'category_ward';
     orgId: string | null;
     unitId: string | null;
     categoryId: string | null;
     provinceCodes: Array<string>;
+    wardCodes: Array<string>;
     grantedBy: string | null;
     grantedAt: string;
 };
@@ -667,6 +670,7 @@ export type CoverageMatrix = {
         categoryName: string;
         provinceCode: string;
         hasModerator: boolean;
+        partialByWard: boolean;
         pending: number;
     }>;
 };
@@ -684,8 +688,25 @@ export type ModerationOverview = {
     live: number;
     hidden: number;
     rejected: number;
+    trend: Array<{
+        day: string;
+        approved: number;
+        pending: number;
+    }>;
+    categories: Array<{
+        categoryId: string;
+        name: string;
+        count: number;
+    }>;
     users: number;
     openReports: number;
+};
+
+export type PublicAxisOverview = {
+    pending: number;
+    live: number;
+    hidden: number;
+    rejected: number;
     trend: Array<{
         day: string;
         approved: number;
@@ -2718,6 +2739,10 @@ export type CreateRoleGrantErrors = {
      */
     403: ErrorResponse;
     /**
+     * Chưa có tài khoản nào dùng email đó
+     */
+    404: ErrorResponse;
+    /**
      * Người này đã có đúng quyền đó
      */
     409: ErrorResponse;
@@ -3750,6 +3775,39 @@ export type ModerationPublicQueueResponses = {
 };
 
 export type ModerationPublicQueueResponse = ModerationPublicQueueResponses[keyof ModerationPublicQueueResponses];
+
+export type ModerationPublicOverviewData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/moderation/public-overview';
+};
+
+export type ModerationPublicOverviewErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Không phụ trách danh mục nào
+     */
+    403: ErrorResponse;
+};
+
+export type ModerationPublicOverviewError = ModerationPublicOverviewErrors[keyof ModerationPublicOverviewErrors];
+
+export type ModerationPublicOverviewResponses = {
+    /**
+     * Số liệu trục danh mục
+     */
+    200: {
+        success: true;
+        message: string;
+        data: PublicAxisOverview;
+    };
+};
+
+export type ModerationPublicOverviewResponse = ModerationPublicOverviewResponses[keyof ModerationPublicOverviewResponses];
 
 export type ModerationCoverageData = {
     body?: never;

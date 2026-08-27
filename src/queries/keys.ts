@@ -109,6 +109,7 @@ export const qk = {
     ['admin', 'listings', orgSlug, status] as const,
   adminPublicQueue: (status: string) => ['admin', 'public-queue', status] as const,
   adminCoverage: () => ['admin', 'coverage'] as const,
+  adminPublicOverview: () => ['admin', 'public-overview'] as const,
   // Ngoài cụm `admin` vì nó là quyền của NGƯỜI, không phải dữ liệu của bàn quản trị: một lượt
   // duyệt tin quét sạch `adminRoot()`, mà quyền thì không đổi theo lượt duyệt nào cả.
   myGrants: () => ['me', 'grants'] as const,

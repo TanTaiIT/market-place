@@ -5,6 +5,7 @@ import {
   moderationPublicQueue,
   moderationRerouteListing,
   moderationOverview,
+  moderationPublicOverview,
   moderationRemoveListing,
   moderationSetListingStatus,
   myRoleGrants,
@@ -78,7 +79,7 @@ export type AdminEvent = {
 };
 
 export type AdminKpi = {
-  key: 'pending' | 'live' | 'users' | 'reports';
+  key: 'pending' | 'live' | 'users' | 'reports' | 'hidden' | 'rejected';
   label: string;
   value: number;
   trend: number[];
@@ -150,6 +151,34 @@ export const adminApi = {
     };
   },
 
+  /**
+   * Cùng hình dạng `Overview` với bàn org để dùng lại `AdminKpis`/`TrendChart`, nhưng hai thẻ
+   * "Người dùng"/"Báo cáo mở" không tồn tại ở trục này (số của MỘT tổ chức). Chỗ đó thay bằng
+   * hai trạng thái người phụ trách ô phải theo: tin đang ẩn và tin đã từ chối.
+   */
+  async getPublicOverview(): Promise<Overview> {
+    const res = await withAuthRetry(() => moderationPublicOverview());
+    const data = unwrap(res, 'Không tải được số liệu trục danh mục');
+
+    const approved = data.trend.map((d) => d.approved);
+    const pendingSeries = data.trend.map((d) => d.pending);
+
+    return {
+      kpis: [
+        {
+          key: 'pending',
+          label: 'Chờ duyệt',
+          value: data.pending,
+          trend: tail(pendingSeries, data.pending),
+        },
+        { key: 'live', label: 'Đang hiển thị', value: data.live, trend: tail(approved, data.live) },
+        { key: 'hidden', label: 'Đang ẩn', value: data.hidden, trend: [data.hidden] },
+        { key: 'rejected', label: 'Đã từ chối', value: data.rejected, trend: [data.rejected] },
+      ],
+      trend: data.trend.map((d) => ({ approved: d.approved, pending: d.pending })),
+      cats: data.categories.map((c) => ({ cat: c.name, count: c.count })),
+    };
+  },
   async getEvents(): Promise<AdminEvent[]> {
     const res = await withAuthRetry(() => moderationActivity({ query: { limit: 20 } }));
     return unwrap(res, 'Không tải được dòng hoạt động').map((log) => ({
@@ -275,9 +304,16 @@ export const isMaster = (grants: RoleGrant[] | undefined) =>
 /**
  * Mở được hàng đợi trục danh mục không. Master vào được vì họ là nơi tin rơi về khi ô chưa
  * có ai phụ trách — bỏ vế này thì đúng người phải dọn hàng tồn lại là người không thấy nó.
+ *
+ * HAI tầng đều tính: khớp `requireCategoryModerator`/`requireAnyModerator` của BE, vốn nhận cả
+ * `category_province` lẫn `category_ward`. Kiểm một tầng là khoá người phụ trách PHƯỜNG ra khỏi
+ * đúng màn của họ.
  */
 export const canModeratePublicAxis = (grants: RoleGrant[] | undefined) =>
-  isMaster(grants) || (grants ?? []).some((g) => g.scopeType === 'category_province');
+  isMaster(grants) ||
+  (grants ?? []).some(
+    (g) => g.scopeType === 'category_province' || g.scopeType === 'category_ward',
+  );
 
 /**
  * Duyệt được thứ gì đó trong tổ chức không (đơn gia nhập, tin nội bộ). Khớp `requireOrgModerator`

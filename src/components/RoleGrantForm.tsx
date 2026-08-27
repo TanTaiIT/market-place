@@ -1,23 +1,22 @@
-import React, { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Text, View } from 'react-native';
 import { AdminChip, AdminPickerField, adminFormStyles } from './AdminPicker';
-import { PinButton } from './ui';
+import { RoleGrantGeoFields } from './RoleGrantGeoFields';
+import { Field, PinButton } from './ui';
 import { useToast } from './Toast';
-import type { PickerSearch } from './PickerSheet';
 import { useMyOrgs, useOrgRoster, useOrgUnits } from '@/queries/org';
-import { useCategories } from '@/queries/listings';
 import { useAdminUsers } from '@/queries/admin-people';
-import { useProvinces } from '@/queries/location';
-import { filterProvinces, type ProvinceName } from '@/api/location';
+import { isMaster } from '@/api/admin';
+import type { ProvinceName } from '@/api/location';
 import {
   ROLE_LABEL,
   SCOPE_LABEL,
   rolesGrantableBy,
   scopesForRole,
   type NewGrantInput,
+  type RoleGrant,
 } from '@/api/org-admin';
 import { useOrgSlug } from '@/stores/auth';
-import { C, F } from '@/theme';
 
 /**
  * Form cấp quyền cho một thành viên.
@@ -31,26 +30,33 @@ import { C, F } from '@/theme';
 
 const EMPTY = {
   userId: null as string | null,
+  userEmail: '',
   role: 'staff' as NewGrantInput['role'],
   scopeType: 'org' as NewGrantInput['scopeType'],
   unitId: null as string | null,
   categoryId: null as string | null,
   provinceCodes: [] as ProvinceName[],
+  wardCodes: [] as string[],
 };
 
 export function RoleGrantForm({
-  master,
+  grants,
   busy,
   onSubmit,
 }: {
-  /** Người đang dùng có phải master không — quyết định cấp được vai trò và phạm vi nào. */
-  master: boolean;
+  /**
+   * Grant của CHÍNH người đang cấp — quyết định cấp được vai trò nào, trong phạm vi nào. Cờ
+   * `master` không đủ: manager trục (danh mục × tỉnh) cấp được staff trong đúng ô của họ, mà
+   * ô đó chỉ đọc ra được từ grant.
+   */
+  grants: RoleGrant[] | undefined;
   busy: boolean;
   onSubmit: (values: NewGrantInput, reset: () => void) => void;
 }) {
   const toast = useToast();
   const orgSlug = useOrgSlug();
   const [form, setForm] = useState(EMPTY);
+  const master = isMaster(grants);
 
   /*
    * NGUỒN NGƯỜI NHẬN QUYỀN phụ thuộc người đang CẤP, không phụ thuộc tổ chức đang chọn.
@@ -77,49 +83,60 @@ export function RoleGrantForm({
       }));
   const peopleLoading = master ? allUsers.isLoading : roster.isLoading;
   const { data: units } = useOrgUnits();
-  const { data: orgs } = useMyOrgs();
-  const { data: categories } = useCategories();
-  const { data: provinces, isPending: provincesPending } = useProvinces();
+  const { data: orgs, isPending: orgsPending } = useMyOrgs();
 
   const patch = (fields: Partial<typeof EMPTY>) => setForm((prev) => ({ ...prev, ...fields }));
-  const roles = rolesGrantableBy(master);
-  const scopes = scopesForRole(form.role, master);
-
-  const searchProvince = useCallback<PickerSearch<ProvinceName>>(
-    (keyword) =>
-      filterProvinces(provinces ?? [], keyword)
-        // Tỉnh đã chọn rồi thì bỏ khỏi danh sách: chọn lại chỉ tạo bản trùng trong `provinceCodes`.
-        .filter((p) => !form.provinceCodes.includes(p.name))
-        .map((p) => ({ key: p.name, label: p.name })),
-    [provinces, form.provinceCodes],
-  );
+  const roles = rolesGrantableBy(grants);
+  const scopes = scopesForRole(form.role, grants);
+  // Grants tới sau lần render đầu, nên phạm vi đang giữ trong state có thể không còn hợp lệ —
+  // chốt về phạm vi hợp lệ đầu tiên thay vì gửi đi tổ hợp BE chắc chắn từ chối.
+  const scope = scopes.includes(form.scopeType) ? form.scopeType : scopes[0];
 
   /** Tổ chức đang hoạt động — `null` khi người dùng không là thành viên tổ chức nào. */
   const orgId = orgs?.find((o) => o.slug === orgSlug)?.id ?? null;
+  /**
+   * Không master và không thuộc tổ chức nào → không có danh bạ nào để chọn, chuyển sang nhập
+   * email. Chờ `useMyOrgs` xong mới quyết: `orgs` chưa về cũng là mảng rỗng, đoán sớm sẽ nhá ô
+   * email cho người thật ra có danh bạ.
+   */
+  const byEmail = !master && !orgsPending && (orgs ?? []).length === 0;
 
   const submit = () => {
-    if (!form.userId) return toast('⚠️ Chọn người sẽ nhận quyền');
+    if (byEmail) {
+      // Chỉ chặn ca rõ ràng là chưa điền — "email này có tài khoản không" là câu của BE, dựng
+      // luật email riêng ở client chỉ tạo thêm một định nghĩa "email hợp lệ" để lệch nhau.
+      if (!form.userEmail.includes('@')) return toast('⚠️ Nhập email người nhận quyền');
+    } else if (!form.userId) {
+      return toast('⚠️ Chọn người sẽ nhận quyền');
+    }
     // Master KHÔNG tự thành thành viên tổ chức mình tạo (xem `org-admin.ts`), nên `orgId` rỗng là
     // ca thường gặp chứ không phải hiếm — thiếu guard là gửi một grant phạm vi `org` không có org
     // và ăn 400, đúng thứ hai scope dưới đã chặn.
-    if (form.scopeType === 'org' && !orgId) {
+    if (scope === 'org' && !orgId) {
       return toast('⚠️ Bạn không thuộc tổ chức nào — chọn phạm vi khác');
     }
-    if (form.scopeType === 'org_unit' && !form.unitId) return toast('⚠️ Chọn nhóm con áp quyền');
-    if (form.scopeType === 'category_province') {
+    if (scope === 'org_unit' && !form.unitId) return toast('⚠️ Chọn nhóm con áp quyền');
+    if (scope === 'category_province') {
       if (!form.categoryId) return toast('⚠️ Chọn danh mục cho trục này');
       if (form.provinceCodes.length === 0) return toast('⚠️ Chọn ít nhất một tỉnh');
+    }
+    if (scope === 'category_ward') {
+      if (!form.categoryId) return toast('⚠️ Chọn danh mục cho trục này');
+      if (form.provinceCodes.length !== 1) return toast('⚠️ Chọn đúng một tỉnh cho phạm vi phường');
+      if (form.wardCodes.length === 0) return toast('⚠️ Chọn ít nhất một phường/xã');
     }
 
     onSubmit(
       {
-        userId: form.userId,
+        userId: byEmail ? null : form.userId,
+        userEmail: byEmail ? form.userEmail.trim() : null,
         role: form.role,
-        scopeType: form.scopeType,
+        scopeType: scope,
         orgId,
         unitId: form.unitId,
         categoryId: form.categoryId,
         provinceCodes: form.provinceCodes,
+        wardCodes: form.wardCodes,
       },
       () => setForm(EMPTY),
     );
@@ -127,17 +144,39 @@ export function RoleGrantForm({
 
   return (
     <>
-      <AdminPickerField
-        label="Cấp cho ai"
-        title={master ? 'Chọn người dùng' : 'Chọn thành viên'}
-        // Ô rỗng phải nói ĐÚNG vì sao rỗng: "danh bạ trống" là một câu trả lời sai với
-        // master chưa chọn tổ chức, và sai luôn với người chưa tải xong.
-        placeholder={emptyReason(master, people.length, orgSlug, peopleLoading)}
-        items={people}
-        loading={peopleLoading}
-        value={form.userId}
-        onChange={(userId) => patch({ userId })}
-      />
+      {/*
+        Không thuộc tổ chức nào thì KHÔNG có danh bạ nào để chọn: `GET /memberships` đòi
+        `requireMembership`, nên với manager trục (danh mục × tỉnh) ô chọn người vĩnh viễn rỗng.
+        BE nhận `userEmail` đúng cho ca này — email là thứ họ biết về người mình định giao việc.
+      */}
+      {byEmail ? (
+        <>
+          <Field
+            onDark
+            label="Cấp cho ai (email)"
+            value={form.userEmail}
+            onChangeText={(userEmail) => patch({ userEmail })}
+            placeholder="email@vidu.com"
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+          <Text style={adminFormStyles.hint}>
+            Người nhận phải có tài khoản sẵn — BE tra theo email, chưa có thì trả lỗi.
+          </Text>
+        </>
+      ) : (
+        <AdminPickerField
+          label="Cấp cho ai"
+          title={master ? 'Chọn người dùng' : 'Chọn thành viên'}
+          // Ô rỗng phải nói ĐÚNG vì sao rỗng: "danh bạ trống" là một câu trả lời sai với
+          // master chưa chọn tổ chức, và sai luôn với người chưa tải xong.
+          placeholder={emptyReason(master, people.length, orgSlug, peopleLoading)}
+          items={people}
+          loading={peopleLoading}
+          value={form.userId}
+          onChange={(userId) => patch({ userId })}
+        />
+      )}
 
       <Text style={adminFormStyles.label}>VAI TRÒ</Text>
       <View style={adminFormStyles.chips}>
@@ -148,7 +187,7 @@ export function RoleGrantForm({
             on={form.role === r}
             // Đổi vai trò kéo theo phạm vi mặc định của chính nó, không giữ phạm vi của vai trò cũ.
             onPress={() =>
-              patch({ role: r, scopeType: scopesForRole(r, master)[0], unitId: null })
+              patch({ role: r, scopeType: scopesForRole(r, grants)[0], unitId: null })
             }
           />
         ))}
@@ -161,14 +200,23 @@ export function RoleGrantForm({
             <AdminChip
               key={s}
               label={SCOPE_LABEL[s]}
-              on={form.scopeType === s}
-              onPress={() => patch({ scopeType: s })}
+              on={scope === s}
+              onPress={() =>
+                // Đổi phạm vi thì dọn lựa chọn của phạm vi cũ: phường chỉ có nghĩa ở
+                // `category_ward`, và phạm vi đó chỉ mang đúng một tỉnh.
+                patch({
+                  scopeType: s,
+                  provinceCodes:
+                    s === 'category_ward' ? form.provinceCodes.slice(0, 1) : form.provinceCodes,
+                  wardCodes: [],
+                })
+              }
             />
           ))}
         </View>
       </View>
 
-      {form.scopeType === 'org_unit' && (
+      {scope === 'org_unit' && (
         <View style={{ marginTop: 18 }}>
           <AdminPickerField
             label="Nhóm con"
@@ -181,41 +229,8 @@ export function RoleGrantForm({
         </View>
       )}
 
-      {form.scopeType === 'category_province' && (
-        <View style={{ marginTop: 18 }}>
-          <AdminPickerField
-            label="Danh mục"
-            title="Chọn danh mục"
-            placeholder="Chưa chọn danh mục"
-            items={(categories ?? []).map((c) => ({ key: c.id, label: c.name }))}
-            value={form.categoryId}
-            onChange={(categoryId) => patch({ categoryId })}
-          />
-
-          <Text style={adminFormStyles.label}>TỈNH PHỤ TRÁCH</Text>
-          <View style={adminFormStyles.chips}>
-            {form.provinceCodes.map((p) => (
-              <Pressable
-                key={p}
-                onPress={() =>
-                  patch({ provinceCodes: form.provinceCodes.filter((x) => x !== p) })
-                }
-                style={({ pressed }) => [styles.province, pressed && { opacity: 0.7 }]}
-              >
-                <Text style={styles.provinceText}>{p} ✕</Text>
-              </Pressable>
-            ))}
-          </View>
-          <AdminPickerField
-            label=""
-            title="Thêm tỉnh phụ trách"
-            placeholder="Thêm tỉnh..."
-            search={searchProvince}
-            loading={provincesPending}
-            value={null}
-            onChange={(p) => p && patch({ provinceCodes: [...form.provinceCodes, p] })}
-          />
-        </View>
+      {(scope === 'category_province' || scope === 'category_ward') && (
+        <RoleGrantGeoFields scope={scope} value={form} onChange={patch} />
       )}
 
       <View style={{ marginTop: 16 }}>
@@ -225,17 +240,6 @@ export function RoleGrantForm({
   );
 }
 
-const styles = StyleSheet.create({
-  province: {
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: C.deskHi,
-    borderWidth: 1,
-    borderColor: C.cork,
-  },
-  provinceText: { fontFamily: F.uiSemi, fontSize: 12, color: C.paper },
-});
 /**
  * Câu hiện trong ô "Cấp cho ai" khi chưa chọn ai.
  *

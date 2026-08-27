@@ -7,8 +7,7 @@ import { EmptyState, Loading } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useMyGrants } from '@/queries/admin';
 import { useGrantRole, useRevokeGrant } from '@/queries/org-admin';
-import { isMaster } from '@/api/admin';
-import { ROLE_LABEL, SCOPE_LABEL, type RoleGrant } from '@/api/org-admin';
+import { ROLE_LABEL, SCOPE_LABEL, rolesGrantableBy, type RoleGrant } from '@/api/org-admin';
 import { C, F } from '@/theme';
 
 /**
@@ -21,6 +20,9 @@ import { C, F } from '@/theme';
 export default function AdminRoleGrants() {
   const toast = useToast();
   const { data, error, isLoading } = useMyGrants();
+  // Cấp được cho ai không là câu hỏi về grant của CHÍNH mình (`canGrant`): staff mở được màn
+  // này để xem quyền của bản thân, nhưng không cấp được cho ai.
+  const grantable = rolesGrantableBy(data);
   const grant = useGrantRole();
   const revoke = useRevokeGrant();
 
@@ -46,8 +48,11 @@ export default function AdminRoleGrants() {
       ],
     );
 
+  // `org="optional"` chứ không phải `org`: chỉ phạm vi `org` mới cần slug, còn manager trục
+  // (danh mục × tỉnh) không thuộc tổ chức nào mà vẫn cấp được staff trong ô của mình — bắt họ
+  // chọn tổ chức là dựng tường trước màn duy nhất họ dùng được.
   return (
-    <AdminScreen title="Phân quyền" note="ai cầm chìa khoá nào" org>
+    <AdminScreen title="Phân quyền" note="ai cầm chìa khoá nào" org="optional">
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <AdminPanel title="Quyền của tôi" note="chạm ✕ để thu hồi">
           {isLoading ? (
@@ -85,23 +90,34 @@ export default function AdminRoleGrants() {
           </Text>
         </AdminPanel>
 
-        <View style={{ marginTop: 18 }}>
-          <AdminPanel title="Cấp quyền" note="không ai tự cấp cho chính mình">
-            <RoleGrantForm
-              master={isMaster(data)}
-              busy={grant.isPending}
-              onSubmit={(values, reset) =>
-                grant.mutate(values, {
-                  onSuccess: (g) => {
-                    reset();
-                    toast(`✓ Đã cấp ${ROLE_LABEL[g.role]} · ${SCOPE_LABEL[g.scopeType]}`);
-                  },
-                  onError: fail,
-                })
-              }
-            />
-          </AdminPanel>
-        </View>
+        {!isLoading && !error && (
+          <View style={{ marginTop: 18 }}>
+            {grantable.length > 0 ? (
+              <AdminPanel title="Cấp quyền" note="không ai tự cấp cho chính mình">
+                <RoleGrantForm
+                  grants={data}
+                  busy={grant.isPending}
+                  onSubmit={(values, reset) =>
+                    grant.mutate(values, {
+                      onSuccess: (g) => {
+                        reset();
+                        toast(`✓ Đã cấp ${ROLE_LABEL[g.role]} · ${SCOPE_LABEL[g.scopeType]}`);
+                      },
+                      onError: fail,
+                    })
+                  }
+                />
+              </AdminPanel>
+            ) : (
+              <AdminPanel title="Cấp quyền" note="ngoài phạm vi của bạn">
+                <Text style={adminFormStyles.limit}>
+                  Chỉ master cấp được Quản lý, và Quản lý cấp được Nhân sự trong đúng phạm vi của
+                  mình — quyền hiện tại của bạn không cấp được cho ai.
+                </Text>
+              </AdminPanel>
+            )}
+          </View>
+        )}
       </ScrollView>
     </AdminScreen>
   );

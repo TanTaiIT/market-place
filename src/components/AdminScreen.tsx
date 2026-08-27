@@ -37,8 +37,11 @@ export function AdminScreen({
    * thuộc tổ chức nào, nên đây là trạng thái BÌNH THƯỜNG của họ lúc mới vào, không phải lỗi:
    * trước đó mọi màn trong nhóm này ném nguyên văn câu của `requireOrg` — "gửi header
    * X-Org-Slug hoặc truy cập qua subdomain" — cho người vừa bấm một mục menu.
+   *
+   * `'optional'` = có đọc slug nhưng KHÔNG đòi (màn Phân quyền): bộ chọn của master vẫn còn,
+   * còn người không thuộc tổ chức nào vẫn vào được ruột màn thay vì gặp bức tường.
    */
-  org?: boolean;
+  org?: boolean | 'optional';
   /**
    * Màn CHỈ ĐỌC mà BE đã mở xuyên tổ chức cho master (`requireOrgReadOrMaster`).
    *
@@ -65,7 +68,7 @@ export function AdminScreen({
    * trường duy nhất, người chưa từng mở bộ chuyển tổ chức lần nào.
    */
   const needsOrg =
-    Boolean(org) && !orgSlug && (myOrgs ?? []).length !== 1 && !(master && masterReadsAll);
+    org === true && !orgSlug && (myOrgs ?? []).length !== 1 && !(master && masterReadsAll);
 
   /*
    * Chưa biết người này có phải master thì CHƯA vẽ lối thoát: `isMaster(undefined)` là

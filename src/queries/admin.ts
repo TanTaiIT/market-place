@@ -33,6 +33,16 @@ export function useAdminOverview() {
   });
 }
 
+/**
+ * Tổng quan trục danh mục. KHÔNG mang `orgSlug` trong key và không `enabled` theo slug: phạm vi
+ * tới từ `role_grants` của chính người gọi, đổi tổ chức đang chọn không đổi một dòng số liệu nào.
+ */
+export function usePublicOverview() {
+  return useQuery({
+    queryKey: qk.adminPublicOverview(),
+    queryFn: adminApi.getPublicOverview,
+  });
+}
 export function useAdminActivity() {
   const orgSlug = useOrgSlug();
   return useQuery({

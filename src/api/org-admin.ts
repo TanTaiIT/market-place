@@ -7,8 +7,14 @@ import {
   organizationSlugAvailability,
   revokeRoleGrant,
   setOrganizationStatus,
-  setOrganizationVisibility,
 } from './generated';
+/*
+ * `setOrganizationVisibility` lấy thẳng từ `sdk.gen` chứ không qua barrel: hey-api 0.97.3 sinh
+ * hàm + 5 type cho nó trong `sdk.gen.ts`/`types.gen.ts` nhưng BỎ nó khỏi danh sách re-export của
+ * `index.ts`. Dựng lại từ spec đầy đủ vẫn thiếu, nên đây là quirk của generator, không phải spec
+ * cũ — và file generated thì không sửa tay được (api:sync ghi đè). Mọi endpoint khác vẫn qua barrel.
+ */
+import { setOrganizationVisibility } from './generated/sdk.gen';
 import type { CreateRoleGrant, Organization, RoleGrant, SlugAvailability } from './generated';
 import type { ProvinceName } from './location';
 

@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ListingPhoto } from '@/components/ListingPhoto';
+import { ListingRow } from '@/components/ListingRow';
 import { SearchFilterPanel } from '@/components/SearchFilterPanel';
 import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
 import { useSearch } from '@/queries/listings';
 import { activeFilterCount, EMPTY_SEARCH, hasSearchCriteria } from '@/api/db';
 import type { SearchFilter } from '@/api/db';
-import { C, F, shadow } from '@/theme';
+import { C, F } from '@/theme';
 
 export default function Search() {
   const router = useRouter();
@@ -94,26 +93,11 @@ export default function Search() {
           </>
         }
         renderItem={({ item, index }) => (
-          <Animated.View entering={FadeInDown.delay(index * 60).duration(320)}>
-            <Pressable
-              onPress={() => router.push(`/listing/${item.id}`)}
-              style={({ pressed }) => [styles.row, pressed && { transform: [{ scale: 0.98 }] }]}
-            >
-              <ListingPhoto
-                photo={item.photo}
-                photoUrl={item.photoUrls?.[0]}
-                style={styles.rowPhoto}
-                imageStyle={styles.rowPhotoRadius}
-              />
-              <View style={{ flex: 1 }}>
-                <Text numberOfLines={2} style={styles.rowTitle}>
-                  {item.title}
-                </Text>
-                <Text style={styles.rowPrice}>{item.price}</Text>
-                <Text style={styles.rowMeta}>{item.meta}</Text>
-              </View>
-            </Pressable>
-          </Animated.View>
+          <ListingRow
+            item={item}
+            index={index}
+            onPress={() => router.push(`/listing/${item.id}`)}
+          />
         )}
         ListEmptyComponent={
           isFetching ? (
@@ -162,17 +146,4 @@ const styles = StyleSheet.create({
   filterBtnText: { fontFamily: F.uiSemi, fontSize: 12, color: C.ink },
   clear: { fontFamily: F.ui, fontSize: 12, color: C.pin },
   input: { flex: 1, fontFamily: F.ui, fontSize: 14, color: C.ink, paddingVertical: 9 },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-    backgroundColor: C.paperWarm,
-    borderRadius: 8,
-    padding: 10,
-    ...shadow,
-  },
-  rowPhoto: { width: 64, height: 64, borderRadius: 6 },
-  rowPhotoRadius: { borderRadius: 6 },
-  rowTitle: { fontFamily: F.uiBold, fontSize: 13, color: C.ink, marginBottom: 3 },
-  rowPrice: { fontFamily: F.monoBold, fontSize: 12, color: C.moss, marginBottom: 3 },
-  rowMeta: { fontFamily: F.ui, fontSize: 10.5, color: C.inkSoft },
 });

@@ -4,7 +4,7 @@ import { adminApi, isMaster } from '@/api/admin';
 import type { AdminEvent, ModStatus } from '@/api/admin';
 import type { RerouteListing } from '@/api/generated';
 import { joinAdminRoom, leaveAdminRoom, onSocketEvent } from '@/api/socket';
-import { useOrgSlug } from '@/stores/auth';
+import { useIsAuthenticated, useOrgSlug } from '@/stores/auth';
 import { qk } from './keys';
 import { useCategories } from './listings';
 
@@ -57,9 +57,12 @@ export function useAdminActivity() {
  * hiếm, và lúc đó phiên đăng nhập cũng đã cần tải lại.
  */
 export function useMyGrants() {
+  const isAuthenticated = useIsAuthenticated();
   return useQuery({
     queryKey: qk.myGrants(),
     queryFn: adminApi.getMyGrants,
+    // Khách không có quyền nào, mà nav/`AdminScreen` gọi hook này ở nhiều màn.
+    enabled: isAuthenticated,
     staleTime: 30 * 60 * 1000,
   });
 }

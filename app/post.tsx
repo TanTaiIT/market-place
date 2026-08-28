@@ -2,7 +2,7 @@ import React from 'react';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Corkboard } from '@/components/Corkboard';
+import { Surface } from '@/components/Surface';
 import { ListingForm } from '@/components/ListingForm';
 import { ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
@@ -33,7 +33,7 @@ export default function Post() {
   const toGroup = orgSlug && org ? { slug: orgSlug, name: org.name } : undefined;
 
   return (
-    <Corkboard>
+    <Surface>
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -64,6 +64,6 @@ export default function Post() {
           />
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </Corkboard>
+    </Surface>
   );
 }

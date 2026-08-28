@@ -20,18 +20,14 @@ import { C, F, shadow } from '@/theme';
 
 export type { ProvinceName };
 
-export function ProvinceField({
-  label = 'Tỉnh / Thành phố',
-  value,
-  onChange,
-  allowAll = false,
-}: {
-  label?: string;
-  value: ProvinceName | null;
-  onChange: (province: ProvinceName | null) => void;
-  allowAll?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
+/**
+ * Phần "biết việc" của ô chọn tỉnh, tách riêng cho những trigger TỰ VẼ (thẻ tìm ở bảng tin).
+ *
+ * Chép lại ở call-site thứ hai là chép lại một luật hành chính: gõ tên tỉnh CŨ vẫn phải ra tỉnh
+ * mới sau đợt sáp nhập 01/07/2025 (`filterProvinces` + `mergedFromLabel`). Một bản sao quên
+ * `note` là người dùng gõ "Bình Dương" rồi kết luận app thiếu tỉnh.
+ */
+export function useProvinceSearch() {
   const { data: provinces, isPending } = useProvinces();
 
   const search = useCallback<PickerSearch<ProvinceName>>(
@@ -46,6 +42,23 @@ export function ProvinceField({
     [provinces],
   );
 
+  return { search, loading: isPending };
+}
+
+export function ProvinceField({
+  label = 'Tỉnh / Thành phố',
+  value,
+  onChange,
+  allowAll = false,
+}: {
+  label?: string;
+  value: ProvinceName | null;
+  onChange: (province: ProvinceName | null) => void;
+  allowAll?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const { search, loading } = useProvinceSearch();
+
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -56,7 +69,7 @@ export function ProvinceField({
         title="Chọn tỉnh / thành"
         placeholder="Gõ tên tỉnh, kể cả tên cũ..."
         search={search}
-        loading={isPending}
+        loading={loading}
         value={value}
         emptyAll={allowAll ? 'Toàn quốc' : undefined}
         onSelect={onChange}

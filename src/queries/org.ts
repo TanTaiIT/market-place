@@ -2,7 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { orgApi } from '@/api/org';
 import type { JoinRequestStatus } from '@/api/org';
 import { useEffect } from 'react';
-import { useOrgSlug, useSetActiveOrg } from '@/stores/auth';
+import { useIsAuthenticated, useOrgSlug, useSetActiveOrg } from '@/stores/auth';
 import { canModerateOrg } from '@/api/admin';
 import { useMyGrants } from './admin';
 import { qk } from './keys';
@@ -47,9 +47,12 @@ export function useOrgByCode(code: string) {
  * không bị ghi đè. Có từ hai nhóm trở lên thì im lặng — lúc đó phải để họ chọn.
  */
 export function useMyOrgs() {
+  const isAuthenticated = useIsAuthenticated();
   const query = useQuery({
     queryKey: qk.myOrgs(),
     queryFn: orgApi.myOrgs,
+    // Khách chưa đăng nhập không thuộc tổ chức nào — hỏi BE là một cú 401 mỗi lần mở app.
+    enabled: isAuthenticated,
     staleTime: 5 * 60_000,
   });
 

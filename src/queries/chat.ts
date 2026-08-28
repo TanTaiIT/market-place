@@ -11,7 +11,7 @@ import {
   reconnectSocket,
 } from '@/api/socket';
 import type { Message } from '@/api/db';
-import { useAuthStore } from '@/stores/auth';
+import { useAuthStore, useIsAuthenticated } from '@/stores/auth';
 import { qk } from './keys';
 
 /**
@@ -26,8 +26,14 @@ import { qk } from './keys';
 const newClientMsgId = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
+/** Khách không có hộp thư — và `TabBar` gọi hook này ở MỌI màn, kể cả màn công khai. */
 export function useConversations() {
-  return useQuery({ queryKey: qk.conversations(), queryFn: api.getConversations });
+  const isAuthenticated = useIsAuthenticated();
+  return useQuery({
+    queryKey: qk.conversations(),
+    queryFn: api.getConversations,
+    enabled: isAuthenticated,
+  });
 }
 
 export function useConversation(id: string) {

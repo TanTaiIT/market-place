@@ -16,6 +16,8 @@ import { ListingSuggestions } from '@/components/ListingSuggestions';
 import { ReportButton } from '@/components/ReportButton';
 import { Avatar, EmptyState, Loading, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
+import { useRequireAuth } from '@/components/GuestGate';
+import { useIsAuthenticated } from '@/stores/auth';
 import { useListing, useSavedIds, useToggleSaved } from '@/queries/listings';
 import { useOpenConversation } from '@/queries/chat';
 import { useCreateReport } from '@/queries/report';
@@ -26,6 +28,8 @@ export default function ListingDetail() {
   // ObjectId của BE là chuỗi 24 hex — `Number()` ở đây sẽ ra NaN.
   const listingId = id ?? '';
   const router = useRouter();
+  const requireAuth = useRequireAuth();
+  const isAuthenticated = useIsAuthenticated();
   const toast = useToast();
   const insets = useSafeAreaInsets();
 
@@ -44,18 +48,28 @@ export default function ListingDetail() {
     transform: [{ scale: bounce.value }, { rotate: `${rot.value}deg` }],
   }));
 
-  const onToggleSave = () => {
-    bounce.value = withSequence(withSpring(1.3, { damping: 6 }), withSpring(1));
-    rot.value = withSequence(withSpring(-10, { damping: 6 }), withSpring(0));
-    toggleSaved.mutate({ id: listingId, saved: !saved }, { onError: (e) => toast(`⚠️ ${e.message}`) });
-  };
+  /*
+   * Khách xem được tin này nhưng không lưu/nhắn được: cả hai đều là hành động CỦA một tài khoản
+   * (`POST /favorites`, `POST /chats` đều đòi token). Chặn ngay ở đầu hành động chứ không để
+   * mutation bay rồi hiện 401 — người dùng cần biết phải làm gì, không cần biết mã lỗi.
+   */
+  const onToggleSave = () =>
+    requireAuth(() => {
+      bounce.value = withSequence(withSpring(1.3, { damping: 6 }), withSpring(1));
+      rot.value = withSequence(withSpring(-10, { damping: 6 }), withSpring(0));
+      toggleSaved.mutate(
+        { id: listingId, saved: !saved },
+        { onError: (e) => toast(`⚠️ ${e.message}`) },
+      );
+    }, 'Đăng nhập để lưu tin');
 
-  const onMessage = () => {
-    openChat.mutate(listingId, {
-      onSuccess: (c) => router.push(`/chat/${c.id}`),
-      onError: (e: Error) => toast(`📌 ${e.message}`),
-    });
-  };
+  const onMessage = () =>
+    requireAuth(() => {
+      openChat.mutate(listingId, {
+        onSuccess: (c) => router.push(`/chat/${c.id}`),
+        onError: (e: Error) => toast(`📌 ${e.message}`),
+      });
+    }, 'Đăng nhập để nhắn cho người bán');
 
   if (isLoading) return <Loading />;
   // `isLoading` chỉ true ở lần fetch đầu: query hỏng hoặc id không tồn tại đều rơi xuống đây,
@@ -119,7 +133,7 @@ export default function ListingDetail() {
 
           {/* Tin của mình thì không: BE trả 400 cho tự báo cáo chính mình, hiện nút ra chỉ để
               người ta bấm vào một lỗi. */}
-          {!listing.mine && (
+          {!listing.mine && isAuthenticated && (
             <ReportButton
               label="⚑ Báo cáo tin này"
               target="tin này"

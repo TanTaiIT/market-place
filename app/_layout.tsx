@@ -125,12 +125,28 @@ export default function RootLayout() {
                   <Stack.Screen name="register" options={{ animation: 'fade' }} />
                 </Stack.Protected>
 
+                {/*
+                  KHÔNG cần đăng nhập — khách vào xem được ngay.
+
+                  BE đã mở đúng những đường đọc này (`GET /listings`, `/listings/:id`,
+                  `/users/:id`, hồ sơ công khai của tổ chức), và scope của khách chỉ thấy tin
+                  CÔNG KHAI ĐÃ DUYỆT (`tenant.middleware` → nhánh không có org), nên không có
+                  gì nội bộ lọt ra ngoài.
+
+                  Ba tab cần tài khoản (Tin nhắn · Thông báo · Cá nhân) nằm TRONG `(tabs)` nên
+                  guard ở đây không tách được chúng — mỗi màn tự dựng `GuestGate`.
+                */}
+                <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+                <Stack.Screen name="search/index" />
+                <Stack.Screen name="search/results" />
+                <Stack.Screen name="listing/[id]" />
+                <Stack.Screen name="user/[id]" />
+                <Stack.Screen name="org/[slug]/index" />
+
                 {/* Mọi route cần đăng nhập phải khai ở đây, kể cả route không cần option
                     riêng — screen không nằm trong khối này vẫn mở được bằng deep link. */}
                 <Stack.Protected guard={isAuthenticated}>
-                  <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
                   <Stack.Screen name="post" options={{ animation: 'slide_from_bottom' }} />
-                  <Stack.Screen name="search" />
                   <Stack.Screen name="mylistings" />
                   <Stack.Screen name="saved" />
                   <Stack.Screen name="settings" />
@@ -139,11 +155,8 @@ export default function RootLayout() {
                   <Stack.Screen name="join-org" />
                   {/* `org/[slug]/` là thư mục không có `_layout` riêng, nên hai file trong đó thành
                       hai route NGANG HÀNG ở stack này — khai `org/[slug]` không còn khớp gì. */}
-                  <Stack.Screen name="org/[slug]/index" />
                   <Stack.Screen name="org/[slug]/edit" />
-                  <Stack.Screen name="listing/[id]" />
                   <Stack.Screen name="listing/edit/[id]" />
-                  <Stack.Screen name="user/[id]" />
                   <Stack.Screen name="chat/[id]" />
                   {/* Khai cả cụm `admin` một lần: `app/admin/_layout.tsx` giữ Stack riêng bên trong */}
                   <Stack.Screen name="admin" />

@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { shortDong } from '@/api/db';
 import { C, F } from '@/theme';
 
 /**
@@ -38,23 +39,20 @@ function indexOf(value: number | null, fallback: number): number {
   return best;
 }
 
-/** "500k" · "2,5tr" · "1,2 tỷ". Hermes không có Intl đủ dùng nên cắt tay. */
-function short(dong: number): string {
-  if (dong >= 1_000_000_000) return `${trim(dong / 1_000_000_000)} tỷ`;
-  if (dong >= 1_000_000) return `${trim(dong / 1_000_000)}tr`;
-  if (dong >= 1_000) return `${trim(dong / 1_000)}k`;
-  return '0';
-}
-const trim = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
-
 export function PriceRange({
   min,
   max,
   onChange,
+  onDragChange,
 }: {
   min: number | null;
   max: number | null;
   onChange: (next: { min: number | null; max: number | null }) => void;
+  /**
+   * Đang kéo hay không. Màn chứa dùng nó để TẠM KHOÁ cuộn dọc: khai `activeOffsetX` mới chỉ giúp
+   * thanh trượt giành được cú kéo ngang, còn cú kéo chéo vẫn có thể tuột về cho danh sách cha.
+   */
+  onDragChange?: (dragging: boolean) => void;
 }) {
   const [width, setWidth] = useState(0);
   const [range, setRange] = useState(() => ({ lo: indexOf(min, 0), hi: indexOf(max, LAST) }));
@@ -93,6 +91,9 @@ export function PriceRange({
   const emit = useRef(onChange);
   emit.current = onChange;
 
+  /** Cùng lý do với `emit`: gesture bị `useMemo` đóng băng, đọc qua ref mới luôn là bản mới nhất. */
+  const drag = useRef(onDragChange);
+  drag.current = onDragChange;
   const usable = Math.max(width - THUMB, 1);
   const xOf = (i: number) => (i / LAST) * usable;
   const idxAt = (x: number) => Math.round((Math.max(0, Math.min(usable, x)) / usable) * LAST);
@@ -111,7 +112,11 @@ export function PriceRange({
       (['lo', 'hi'] as const).map((side) =>
         Gesture.Pan()
           .runOnJS(true)
+          // 6px ngang là đủ để tách khỏi ý định cuộn dọc của màn: dưới ngưỡng này cú chạm còn
+          // thuộc về danh sách cha, quá ngưỡng thì thanh trượt giành và cha nhả ra.
+          .activeOffsetX([-6, 6])
           .onBegin(() => {
+            drag.current?.(true);
             startIdx.current = side === 'lo' ? live.current.lo : live.current.hi;
           })
           .onUpdate((e) => {
@@ -122,8 +127,13 @@ export function PriceRange({
                 : { ...r, hi: Math.max(next, r.lo) },
             );
           })
-          // Nhả ra ngoài KHI THẢ TAY, không phải mỗi frame: mỗi lần nhả là một lần đổi query
-          // key và một lượt gọi mạng. Hai đầu mút thành `null` để "kéo hết biên" = bỏ lọc giá.
+          // `onFinalize` chứ không `onEnd`: cú kéo bị huỷ (nhấc tay ngoài vùng, gesture khác
+          // giành) cũng phải trả quyền cuộn lại cho màn, nếu không màn đứng cứng.
+          .onFinalize(() => {
+            drag.current?.(false);
+          })
+          // Nhả bộ lọc ra ngoài KHI THẢ TAY, không phải mỗi frame: mỗi lần nhả là một lần đổi
+          // query key và một lượt gọi mạng. Hai đầu mút thành `null` để "kéo hết biên" = bỏ lọc giá.
           .onEnd(() => {
             const { lo: l, hi: h } = live.current;
             emit.current({ min: l === 0 ? null : STOPS[l], max: h === LAST ? null : STOPS[h] });
@@ -139,7 +149,9 @@ export function PriceRange({
       <Text style={styles.readout}>
         {lo === 0 && hi === LAST
           ? 'Mọi mức giá'
-          : `${lo === 0 ? '0' : short(STOPS[lo])} — ${hi === LAST ? `${short(STOPS[LAST])} trở lên` : short(STOPS[hi])}`}
+          : `${lo === 0 ? '0' : shortDong(STOPS[lo])} — ${
+              hi === LAST ? `${shortDong(STOPS[LAST])} trở lên` : shortDong(STOPS[hi])
+            }`}
       </Text>
 
       <View

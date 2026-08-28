@@ -2,7 +2,7 @@ import React from 'react';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Corkboard } from '@/components/Corkboard';
+import { Surface } from '@/components/Surface';
 import { ListingForm, listingToFormValues } from '@/components/ListingForm';
 import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
@@ -22,7 +22,7 @@ export default function EditListing() {
   const { data: listing, error, isLoading } = useListing(listingId);
 
   return (
-    <Corkboard>
+    <Surface>
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -44,7 +44,7 @@ export default function EditListing() {
           )}
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </Corkboard>
+    </Surface>
   );
 }
 

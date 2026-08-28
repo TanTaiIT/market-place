@@ -278,7 +278,91 @@ export const activeFilterCount = (f: SearchFilter): number =>
   [f.province, f.categoryId, f.minPrice, f.maxPrice].filter((v) => v !== null).length +
   Object.keys(f.attrs).length;
 
+const trimTenth = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
+
+/**
+ * "500k" · "2,5tr" · "1,2 tỷ" — Hermes không có `Intl` đủ dùng nên cắt tay.
+ *
+ * Nằm ở đây chứ không trong component: thanh kéo giá và hàng chip tiêu chí phải đọc ra CÙNG một
+ * chuỗi cho cùng một số. Hai bản sao là hai lần lệch cách viết mà không ai thấy cho tới lúc
+ * chúng nằm cạnh nhau trên một màn.
+ */
+export function shortDong(dong: number): string {
+  if (dong >= 1_000_000_000) return `${trimTenth(dong / 1_000_000_000)} tỷ`;
+  if (dong >= 1_000_000) return `${trimTenth(dong / 1_000_000)}tr`;
+  if (dong >= 1_000) return `${trimTenth(dong / 1_000)}k`;
+  return `${dong}đ`;
+}
+
+/**
+ * Nhãn khoảng giá, `null` khi không ràng buộc giá.
+ *
+ * Một đầu để trống thì viết "từ …"/"đến …" chứ không bơm số thay vào: "0 — 2tr" nói rằng có chặn
+ * dưới ở 0, còn "đến 2tr" mới đúng là không có chặn dưới.
+ */
+export function priceRangeLabel(min: number | null, max: number | null): string | null {
+  if (min !== null && max !== null) return `${shortDong(min)} — ${shortDong(max)}`;
+  if (min !== null) return `từ ${shortDong(min)}`;
+  if (max !== null) return `đến ${shortDong(max)}`;
+  return null;
+}
+
 export const CHAT_COLORS = ['#3F6B4A', '#D9A566', '#8C6539', '#6B7F8C', '#B98851'];
+
+/**
+ * `SearchFilter` ↔ params của route.
+ *
+ * Tiêu chí đi bằng URL chứ không bằng store: trang kết quả mở được bằng deep link, nút back trả
+ * đúng bộ lọc cũ, và hai màn không phải chia nhau một cục state toàn cục chỉ để nói với nhau một
+ * lần. `attrs` là object nên gói JSON vào MỘT param — expo-router chỉ chuyển chuỗi.
+ */
+export function searchToParams(f: SearchFilter): Record<string, string> {
+  const p: Record<string, string> = {};
+  if (f.q.trim()) p.q = f.q.trim();
+  if (f.province) p.province = f.province;
+  if (f.categoryId) p.categoryId = f.categoryId;
+  if (f.minPrice !== null) p.minPrice = String(f.minPrice);
+  if (f.maxPrice !== null) p.maxPrice = String(f.maxPrice);
+  if (Object.keys(f.attrs).length > 0) p.attrs = JSON.stringify(f.attrs);
+  return p;
+}
+
+/**
+ * Ngược lại. Param thiếu/hỏng rơi về giá trị rỗng chứ KHÔNG ném: params tới từ URL nên có thể do
+ * người dùng dán tay, và một trang kết quả trắng vì `JSON.parse` vỡ thì không ai đoán được vì sao.
+ */
+/** Param của expo-router có thể là mảng khi URL lặp khoá — lấy giá trị đầu. */
+const oneParam = (v: string | string[] | undefined): string | undefined =>
+  Array.isArray(v) ? v[0] : v;
+
+export function paramsToSearch(p: Record<string, string | string[] | undefined>): SearchFilter {
+  const num = (v: string | string[] | undefined): number | null => {
+    const n = Number(oneParam(v));
+    return oneParam(v) !== undefined && Number.isFinite(n) ? n : null;
+  };
+
+  let attrs: ListingAttrFilter = {};
+  const rawAttrs = oneParam(p.attrs);
+  if (rawAttrs) {
+    try {
+      const parsed: unknown = JSON.parse(rawAttrs);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        attrs = parsed as ListingAttrFilter;
+      }
+    } catch {
+      // Params hỏng → coi như không lọc thuộc tính, phần còn lại của bộ lọc vẫn dùng được.
+    }
+  }
+
+  return {
+    q: oneParam(p.q) ?? '',
+    province: (oneParam(p.province) as ProvinceName | undefined) ?? null,
+    categoryId: oneParam(p.categoryId) ?? null,
+    minPrice: num(p.minPrice),
+    maxPrice: num(p.maxPrice),
+    attrs,
+  };
+}
 
 export const NEW_PHOTOS: Grad[] = [
   ['#EFCB9C', '#D9A566'],

@@ -7,6 +7,7 @@ import {
 import { api } from '@/api/client';
 import { hasSearchCriteria } from '@/api/db';
 import type { Listing, Profile, SearchFilter } from '@/api/db';
+import { useIsAuthenticated } from '@/stores/auth';
 import { qk } from './keys';
 
 /**
@@ -79,16 +80,35 @@ export function useMyListings() {
   return useQuery({ queryKey: qk.myListings(), queryFn: api.getMyListings });
 }
 
+/**
+ * Chỉ chạy khi đã đăng nhập. Khách xem bảng tin không có "tin đã lưu" — để query bay là mỗi lần
+ * mở app một cú 401 và một dòng lỗi đỏ, trong khi thứ đúng để hiện là trái tim rỗng.
+ */
 export function useSavedIds() {
-  return useQuery({ queryKey: qk.savedIds(), queryFn: api.getSavedIds });
+  const isAuthenticated = useIsAuthenticated();
+  return useQuery({
+    queryKey: qk.savedIds(),
+    queryFn: api.getSavedIds,
+    enabled: isAuthenticated,
+  });
 }
 
 export function useSavedListings() {
-  return useQuery({ queryKey: qk.savedListings(), queryFn: api.getSavedListings });
+  const isAuthenticated = useIsAuthenticated();
+  return useQuery({
+    queryKey: qk.savedListings(),
+    queryFn: api.getSavedListings,
+    enabled: isAuthenticated,
+  });
 }
 
 export function useProfile() {
-  return useQuery({ queryKey: qk.profile(), queryFn: api.getProfile });
+  const isAuthenticated = useIsAuthenticated();
+  return useQuery({
+    queryKey: qk.profile(),
+    queryFn: api.getProfile,
+    enabled: isAuthenticated,
+  });
 }
 
 /* --------------------------- mutations --------------------------- */

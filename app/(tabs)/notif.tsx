@@ -3,6 +3,8 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState, Loading, TabHeader } from '@/components/ui';
+import { GuestGate } from '@/components/GuestGate';
+import { useIsAuthenticated } from '@/stores/auth';
 import { useToast } from '@/components/Toast';
 import { useMarkNotificationRead, useNotifications } from '@/queries/notifications';
 import { C, F, shadow } from '@/theme';
@@ -21,6 +23,17 @@ export default function Notifications() {
   const markRead = useMarkNotificationRead();
   const toast = useToast();
 
+  const isAuthenticated = useIsAuthenticated();
+
+  // Thông báo là việc xảy ra VỚI tin của bạn: được duyệt, có người quan tâm, có tin nhắn mới.
+  if (!isAuthenticated) {
+    return (
+      <GuestGate
+        title="Thông báo"
+        message="Tin của bạn được duyệt, có người quan tâm hay có tin nhắn mới — đăng nhập để nhận những thông báo đó."
+      />
+    );
+  }
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <TabHeader title="Thông báo" />

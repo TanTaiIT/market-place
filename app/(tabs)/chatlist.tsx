@@ -4,6 +4,8 @@ import { useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar, EmptyState, Loading, TabHeader } from '@/components/ui';
+import { GuestGate } from '@/components/GuestGate';
+import { useIsAuthenticated } from '@/stores/auth';
 import { chatColor } from '@/api/client';
 import { useConversations } from '@/queries/chat';
 import { C, F, shadow } from '@/theme';
@@ -12,6 +14,18 @@ export default function ChatList() {
   const router = useRouter();
   const { data, error, isLoading } = useConversations();
 
+  const isAuthenticated = useIsAuthenticated();
+
+  // Khách xem được bảng tin, nhưng hộp thư luôn là hộp thư của MỘT tài khoản — không có gì để
+  // hiện, và mọi endpoint chat đều đòi token.
+  if (!isAuthenticated) {
+    return (
+      <GuestGate
+        title="Tin nhắn"
+        message="Hỏi giá, hẹn gặp và giữ lại lịch sử trao đổi với người bán — tất cả cần một tài khoản."
+      />
+    );
+  }
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <TabHeader title="Tin nhắn" />

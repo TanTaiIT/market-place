@@ -21,9 +21,12 @@ import { C, F } from '@/theme';
 export function SearchFilterPanel({
   filter,
   onChange,
+  onPriceDragChange,
 }: {
   filter: SearchFilter;
   onChange: (next: SearchFilter) => void;
+  /** Chuyển tiếp trạng thái kéo của thanh giá lên màn — màn cần nó để tạm khoá cuộn dọc. */
+  onPriceDragChange?: (dragging: boolean) => void;
 }) {
   const { data: categories } = useCategories();
   const patch = (part: Partial<SearchFilter>) => onChange({ ...filter, ...part });
@@ -73,6 +76,7 @@ export function SearchFilterPanel({
         min={filter.minPrice}
         max={filter.maxPrice}
         onChange={({ min, max }) => patch({ minPrice: min, maxPrice: max })}
+        onDragChange={onPriceDragChange}
       />
     </View>
   );

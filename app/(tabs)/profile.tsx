@@ -5,6 +5,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, EmptyState, Loading } from '@/components/ui';
+import { GuestGate } from '@/components/GuestGate';
+import { useIsAuthenticated } from '@/stores/auth';
 import { OrgSwitcher } from '@/components/OrgSwitcher';
 import { useToast } from '@/components/Toast';
 import { useSignOut } from '@/queries/auth';
@@ -22,6 +24,16 @@ export default function Profile() {
   const master = isMaster(grants);
   const signOut = useSignOut();
 
+  const isAuthenticated = useIsAuthenticated();
+
+  if (!isAuthenticated) {
+    return (
+      <GuestGate
+        title="Cá nhân"
+        message="Trang cá nhân giữ tin bạn đăng, tin đã lưu và đánh giá từ người mua. Đăng nhập để mở."
+      />
+    );
+  }
   if (isLoading) return <Loading />;
   if (error || !profile) {
     return <EmptyState icon="📡" text={(error as Error | null)?.message ?? 'Không tải được hồ sơ'} />;

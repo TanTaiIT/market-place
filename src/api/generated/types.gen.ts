@@ -798,6 +798,10 @@ export type SetOrgVisibility = {
     isPublic: boolean;
 };
 
+export type MoveMember = {
+    unitId: string | null;
+};
+
 export type BannedPhrase = {
     _id: string;
     phrase: string;
@@ -2546,6 +2550,88 @@ export type MembershipListResponses = {
 };
 
 export type MembershipListResponse = MembershipListResponses[keyof MembershipListResponses];
+
+export type MembershipRemoveData = {
+    body?: never;
+    path: {
+        userId: string;
+    };
+    query?: never;
+    url: '/memberships/{userId}';
+};
+
+export type MembershipRemoveErrors = {
+    /**
+     * Tự gỡ mình — dùng chức năng rời nhóm
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền quản trị tổ chức, hoặc mục tiêu cũng là quản trị
+     */
+    403: ErrorResponse;
+    /**
+     * Người này không còn trong nhóm
+     */
+    404: ErrorResponse;
+};
+
+export type MembershipRemoveError = MembershipRemoveErrors[keyof MembershipRemoveErrors];
+
+export type MembershipRemoveResponses = {
+    /**
+     * Đã gỡ
+     */
+    200: {
+        success: true;
+        message: string;
+        data: unknown;
+    };
+};
+
+export type MembershipRemoveResponse = MembershipRemoveResponses[keyof MembershipRemoveResponses];
+
+export type MembershipMoveData = {
+    body?: MoveMember;
+    path: {
+        userId: string;
+    };
+    query?: never;
+    url: '/memberships/{userId}';
+};
+
+export type MembershipMoveErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền quản trị tổ chức
+     */
+    403: ErrorResponse;
+    /**
+     * Người này không còn trong nhóm
+     */
+    404: ErrorResponse;
+};
+
+export type MembershipMoveError = MembershipMoveErrors[keyof MembershipMoveErrors];
+
+export type MembershipMoveResponses = {
+    /**
+     * Đã chuyển
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Member;
+    };
+};
+
+export type MembershipMoveResponse = MembershipMoveResponses[keyof MembershipMoveResponses];
 
 export type InviteListData = {
     body?: never;

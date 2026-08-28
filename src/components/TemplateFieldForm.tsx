@@ -46,6 +46,8 @@ export function TemplateFieldForm({
   const [type, setType] = useState<FieldType>('text');
   const [required, setRequired] = useState(false);
   const [filterable, setFilterable] = useState(false);
+  /** Mỗi dòng một lựa chọn — chỉ dùng cho select/multiselect. */
+  const [optionsText, setOptionsText] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const available = dictionary
@@ -59,6 +61,7 @@ export function TemplateFieldForm({
     setType('text');
     setRequired(false);
     setFilterable(false);
+    setOptionsText('');
     setError(null);
   };
 
@@ -86,7 +89,27 @@ export function TemplateFieldForm({
     if (used.includes(trimmed)) return setError(`Khoá "${trimmed}" đã có trong template`);
     if (!label.trim()) return setError('Nhập nhãn hiển thị');
 
-    onAdd({ key: trimmed, label: label.trim(), type, required, filterable, isNew: true });
+    const needsOptions = type === 'select' || type === 'multiselect';
+    // Mỗi dòng một lựa chọn; `value` dùng chính nhãn. BE lưu value nguyên văn vào
+    // `Listing.attributes`, nên nhãn tiếng Việt làm value là hợp lệ và dễ đọc khi lọc.
+    const options = optionsText
+      .split(String.fromCharCode(10))
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => ({ value: line, label: line }));
+    if (needsOptions && options.length === 0) {
+      return setError('Kiểu chọn cần ít nhất một lựa chọn — mỗi dòng một cái');
+    }
+
+    onAdd({
+      key: trimmed,
+      label: label.trim(),
+      type,
+      required,
+      filterable,
+      isNew: true,
+      ...(needsOptions ? { options } : {}),
+    });
     reset();
   };
 
@@ -145,6 +168,19 @@ export function TemplateFieldForm({
               />
             ))}
           </View>
+
+          {(type === 'select' || type === 'multiselect') && (
+            <Field
+              onDark
+              label="Các lựa chọn — mỗi dòng một cái"
+              value={optionsText}
+              onChangeText={setOptionsText}
+              placeholder={"Đỏ" + String.fromCharCode(10) + "Xanh" + String.fromCharCode(10) + "Đen"}
+              multiline
+              autoCorrect={false}
+              style={styles.optionsInput}
+            />
+          )}
         </>
       )}
 
@@ -171,4 +207,5 @@ const styles = StyleSheet.create({
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
   toggleLabel: { fontFamily: F.uiBold, fontSize: 13, color: C.deskTxt },
   error: { fontFamily: F.ui, fontSize: 12, color: C.pin, marginTop: 8 },
+  optionsInput: { minHeight: 76, textAlignVertical: 'top' },
 });

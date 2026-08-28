@@ -50,6 +50,12 @@ export type DraftField = {
    */
   showIf?: TemplateField['showIf'];
   group?: string;
+  /**
+   * Lựa chọn của field MỚI kiểu select/multiselect — BE bắt buộc có ít nhất một
+   * (`fieldDefinitionInputSchema`). Field lấy từ từ điển thì options nằm bên từ điển,
+   * mảng này để trống.
+   */
+  options?: { value: string; label: string }[];
 };
 
 /**
@@ -96,7 +102,18 @@ function toPayload(fields: DraftField[], dictionary: FieldDefinition[]) {
         ...(def && f.label !== def.label ? { override: { label: f.label } } : {}),
         // Field chưa có trong từ điển thì BE bắt buộc kèm `define` — và chính lượt gọi này tạo
         // luôn mục từ điển, nên không cần gọi `POST /field-definitions` riêng.
-        ...(def ? {} : { define: { label: f.label, type: f.type, filterable: f.filterable } }),
+        ...(def
+          ? {}
+          : {
+              define: {
+                label: f.label,
+                type: f.type,
+                filterable: f.filterable,
+                // BE từ chối select/multiselect không có lựa chọn — thiếu mảng này thì cả
+                // lượt lưu 400 với thông điệp chung chung, đúng lỗi từng bị nuốt.
+                ...(f.options?.length ? { options: f.options } : {}),
+              },
+            }),
       };
     }),
   };
@@ -113,6 +130,11 @@ export function validateDraft(fields: DraftField[]): string | null {
     if (seen.has(f.key)) return `Khoá "${f.key}" khai hai lần`;
     seen.add(f.key);
     if (!f.label.trim()) return `Field "${f.key}" chưa có nhãn`;
+    // Cùng luật với `fieldDefinitionInputSchema` bên BE — chặn ở đây để người soạn biết
+    // NGAY field nào thiếu, thay vì một toast "Validation failed" lúc bấm Lưu.
+    if (f.isNew && (f.type === 'select' || f.type === 'multiselect') && !f.options?.length) {
+      return `"${f.label}" là kiểu chọn — thêm ít nhất một lựa chọn cho nó`;
+    }
   }
 
   // `showIf` trỏ ra ngoài template = field không bao giờ hiện. BE chặn, nhưng lỗi ở đây đọc

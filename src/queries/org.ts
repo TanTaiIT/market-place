@@ -122,6 +122,36 @@ export function useJoinRequestQueue(status?: JoinRequestStatus) {
   });
 }
 
+/**
+ * Gỡ thành viên / chuyển nhóm con.
+ *
+ * Refetch contract: cả hai quét `orgMembers(slug)` — danh bạ là chỗ duy nhất hiện thay đổi.
+ * Gỡ người còn quét `joinRequestsRoot()`: người bị gỡ có thể xin vào lại, và hàng đợi đơn
+ * đang cache trạng thái "đã là thành viên" của họ.
+ */
+export function useRemoveMember() {
+  const qc = useQueryClient();
+  const orgSlug = useOrgSlug();
+  return useMutation({
+    mutationFn: (userId: string) => orgApi.removeMember(userId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.orgMembers(orgSlug ?? '-') });
+      void qc.invalidateQueries({ queryKey: qk.joinRequestsRoot() });
+    },
+  });
+}
+
+export function useMoveMember() {
+  const qc = useQueryClient();
+  const orgSlug = useOrgSlug();
+  return useMutation({
+    mutationFn: (v: { userId: string; unitId: string | null }) =>
+      orgApi.moveMember(v.userId, v.unitId),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: qk.orgMembers(orgSlug ?? '-') }),
+  });
+}
+
 /** Nhóm con để duyệt kèm xếp nhóm. Đổi rất ít nên cache lâu, cùng lý do với `useMyOrgs`. */
 export function useOrgUnits() {
   const orgSlug = useOrgSlug();

@@ -1,5 +1,13 @@
 import React from 'react';
-import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
+import {
+  Pressable,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
+  type TextInputProps,
+} from 'react-native';
 import { C, F } from '@/theme';
 
 /**
@@ -14,11 +22,19 @@ import { C, F } from '@/theme';
  * mô tả.
  */
 
-export function FormSection({ title, hint }: { title: string; hint?: string }) {
+export function FormSection({ step, title, hint }: { step?: number; title: string; hint?: string }) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {!!hint && <Text style={styles.sectionHint}>{hint}</Text>}
+      <View style={styles.sectionRow}>
+        {step !== undefined && (
+          <View style={styles.stepBadge}>
+            <Text style={styles.stepText}>{step}</Text>
+          </View>
+        )}
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </View>
+      {/* Hint thẳng cột với tiêu đề, không chui xuống dưới huy hiệu — mắt đọc theo một mép. */}
+      {!!hint && <Text style={[styles.sectionHint, step !== undefined && styles.hintIndent]}>{hint}</Text>}
     </View>
   );
 }
@@ -58,10 +74,85 @@ export function BoxField({
   );
 }
 
+/**
+ * Ô CHỌN cùng hình thẻ với `BoxField` — form đăng tin không được trộn hai ngôn ngữ ô nhập.
+ *
+ * Tồn tại vì các field động (`AttrFields`) từng vẽ select bằng kiểu gạch chân cũ: đứng cạnh
+ * các thẻ tiêu đề/giá, nó trông như một dòng kẻ bị bỏ quên. Dùng CHUNG style thẻ ở đây thay
+ * vì chép sang file kia — chép là hai bản lệch nhau ngay lần chỉnh thẻ kế tiếp.
+ */
+export function BoxSelect({
+  label,
+  value,
+  placeholder,
+  onPress,
+}: {
+  label: string;
+  /** Nhãn của giá trị đang chọn — `undefined` là chưa chọn, hiện placeholder mờ. */
+  value?: string;
+  placeholder: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.box, pressed && styles.boxOn]}>
+      <Text style={styles.boxLabel}>{label}</Text>
+      <View style={styles.boxLine}>
+        <Text numberOfLines={1} style={[styles.boxValue, !value && { color: C.muted }]}>
+          {value ?? placeholder}
+        </Text>
+        <Text style={styles.chevron}>▾</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+/** Công tắc trong thẻ — cả thẻ là vùng bấm, không bắt ngón tay nhắm trúng cái Switch nhỏ. */
+export function BoxSwitch({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <Pressable onPress={() => onChange(!value)} style={[styles.box, styles.switchBox]}>
+      <Text style={styles.switchLabel}>{label}</Text>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ true: C.pin, false: C.lineInput }}
+      />
+    </Pressable>
+  );
+}
+
+/** Thẻ bọc cho nội dung tuỳ ý mang cùng nhãn nhỏ — hàng chip của multiselect dùng nó. */
+export function BoxGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.box}>
+      <Text style={styles.boxLabel}>{label}</Text>
+      <View style={styles.groupBody}>{children}</View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   section: { marginTop: 22, marginBottom: 12 },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  stepBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: C.corkDark,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepText: { fontFamily: F.uiBlack, fontSize: 12, color: C.ink },
   sectionTitle: { fontFamily: F.uiBlack, fontSize: 15, color: C.ink },
   sectionHint: { fontFamily: F.ui, fontSize: 12, color: C.inkSoft, marginTop: 4, lineHeight: 17 },
+  hintIndent: { marginLeft: 30 },
 
   box: {
     backgroundColor: C.paper,
@@ -80,4 +171,19 @@ const styles = StyleSheet.create({
   boxLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   boxInput: { flex: 1, fontFamily: F.uiBold, fontSize: 15, color: C.ink, paddingVertical: 7 },
   suffix: { fontFamily: F.uiBold, fontSize: 14, color: C.inkSoft },
+  boxValue: { flex: 1, fontFamily: F.uiBold, fontSize: 15, color: C.ink, paddingVertical: 7 },
+  chevron: { fontFamily: F.ui, fontSize: 13, color: C.inkSoft },
+  switchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+  },
+  switchLabel: { fontFamily: F.uiBold, fontSize: 13.5, color: C.ink },
+  groupBody: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingTop: 9,
+    paddingBottom: 5,
+  },
 });

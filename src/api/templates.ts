@@ -80,7 +80,7 @@ export type DraftField = {
   label: string;
   type: FieldType;
   /**
-   * Lựa chọn của kiểu select/multiselect. Mang cả `value` chứ không chỉ nhãn — xem `parseOptions`.
+   * Lựa chọn của kiểu select/multiselect. Mang cả `value` chứ không chỉ nhãn — xem `OptionRow`.
    * Kiểu khác thì rỗng.
    */
   options: FieldOption[];
@@ -168,42 +168,39 @@ const optionValue = (label: string, taken: ReadonlySet<string>) => {
   return `${base}_${taken.size}`;
 };
 
-/** Options → chuỗi một dòng cho ô nhập ("4GB, 6GB, 8GB"). */
-export function formatOptions(options: readonly FieldOption[]): string {
-  return options.map((o) => o.label).join(', ');
-}
-
 /**
- * Chuỗi một dòng → options, GIỮ NGUYÊN `value` của lựa chọn đã tồn tại.
+ * Một dòng lựa chọn trên form — mỗi ô nhập một dòng, thêm dòng bằng nút +.
  *
- * `value` là thứ tin đăng lưu xuống DB; `label` chỉ là chữ hiện ra. Sinh lại `value` mỗi lần
- * người soạn sửa một nhãn nghĩa là mọi tin cũ đang giữ value cũ hoá KHÔNG HỢP LỆ — và nó nổ ở
- * chỗ không ai ngờ: `validateAttributes` trả 400 đúng lúc chủ tin bấm Sửa tin.
+ * `value` là thứ tin đăng LƯU XUỐNG DB, `label` chỉ là chữ hiện ra. Vì thế `value` sinh ra
+ * đúng MỘT lần cho mỗi dòng rồi khoá lại: người soạn sửa chính tả nhãn ("Đỏ tuơi" → "Đỏ tươi")
+ * thì mọi tin cũ đang giữ value đó vẫn hợp lệ. Bản trước nhập cả chuỗi phẩy nên phải ĐOÁN
+ * dòng nào là dòng cũ vừa đổi tên (khớp hai bậc theo nhãn/vị trí để đoán) — mô hình
+ * dòng làm phép đoán đó thành thừa: danh tính của lựa chọn là chính cái dòng.
  *
- * Nên khớp theo hai bậc:
- *   1. cùng nhãn ở bất kỳ vị trí nào → đúng lựa chọn cũ, giữ `value`
- *   2. nhãn cũ ở CHÍNH vị trí đó mà không còn xuất hiện ở đâu nữa → người soạn vừa sửa chính tả
- *      tại chỗ, vẫn là lựa chọn cũ
- * Không khớp được cả hai mới là lựa chọn mới và mới sinh `value`.
+ * `value: null` = dòng MỚI chưa chốt — lúc build payload mới sinh value từ nhãn hiện tại.
+ * Không sinh sớm hơn: đang gõ dở "Đ" thì value "d" là rác, mà chưa tin nào lưu nó nên đổi
+ * lúc nào cũng vô hại.
  */
-export function parseOptions(text: string, previous: readonly FieldOption[]): FieldOption[] {
-  const labels = text
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const fresh = new Set(labels);
-  const byLabel = new Map(previous.map((o) => [o.label, o]));
+export type OptionRow = { id: string; value: string | null; label: string };
+
+export const toOptionRows = (options: readonly FieldOption[]): OptionRow[] =>
+  options.map((o) => ({ id: nextUid(), value: o.value, label: o.label }));
+
+export const emptyOptionRow = (): OptionRow => ({ id: nextUid(), value: null, label: '' });
+
+/** Dòng → options gửi BE. Dòng trống bị bỏ (thêm rồi đổi ý), value đã khoá được giữ nguyên. */
+export function rowsToOptions(rows: readonly OptionRow[]): FieldOption[] {
   const taken = new Set<string>();
-
-  return labels.map((label, i) => {
-    const at = previous[i];
-    const kept = byLabel.get(label) ?? (at && !fresh.has(at.label) ? at : undefined);
-    const value = kept && !taken.has(kept.value) ? kept.value : optionValue(label, taken);
+  const out: FieldOption[] = [];
+  for (const row of rows) {
+    const label = row.label.trim();
+    if (!label) continue;
+    const value = row.value && !taken.has(row.value) ? row.value : optionValue(label, taken);
     taken.add(value);
-    return { value, label };
-  });
+    out.push({ value, label });
+  }
+  return out;
 }
-
 /* ── ĐỔI HÌNH ───────────────────────────────────────────────────────── */
 
 /**

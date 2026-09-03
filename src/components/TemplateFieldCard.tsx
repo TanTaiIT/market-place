@@ -1,7 +1,8 @@
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useReorderableDrag } from 'react-native-reorderable-list';
-import { formatOptions, parseOptions } from '@/api/templates';
-import type { DraftField, FieldType } from '@/api/templates';
+import { emptyOptionRow, rowsToOptions, toOptionRows } from '@/api/templates';
+import type { DraftField, FieldType, OptionRow } from '@/api/templates';
 import { C, F, R, shadow } from '@/theme';
 
 /** Bảy kiểu của BE, nhãn tiếng Việt. Xếp theo mức hay dùng, không theo thứ tự enum. */
@@ -106,14 +107,10 @@ export function TemplateFieldCard({
       )}
 
       {WITH_OPTIONS.has(field.type) && (
-        <TextInput
-          value={formatOptions(field.options)}
-          // `parseOptions` giữ `value` cũ của nhãn đã có: `value` là thứ tin đăng lưu, sinh lại
-          // nó khi sửa chính tả một nhãn là làm mọi tin cũ hoá không hợp lệ.
-          onChangeText={(text) => onPatch({ options: parseOptions(text, field.options) })}
-          placeholder="4GB, 6GB, 8GB, 12GB"
-          placeholderTextColor={C.muted}
-          style={styles.options}
+        <OptionRows
+          multi={field.type === 'multiselect'}
+          initial={field.options}
+          onChange={(options) => onPatch({ options })}
         />
       )}
 
@@ -133,6 +130,80 @@ export function TemplateFieldCard({
           Chỉ hiện khi `{field.showIf.key}` có giá trị — điều kiện giữ nguyên, màn này không sửa.
         </Text>
       )}
+    </View>
+  );
+}
+
+/**
+ * Danh sách lựa chọn — mỗi dòng một ô nhập, nút + thêm dòng, ✕ bỏ dòng.
+ *
+ * DÒNG là state cục bộ, chỉ `rowsToOptions` (đã bỏ dòng trống) mới đẩy lên `DraftField`:
+ * dòng vừa thêm còn trống là trạng thái soạn thảo, không phải dữ liệu — đẩy nó lên là
+ * validate thấy một lựa chọn rỗng, còn giữ ở đây thì nó chỉ là một ô đang chờ gõ.
+ *
+ * `key` theo `row.id` chứ không theo chỉ số: xoá dòng giữa sẽ dồn chỉ số, và React đem
+ * con trỏ + bàn phím đang mở của dòng dưới gán sang dòng khác — đúng bài học của form nội
+ * quy nhóm (`org/[slug]/edit.tsx`).
+ */
+function OptionRows({
+  multi,
+  initial,
+  onChange,
+}: {
+  multi: boolean;
+  initial: DraftField['options'];
+  onChange: (options: DraftField['options']) => void;
+}) {
+  // Khởi tạo MỘT lần từ options đã lưu; luôn có sẵn một ô trống để gõ ngay, khỏi bấm +.
+  const [rows, setRows] = useState<OptionRow[]>(() => {
+    const loaded = toOptionRows(initial);
+    return loaded.length ? loaded : [emptyOptionRow()];
+  });
+
+  // Đẩy lên cha qua effect thay vì gọi trong setState: `onChange` là setState của CHA,
+  // gọi nó giữa lúc render con là cảnh báo "update a component while rendering another".
+  useEffect(() => {
+    onChange(rowsToOptions(rows));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi rows đổi
+  }, [rows]);
+
+  const setLabel = (id: string, label: string) =>
+    setRows((list) => list.map((r) => (r.id === id ? { ...r, label } : r)));
+
+  return (
+    <View style={styles.optBox}>
+      <Text style={styles.optHint}>
+        {multi
+          ? 'Người đăng tin chọn được NHIỀU giá trị trong danh sách này'
+          : 'Người đăng tin chỉ chọn ĐÚNG MỘT giá trị trong danh sách này'}
+      </Text>
+      {rows.map((row, i) => (
+        <View key={row.id} style={styles.optRow}>
+          <TextInput
+            value={row.label}
+            onChangeText={(t) => setLabel(row.id, t)}
+            placeholder={"Giá trị " + (i + 1)}
+            placeholderTextColor={C.muted}
+            style={styles.optInput}
+          />
+          {/* Còn một dòng thì không cho bỏ: field kiểu chọn không có lựa chọn nào là 400
+              của BE — giữ lại ô cuối là giữ cho người soạn khỏi tự đào hố. */}
+          {rows.length > 1 && (
+            <Pressable
+              onPress={() => setRows((list) => list.filter((r) => r.id !== row.id))}
+              hitSlop={8}
+            >
+              <Text style={styles.optRemove}>✕</Text>
+            </Pressable>
+          )}
+        </View>
+      ))}
+      <Pressable
+        onPress={() => setRows((list) => [...list, emptyOptionRow()])}
+        style={({ pressed }) => [styles.optAdd, pressed && { opacity: 0.6 }]}
+      >
+        <Text style={styles.optAddText}>＋ Thêm lựa chọn</Text>
+      </Pressable>
     </View>
   );
 }
@@ -204,15 +275,21 @@ const styles = StyleSheet.create({
   chipOff: { opacity: 0.4 },
   chipText: { fontFamily: F.uiSemi, fontSize: 12, color: C.inkSoft },
   chipTextOn: { fontFamily: F.uiBold, color: C.paperWarm },
-  options: {
+  optBox: { marginTop: 10, gap: 2 },
+  optHint: { fontFamily: F.ui, fontSize: 11, lineHeight: 16, color: C.muted, marginBottom: 4 },
+  optRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  optInput: {
+    flex: 1,
     fontFamily: F.ui,
     fontSize: 13.5,
     color: C.ink,
     paddingVertical: 7,
-    marginTop: 10,
     borderBottomWidth: 1,
     borderBottomColor: C.lineInput,
   },
+  optRemove: { fontFamily: F.uiBold, fontSize: 14, color: C.inkSoft, paddingHorizontal: 4 },
+  optAdd: { alignSelf: 'flex-start', paddingVertical: 9, paddingRight: 12 },
+  optAddText: { fontFamily: F.uiBold, fontSize: 12.5, color: C.moss },
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 9 },
   toggleLabel: { flex: 1, fontFamily: F.ui, fontSize: 13, color: C.inkSoft },
   note: { fontFamily: F.ui, fontSize: 11, lineHeight: 16, color: C.muted, marginTop: 8 },

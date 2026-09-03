@@ -15,6 +15,12 @@ export const qk = {
    */
   categoryTemplate: (categoryId: string, version?: number) =>
     ['categories', 'template', categoryId, version ?? 'latest'] as const,
+  /**
+   * MẪU MẶC ĐỊNH — dãy version của nó RỜI khỏi dãy của từng danh mục, nên không dùng chung key
+   * với `categoryTemplate`. Vẫn nằm dưới prefix `categories` để một lần invalidate quét cả cụm.
+   */
+  defaultTemplate: (version?: number) =>
+    ['categories', 'default-template', version ?? 'latest'] as const,
   /** Hạn mức đăng tin — đổi sau mỗi lần đăng hoặc mỗi lần một tin được duyệt. */
   listingQuota: () => ['listings', 'quota'] as const,
   listing: (id: string) => ['listing', id] as const,

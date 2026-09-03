@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   fav: { top: 10, right: 10 },
-  favOn: { backgroundColor: 'rgba(255,255,255,0.9)' },
+  favOn: { backgroundColor: C.glassLift },
   favGlyph: { fontSize: 15 },
 
   pending: {

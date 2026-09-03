@@ -1,42 +1,65 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { AdminPanel, AdminScreen, AdminSwitch } from '@/components/AdminScreen';
-import { AdminPickerField, AdminSmallBtn, adminFormStyles } from '@/components/AdminPicker';
-import { TemplateFieldForm } from '@/components/TemplateFieldForm';
-import { EmptyState, Loading, PinButton } from '@/components/ui';
+import { Alert, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { reorderItems, type ReorderableListReorderEvent } from 'react-native-reorderable-list';
+import { Surface } from '@/components/Surface';
+import { TemplateCategoryBar } from '@/components/TemplateCategoryBar';
+import { TemplateFieldList } from '@/components/TemplateFieldList';
+import { TemplatePreview } from '@/components/TemplatePreview';
+import { TemplateSaveBar } from '@/components/TemplateSaveBar';
+import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useAdminCategories } from '@/queries/admin-content';
 import {
-  useCategoryTemplate,
   useCreateTemplateDraft,
   useFieldDefinitions,
   usePublishTemplate,
   useTemplateDraft,
+  useTemplatePublished,
   useUpdateTemplateDraft,
 } from '@/queries/templates';
-import { MAX_FILTERABLE, toDraft, validateDraft } from '@/api/templates';
-import type { DraftField } from '@/api/templates';
-import { C, F } from '@/theme';
+import { deriveKey, nextUid, toDraft, validateDraft } from '@/api/templates';
+import type { CategoryTemplate, DraftField, TemplateTarget } from '@/api/templates';
+
+/** Thuộc tính mới: kiểu chữ, không bắt buộc, không cho lọc — mức an toàn nhất để bắt đầu. */
+const blankField = (): DraftField => ({
+  uid: nextUid(),
+  key: '',
+  label: '',
+  type: 'text',
+  required: false,
+  filterable: false,
+  options: [],
+  isNew: true,
+});
 
 /**
- * Soạn template thuộc tính cho một danh mục — bộ field động của form đăng tin.
+ * Soạn template thuộc tính — cho một danh mục, hoặc cho MẪU MẶC ĐỊNH.
  *
  * Vòng đời BE ép: nháp → phát hành, và **bản đã phát hành là bất biến**. Tin đăng ghim
  * `templateRef.version` để form sửa tin dựng lại đúng bộ field lúc tin ra đời, nên sửa bản cũ
  * sẽ khiến tin cũ đột nhiên mang field chưa từng tồn tại với chúng. Muốn đổi thì tạo nháp mới.
  *
+ * Một nút "Lưu template" như bản thiết kế, nhưng nó KHÔNG âm thầm phát hành: lưu nháp xong mới
+ * hỏi, vì phát hành không lùi lại được và người soạn phải nghe điều đó đúng lúc quyết.
+ *
+ * Nền giấy sáng chứ không phải nền `desk` của `AdminScreen`: bản thiết kế vẽ nó như một route
+ * thường, và đây là màn soạn nội dung dài. Đổi lại là mất thanh điều hướng quản trị — đường ra
+ * là nút ← của `ScreenHeader`.
+ *
  * Chỉ master — cùng cửa với màn Danh mục, vì template là từ điển toàn hệ thống.
  */
 export default function AdminCategoryTemplates() {
   const toast = useToast();
-  const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [target, setTarget] = useState<TemplateTarget | null>(null);
   const [fields, setFields] = useState<DraftField[]>([]);
   const [dirty, setDirty] = useState(false);
+  const [preview, setPreview] = useState(false);
 
   const categories = useAdminCategories();
   const dictionary = useFieldDefinitions();
-  const published = useCategoryTemplate(categoryId ?? '');
-  const draft = useTemplateDraft(published.data, categoryId ?? '');
+  const published = useTemplatePublished(target);
+  const draft = useTemplateDraft(published.data, target);
 
   const create = useCreateTemplateDraft();
   const update = useUpdateTemplateDraft();
@@ -48,14 +71,18 @@ export default function AdminCategoryTemplates() {
   const defs = dictionary.data;
   const current = draft.data ?? published.data ?? null;
   const draftVersion = draft.data?.version ?? null;
+  const liveVersion = published.data?.version ?? 0;
   const busy = create.isPending || update.isPending || publish.isPending;
   const fail = (e: Error) => toast(`⚠️ ${e.message}`);
 
   /*
-   * Nạp lại danh sách sửa được mỗi khi đổi danh mục hoặc BE trả bản mới.
+   * Nạp lại danh sách sửa được mỗi khi đổi mục tiêu hoặc BE trả bản mới.
    *
    * `dirty` chặn ghi đè: không có nó thì mỗi lần `invalidateQueries` sau một lượt lưu, hoặc mỗi
    * lần refetch nền, các thay đổi chưa lưu của người soạn biến mất giữa chừng.
+   *
+   * Danh mục chưa có template riêng thì `current` là MẪU MẶC ĐỊNH (`isFallback`) — nạp field
+   * của nó làm điểm bắt đầu, đúng ý "chưa có template thì phải có sẵn một mẫu để áp".
    */
   useEffect(() => {
     if (dirty || !current || !defs) return;
@@ -64,165 +91,137 @@ export default function AdminCategoryTemplates() {
 
   const patch = (i: number, next: Partial<DraftField>) => {
     setDirty(true);
-    setFields((prev) => prev.map((f, idx) => (idx === i ? { ...f, ...next } : f)));
+    setFields((prev) =>
+      prev.map((f, idx) => {
+        if (idx !== i) return f;
+        const merged = { ...f, ...next };
+        if (next.label === undefined || !f.isNew) return merged;
+
+        // Khoá sinh lại theo nhãn, và CHỈ khi field còn mới: khoá đã có trong từ điển là khoá
+        // của mọi danh mục đang dùng nó, đổi ở đây là đổi cho người khác.
+        const key = deriveKey(
+          merged.label,
+          prev.filter((_, k) => k !== i).map((x) => x.key),
+        );
+        const known = defs?.find((d) => d.key === key);
+        // Khoá vừa sinh đã có trong từ điển → nhận luôn field đó thay vì khai một định nghĩa
+        // thứ hai: BE từ chối "một khoá không được mang hai kiểu", mà đây cũng là điều đúng —
+        // cùng tên thì nên là cùng field, dùng lại cả kiểu và lựa chọn của nó.
+        return known
+          ? { ...merged, key, isNew: false, type: known.type, options: known.options }
+          : { ...merged, key, isNew: true };
+      }),
+    );
   };
 
-  const move = (i: number, by: -1 | 1) => {
-    const to = i + by;
-    if (to < 0 || to >= fields.length) return;
+  const reorder = ({ from, to }: ReorderableListReorderEvent) => {
     setDirty(true);
-    setFields((prev) => {
-      const next = [...prev];
-      [next[i], next[to]] = [next[to], next[i]];
-      return next;
-    });
+    // `reorderItems` của thư viện chứ không tự cắt mảng: nó DỊCH cả đoạn giữa hai vị trí, khác
+    // hẳn phép đổi chỗ hai phần tử — đổi chỗ thì kéo thẻ đầu xuống cuối sẽ ném thẻ cuối lên đầu.
+    setFields((prev) => reorderItems(prev, from, to));
   };
+
+  /** Phát hành là bước không lùi được, nên nó là một câu hỏi chứ không phải một hệ quả. */
+  const askPublish = (version: number) =>
+    Alert.alert(
+      `Đã lưu nháp v${version}`,
+      target?.kind === 'default'
+        ? `Phát hành ngay? MỌI danh mục chưa có template riêng sẽ dùng bản này ngay lập tức, và sau khi phát hành thì nó KHÔNG sửa được nữa.`
+        : 'Phát hành ngay? Sau khi phát hành, bản này KHÔNG sửa được nữa — tin đăng ghim số version để dựng lại đúng form lúc chúng ra đời.',
+      [
+        { text: 'Để nháp', style: 'cancel' },
+        {
+          text: 'Phát hành',
+          onPress: () =>
+            target &&
+            publish.mutate(
+              { target, version },
+              { onSuccess: () => toast(`✓ Đã phát hành v${version}`), onError: fail },
+            ),
+        },
+      ],
+    );
 
   const save = () => {
-    if (!categoryId) return;
+    if (!target) return;
     const problem = validateDraft(fields);
     if (problem) return toast(`⚠️ ${problem}`);
 
-    const done = { onSuccess: () => { setDirty(false); toast('Đã lưu bản nháp'); }, onError: fail };
-    if (draftVersion != null) {
-      update.mutate({ categoryId, version: draftVersion, fields, dictionary: defs ?? [] }, done);
-    } else {
-      create.mutate({ categoryId, fields, dictionary: defs ?? [] }, done);
-    }
+    const done = {
+      onSuccess: (tpl: CategoryTemplate) => {
+        setDirty(false);
+        askPublish(tpl.version);
+      },
+      onError: fail,
+    };
+    const input = { target, fields, dictionary: defs ?? [] };
+    if (draftVersion != null) update.mutate({ ...input, version: draftVersion }, done);
+    else create.mutate(input, done);
   };
 
-  const filterable = fields.filter((f) => f.filterable).length;
+  const status = !target
+    ? undefined
+    : draftVersion != null
+      ? `Đang sửa nháp v${draftVersion} · bản đang chạy v${liveVersion}`
+      : target.kind === 'default'
+        ? liveVersion === 0
+          ? 'Chưa có mẫu mặc định nào — lưu là tạo v1, và mọi danh mục chưa có template riêng sẽ dùng nó.'
+          : `Mẫu mặc định đang chạy v${liveVersion} — sửa nó là sửa form của MỌI danh mục chưa có template riêng.`
+        : published.data?.isFallback
+          ? 'Danh mục này đang dùng MẪU MẶC ĐỊNH — field dưới đây nạp từ mẫu đó, lưu là tạo bản riêng v1.'
+          : `Bản đang chạy v${liveVersion} đã phát hành nên bất biến — lưu sẽ tạo nháp mới.`;
 
   return (
-    <AdminScreen title="Mẫu thuộc tính" note="bộ field của form đăng tin, theo từng danh mục">
-      <ScrollView contentContainerStyle={styles.body}>
-        <AdminPanel title="Danh mục">
-          <AdminPickerField
-            label="ĐANG SOẠN CHO"
-            title="Chọn danh mục"
-            placeholder="Chạm để chọn"
-            items={(categories.data ?? []).map((c) => ({ key: c.id, label: c.name }))}
-            loading={categories.isLoading}
-            value={categoryId}
-            onChange={(id) => {
-              setCategoryId(id);
-              setDirty(false);
-              setFields([]);
+    <Surface>
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <ScreenHeader title="Tạo template danh mục" />
+
+        <TemplateCategoryBar
+          categories={categories.data ?? []}
+          value={target}
+          status={status}
+          onChange={(next) => {
+            setTarget(next);
+            setDirty(false);
+            setFields([]);
+          }}
+        />
+
+        {!target ? (
+          <EmptyState icon="🗂" text="Chọn một danh mục để xem và sửa bộ thuộc tính của nó" />
+        ) : published.isLoading || draft.isLoading ? (
+          <Loading />
+        ) : (
+          <TemplateFieldList
+            fields={fields}
+            onPatch={patch}
+            onReorder={reorder}
+            onRemove={(i) => {
+              setDirty(true);
+              setFields((prev) => prev.filter((_, idx) => idx !== i));
+            }}
+            onAdd={() => {
+              setDirty(true);
+              setFields((prev) => [...prev, blankField()]);
             }}
           />
-          {current ? (
-            <Text style={adminFormStyles.hint}>
-              {draftVersion != null
-                ? `Đang sửa bản nháp v${draftVersion}. Bản đang chạy: v${published.data?.version}.`
-                : published.data?.isFallback
-                  ? 'Danh mục này đang dùng bản CHUNG. Lưu lần đầu sẽ tạo bản riêng v1.'
-                  : `Bản đang chạy v${published.data?.version} đã phát hành nên không sửa được — lưu sẽ tạo nháp mới.`}
-            </Text>
-          ) : null}
-        </AdminPanel>
-
-        {!categoryId ? (
-          <EmptyState icon="🗂" text="Chọn một danh mục để xem và sửa bộ field của nó" />
-        ) : published.isLoading || draft.isLoading ? (
-          <Loading onDark />
-        ) : (
-          <>
-            <AdminPanel title="Field trong mẫu" note={`${fields.length} field · ${filterable}/${MAX_FILTERABLE} mở lọc`}>
-              {fields.length === 0 ? (
-                <Text style={adminFormStyles.hint}>Chưa có field nào — thêm ở panel dưới.</Text>
-              ) : (
-                fields.map((f, i) => (
-                  <View key={f.key} style={styles.row}>
-                    <View style={styles.rowHead}>
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <Text style={styles.rowLabel}>
-                          {f.label}
-                          {f.isNew ? <Text style={styles.badge}>  MỚI</Text> : null}
-                        </Text>
-                        <Text style={styles.rowMeta}>
-                          {f.key} · {f.type}
-                          {f.showIf ? ` · hiện khi ${f.showIf.key}` : ''}
-                        </Text>
-                      </View>
-                      <AdminSmallBtn label="↑" onPress={() => move(i, -1)} />
-                      <AdminSmallBtn label="↓" onPress={() => move(i, 1)} />
-                      <AdminSmallBtn
-                        label="Gỡ"
-                        onPress={() => {
-                          setDirty(true);
-                          setFields((prev) => prev.filter((_, idx) => idx !== i));
-                        }}
-                      />
-                    </View>
-                    <Pressable style={styles.toggle} onPress={() => patch(i, { required: !f.required })}>
-                      <Text style={styles.toggleLabel}>Bắt buộc</Text>
-                      <AdminSwitch value={f.required} onChange={() => patch(i, { required: !f.required })} />
-                    </Pressable>
-                    <Pressable style={styles.toggle} onPress={() => patch(i, { filterable: !f.filterable })}>
-                      <Text style={styles.toggleLabel}>Cho lọc</Text>
-                      <AdminSwitch value={f.filterable} onChange={() => patch(i, { filterable: !f.filterable })} />
-                    </Pressable>
-                  </View>
-                ))
-              )}
-
-              <PinButton
-                label={draftVersion != null ? 'Lưu bản nháp' : 'Tạo bản nháp'}
-                onPress={save}
-                loading={busy}
-                style={{ marginTop: 12 }}
-              />
-              {draftVersion != null ? (
-                <>
-                  <AdminSmallBtn
-                    label={dirty ? 'Lưu trước khi phát hành' : `Phát hành v${draftVersion}`}
-                    onPress={() =>
-                      dirty
-                        ? toast('⚠️ Còn thay đổi chưa lưu')
-                        : publish.mutate(
-                            { categoryId, version: draftVersion },
-                            { onSuccess: () => toast(`Đã phát hành v${draftVersion}`), onError: fail },
-                          )
-                    }
-                  />
-                  <Text style={adminFormStyles.limit}>
-                    Phát hành xong bản này KHÔNG sửa được nữa: tin đăng ghim số version để dựng lại
-                    đúng form lúc chúng ra đời.
-                  </Text>
-                </>
-              ) : null}
-            </AdminPanel>
-
-            <AdminPanel title="Thêm field">
-              <TemplateFieldForm
-                dictionary={defs ?? []}
-                used={fields.map((f) => f.key)}
-                loading={dictionary.isLoading}
-                onAdd={(f) => {
-                  setDirty(true);
-                  setFields((prev) => [...prev, f]);
-                }}
-              />
-            </AdminPanel>
-          </>
         )}
-      </ScrollView>
-    </AdminScreen>
+
+        {!!target && (
+          <TemplateSaveBar busy={busy} onPreview={() => setPreview(true)} onSave={save} />
+        )}
+
+        <TemplatePreview
+          visible={preview}
+          fields={fields}
+          dictionary={defs ?? []}
+          onClose={() => setPreview(false)}
+        />
+      </SafeAreaView>
+    </Surface>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { padding: 16, paddingBottom: 48, gap: 14 },
-  row: {
-    borderTopWidth: 1,
-    borderTopColor: C.deskLine,
-    paddingTop: 12,
-    marginTop: 12,
-  },
-  rowHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rowLabel: { fontFamily: F.uiBold, fontSize: 13.5, color: C.deskTxt },
-  badge: { fontFamily: F.mono, fontSize: 9.5, color: C.amber, letterSpacing: 1 },
-  rowMeta: { fontFamily: F.mono, fontSize: 10.5, color: C.deskTxtDim, marginTop: 3 },
-  toggle: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 8 },
-  toggleLabel: { flex: 1, fontFamily: F.ui, fontSize: 12.5, color: C.deskTxtDim },
+  screen: { flex: 1 },
 });

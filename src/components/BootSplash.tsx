@@ -11,7 +11,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { C, F, shadow } from '@/theme';
+import { C, F, G, shadow } from '@/theme';
 
 /**
  * Màn hình khởi động: tờ giấy rơi xuống bảng bần, đinh ghim cắm xuống, chữ ký hiện dần.
@@ -147,7 +147,7 @@ export function BootSplash({
     <Animated.View style={[styles.root, rootStyle]}>
       {/* Quầng đèn hắt từ trên. RN không có radial-gradient, linear dọc là đủ gần. */}
       <LinearGradient
-        colors={[C.cork, 'transparent']}
+        colors={G.glow}
         style={[StyleSheet.absoluteFill, styles.glow]}
         pointerEvents="none"
       />

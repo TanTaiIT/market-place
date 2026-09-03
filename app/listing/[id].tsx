@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: 'rgba(250,248,240,0.92)',
+    backgroundColor: C.glassLift,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 5,

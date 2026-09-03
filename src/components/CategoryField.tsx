@@ -1,24 +1,24 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { PickerSheet, type PickerSearch } from './PickerSheet';
+import { useRouter } from 'expo-router';
+import { CategoryPicker } from './CategoryPicker';
 import { useCategories } from '@/queries/listings';
 import { C, F, shadow } from '@/theme';
 
 /**
- * Chọn danh mục cho tin đăng — qua popup, không phải hàng chip trải sẵn trên form.
+ * Ô danh mục của form đăng tin — thực chất hai thứ: MỘT dòng hiện danh mục đã chọn, và cái cửa
+ * mở màn chọn danh mục (`CategoryPicker`, chiếm trọn màn hình).
  *
- * Hai hình dạng, cùng một component:
- * - **Chưa chọn**: lời mời + một nút mở popup. Phần còn lại của form chưa hiện, vì danh mục
- *   quyết định bộ field của nó (template).
- * - **Đã chọn**: đúng MỘT dòng "Danh mục · <tên> · Đổi". Trải lại cả danh sách ở đây là bắt
- *   người dùng đọc hai lần một thứ họ vừa chốt.
+ * Không còn nút "Chọn danh mục" ở trạng thái chưa chọn: với `autoOpen`, màn chọn đã phủ kín ngay
+ * lúc mount, nên cái nút đó là một affordance không ai kịp nhìn thấy. Hệ quả là chưa chọn thì ô
+ * này KHÔNG vẽ gì cả — và thoát màn chọn không còn đường quay lại.
  *
- * `autoOpen` bật popup ngay lúc mount — dùng cho form ĐĂNG MỚI, nơi câu hỏi đầu tiên đúng là
- * "đăng tin gì". Form SỬA truyền `false`: danh mục đã có, chặn ngang bằng một popup không ai
- * yêu cầu là phiền.
+ * Vì thế thoát mà chưa chọn ở luồng ĐĂNG MỚI thì rời luôn việc đăng. Component dùng chung vẫn
+ * không phải đoán mình được mount từ đâu: chính `autoOpen` nói ra điều đó — nó mang nghĩa "ô này
+ * là cửa vào của luồng đăng tin", không phải "mở giúp tôi một popup".
  *
- * Đóng popup mà chưa chọn thì KHÔNG điều hướng đi đâu cả. Component dùng chung mà tự gọi
- * `router.back()` là buộc nó phải biết mình đang được mount từ màn nào.
+ * Form SỬA truyền `autoOpen={false}`: danh mục đã có, chặn ngang bằng một màn không ai yêu cầu
+ * là phiền, và thoát ra ở đó chỉ là đóng màn chọn chứ không rời việc sửa.
  */
 export function CategoryField({
   value,
@@ -29,55 +29,50 @@ export function CategoryField({
   onChange: (categoryId: string) => void;
   autoOpen?: boolean;
 }) {
+  const router = useRouter();
   const { data: categories } = useCategories();
   const [open, setOpen] = useState(Boolean(autoOpen));
 
-  const search = useCallback<PickerSearch<string>>(
-    (keyword) =>
-      (categories ?? [])
-        .filter((c) => c.name.toLowerCase().includes(keyword.trim().toLowerCase()))
-        .map((c) => ({ key: c.id, label: c.icon ? `${c.icon} ${c.name}` : c.name })),
-    [categories],
-  );
+  const picked = categories?.find((c) => c.id === value);
 
-  const name = categories?.find((c) => c.id === value)?.name;
+  const dismiss = () => {
+    setOpen(false);
+    // Điều kiện là `value` chứ không phải một cờ riêng: vào lại màn chọn bằng "Đổi" thì đã có
+    // danh mục, lúc đó thoát chỉ là đóng màn chọn.
+    if (!autoOpen || value) return;
+    // `canGoBack` vì `/post` mở được bằng deep link — lúc đó không có gì phía sau để lùi về.
+    // Cùng lối rơi với `ScreenHeader`.
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)/feed');
+  };
 
   return (
     <>
-      <PickerSheet
+      <CategoryPicker
         visible={open}
-        title="Đăng tin gì?"
-        placeholder="Tìm danh mục..."
-        search={search}
-        loading={categories === undefined}
+        categories={categories ?? []}
         value={value || null}
-        onSelect={(id) => id && onChange(id)}
-        onClose={() => setOpen(false)}
+        loading={categories === undefined}
+        onSelect={(id) => {
+          onChange(id);
+          setOpen(false);
+        }}
+        onDismiss={dismiss}
       />
 
-      {value ? (
+      {!!value && (
         <Pressable
           onPress={() => setOpen(true)}
           style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
         >
           <View style={{ flex: 1 }}>
             <Text style={styles.rowLabel}>Danh mục</Text>
-            <Text style={styles.rowValue}>{name ?? '—'}</Text>
+            <Text style={styles.rowValue}>
+              {picked ? `${picked.icon || ''} ${picked.name}`.trim() : '—'}
+            </Text>
           </View>
           <Text style={styles.change}>Đổi ›</Text>
         </Pressable>
-      ) : (
-        <>
-          <Text style={styles.hint}>
-            Chọn danh mục trước — mỗi loại món đồ hỏi những thông tin khác nhau.
-          </Text>
-          <Pressable
-            onPress={() => setOpen(true)}
-            style={({ pressed }) => [styles.pickBtn, pressed && { opacity: 0.7 }]}
-          >
-            <Text style={styles.pickBtnText}>Chọn danh mục</Text>
-          </Pressable>
-        </>
       )}
     </>
   );
@@ -97,14 +92,4 @@ const styles = StyleSheet.create({
   rowLabel: { fontFamily: F.mono, fontSize: 9.5, letterSpacing: 1.2, color: C.inkSoft },
   rowValue: { fontFamily: F.uiBold, fontSize: 14, color: C.ink, marginTop: 3 },
   change: { fontFamily: F.uiSemi, fontSize: 12.5, color: C.pin },
-  hint: { fontFamily: F.ui, fontSize: 13, color: C.inkSoft, lineHeight: 20, marginTop: 4 },
-  pickBtn: {
-    alignSelf: 'flex-start',
-    backgroundColor: C.pin,
-    borderRadius: 10,
-    paddingHorizontal: 18,
-    paddingVertical: 11,
-    marginTop: 14,
-  },
-  pickBtnText: { fontFamily: F.uiBold, fontSize: 13.5, color: C.paperWarm },
 });

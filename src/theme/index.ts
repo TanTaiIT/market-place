@@ -38,6 +38,8 @@ export const C = {
   brandLt: '#E9F9F0',
   /** Chữ/biểu tượng thương hiệu trên nền sáng: `brand` quá nhạt để đọc. */
   brandTx: '#16A05B',
+  /** Sắc thương hiệu nhạt nhất còn phân biệt được với `paper` — chặng đỉnh của dải màn đăng nhập. */
+  brandWash: '#F4FCF7',
 
   // ── Nhấn phụ ────────────────────────────────────────────────────
   orange: '#FF7A3D',
@@ -47,6 +49,27 @@ export const C = {
   /** Đỏ báo động — huy hiệu chưa đọc, hành động phá huỷ. */
   danger: '#FF4D4D',
   dangerLt: '#FFECEC',
+
+  // ── Mặt kính ────────────────────────────────────────────────────
+  /*
+   * Trắng mờ đặt TRÊN nền thương hiệu hoặc trên ảnh. Cố tình là alpha, không phải một sắc của
+   * `paper*`: nền bên dưới phải hắt qua được, đổi sang hex đục là mất luôn hiệu ứng kính.
+   */
+  /** Mảng sáng lớn — quầng đèn trên hero. */
+  glass: 'rgba(255,255,255,0.16)',
+  /**
+   * Độ đục của TẤM kính — nút tròn, viên chip nổi trên nền màu.
+   *
+   * 0.30 chứ không phải 0.22 như bản đầu: một mảng trắng 22% trên nền màu đọc ra "màu nhạt hơn"
+   * chứ không ra "vật liệu". Đây chỉ là lớp 1/3 — xem `glassFace` trong `GlassSurface.tsx`.
+   */
+  glassRaise: 'rgba(255,255,255,0.30)',
+  /** Viền outline trên nền đậm — nét mảnh nên cần alpha cao hơn mới thấy. */
+  glassLine: 'rgba(255,255,255,0.5)',
+  /** Chữ phụ trên nền đậm: `paperWarm` đục quá gắt, hạ alpha cho nó lùi sau chữ chính. */
+  glassTx: 'rgba(255,255,255,0.88)',
+  /** Nút tròn nổi trên ẢNH (không phải trên nền thương hiệu) — gần đục để icon còn đọc được. */
+  glassLift: 'rgba(255,255,255,0.92)',
 
   // ── Token cũ, giữ tên ───────────────────────────────────────────
   /** Màu cảnh báo/chú ý. KHÔNG phải màu thương hiệu — xem ghi chú đầu file. */
@@ -146,3 +169,31 @@ export const shadowLift = Platform.select({
 
 /** Cặp màu gradient cho ảnh giả lập của từng tin (thay linear-gradient của web) */
 export type Grad = readonly [string, string];
+
+/**
+ * Dải màu cố định của app — chặng đầu/chặng cuối cho `<LinearGradient>`.
+ *
+ * Ghép tay tại call-site là cách sinh ra dải PHẲNG mà không ai thấy: `profile` từng viết
+ * `[C.cork, C.paper]`, hai token đó cùng về `#F1F2F4` sau đợt đổi màu nên hero mất hẳn gradient.
+ * Gom về đây thì đợt đổi màu sau chỉ phải soi một chỗ.
+ *
+ * Chặng tắt dần phải là alpha-0 CỦA CHÍNH màu đó, không phải `'transparent'`: Android nội suy
+ * `transparent` (= đen alpha 0) nên dải bị bẩn sắc đen ở quãng giữa.
+ */
+export const G = {
+  /** Hero bảng tin — dải thương hiệu duy nhất của app. */
+  brand: [C.brand, C.brandDark],
+  /** Đỉnh màn hồ sơ: mặt thẻ trắng chìm dần về nền màn. */
+  hero: [C.paperWarm, C.paper],
+  /** Nền màn đăng nhập/đăng ký — ngả thương hiệu ở đỉnh để hai màn này không chỉ là một mảng xám. */
+  auth: [C.brandWash, C.corkDark],
+  /** Quầng đèn hắt xuống của splash (đặt trên nền `desk` tối). */
+  glow: [C.paper, 'rgba(241,242,244,0)'],
+  /**
+   * Vệt sáng chéo của mặt kính — lớp làm mắt đọc ra "bề mặt bóng" thay vì "màu nhạt hơn".
+   *
+   * Chặng cuối là 0.03 chứ không phải 0: alpha về 0 tuyệt đối làm cạnh dưới của vệt sáng thành
+   * một đường cắt thấy được trên nền tối.
+   */
+  sheen: ['rgba(255,255,255,0.42)', 'rgba(255,255,255,0.03)'],
+} as const satisfies Record<string, Grad>;

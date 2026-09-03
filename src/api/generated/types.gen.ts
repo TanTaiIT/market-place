@@ -575,7 +575,7 @@ export type FieldDefinition = {
 export type CreateCategory = {
     name: string;
     slug?: string;
-    icon?: string;
+    icon: string;
     order?: number;
     requireManualReview?: boolean;
     template?: {
@@ -3226,6 +3226,164 @@ export type FieldDefinitionCreateResponses = {
 };
 
 export type FieldDefinitionCreateResponse = FieldDefinitionCreateResponses[keyof FieldDefinitionCreateResponses];
+
+export type DefaultTemplateGetData = {
+    body?: never;
+    path?: never;
+    query?: {
+        version?: number;
+    };
+    url: '/default-template';
+};
+
+export type DefaultTemplateGetErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+};
+
+export type DefaultTemplateGetError = DefaultTemplateGetErrors[keyof DefaultTemplateGetErrors];
+
+export type DefaultTemplateGetResponses = {
+    /**
+     * Mẫu mặc định
+     */
+    200: {
+        success: true;
+        message: string;
+        data: CategoryTemplate;
+    };
+};
+
+export type DefaultTemplateGetResponse = DefaultTemplateGetResponses[keyof DefaultTemplateGetResponses];
+
+export type DefaultTemplateCreateDraftData = {
+    body?: TemplateFields;
+    path?: never;
+    query?: never;
+    url: '/default-template';
+};
+
+export type DefaultTemplateCreateDraftErrors = {
+    /**
+     * Hình dạng template không hợp lệ
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+};
+
+export type DefaultTemplateCreateDraftError = DefaultTemplateCreateDraftErrors[keyof DefaultTemplateCreateDraftErrors];
+
+export type DefaultTemplateCreateDraftResponses = {
+    /**
+     * Đã tạo bản nháp
+     */
+    201: {
+        success: true;
+        message: string;
+        data: CategoryTemplate;
+    };
+};
+
+export type DefaultTemplateCreateDraftResponse = DefaultTemplateCreateDraftResponses[keyof DefaultTemplateCreateDraftResponses];
+
+export type DefaultTemplateUpdateDraftData = {
+    body?: TemplateFields;
+    path: {
+        version: number;
+    };
+    query?: never;
+    url: '/default-template/{version}';
+};
+
+export type DefaultTemplateUpdateDraftErrors = {
+    /**
+     * Bản đã phát hành, hoặc hình dạng không hợp lệ
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không có bản nào ở version này
+     */
+    404: ErrorResponse;
+};
+
+export type DefaultTemplateUpdateDraftError = DefaultTemplateUpdateDraftErrors[keyof DefaultTemplateUpdateDraftErrors];
+
+export type DefaultTemplateUpdateDraftResponses = {
+    /**
+     * Đã lưu bản nháp
+     */
+    200: {
+        success: true;
+        message: string;
+        data: CategoryTemplate;
+    };
+};
+
+export type DefaultTemplateUpdateDraftResponse = DefaultTemplateUpdateDraftResponses[keyof DefaultTemplateUpdateDraftResponses];
+
+export type DefaultTemplatePublishData = {
+    body?: never;
+    path: {
+        version: number;
+    };
+    query?: never;
+    url: '/default-template/{version}/publish';
+};
+
+export type DefaultTemplatePublishErrors = {
+    /**
+     * Bản này đã phát hành rồi
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không có bản nào ở version này
+     */
+    404: ErrorResponse;
+};
+
+export type DefaultTemplatePublishError = DefaultTemplatePublishErrors[keyof DefaultTemplatePublishErrors];
+
+export type DefaultTemplatePublishResponses = {
+    /**
+     * Đã phát hành
+     */
+    200: {
+        success: true;
+        message: string;
+        data: CategoryTemplate;
+    };
+};
+
+export type DefaultTemplatePublishResponse = DefaultTemplatePublishResponses[keyof DefaultTemplatePublishResponses];
 
 export type ChatListData = {
     body?: never;

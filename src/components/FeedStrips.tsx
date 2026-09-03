@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   promoTitle: { fontFamily: F.uiBold, fontSize: 17, lineHeight: 22, color: '#fff', maxWidth: 150 },
-  promoNote: { fontFamily: F.ui, fontSize: 11.5, color: 'rgba(255,255,255,0.9)', marginTop: 5 },
+  promoNote: { fontFamily: F.ui, fontSize: 11.5, color: C.glassTx, marginTop: 5 },
   promoBig: { fontFamily: F.uiBold, fontSize: 30, color: '#fff' },
 
   perk: { width: 280, backgroundColor: C.brandLt, borderRadius: R.lg, padding: 17, ...shadow },

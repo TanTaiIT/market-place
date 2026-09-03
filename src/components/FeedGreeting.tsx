@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { GlassSheen, glassFace } from './GlassSurface';
 import { Avatar } from './ui';
 import type { MyOrg } from '@/api/org';
 import { gradOf } from '@/api/client';
@@ -89,6 +90,7 @@ export function FeedGreeting({
             onPress={() => onOrg(o.slug)}
             style={({ pressed }) => [styles.orgChip, pressed && styles.pressed]}
           >
+            <GlassSheen />
             <View style={[styles.orgDot, { backgroundColor: gradOf(o.slug)[1] }]} />
             <Text numberOfLines={1} style={styles.orgChipText}>
               {o.name}
@@ -113,6 +115,7 @@ function Icon({ glyph, onPress }: { glyph: string; onPress: () => void }) {
       hitSlop={6}
       style={({ pressed }) => [styles.icon, pressed && styles.pressed]}
     >
+      <GlassSheen />
       <Text style={styles.iconText}>{glyph}</Text>
     </Pressable>
   );
@@ -129,13 +132,13 @@ const styles = StyleSheet.create({
   // `flex: 1` để dòng tên nuốt hết chỗ giữa avatar và hai nút — có nó thì `numberOfLines` mới cắt
   // được tên dài, thiếu nó thì tên đẩy hai nút ra khỏi màn.
   hiText: { flex: 1 },
-  hiSmall: { fontFamily: F.ui, fontSize: 11.5, color: 'rgba(255,255,255,0.88)' },
+  hiSmall: { fontFamily: F.ui, fontSize: 11.5, color: C.glassTx },
   hiName: { fontFamily: F.uiBold, fontSize: 16.5, color: C.paperWarm },
   icon: {
     width: 36,
     height: 36,
     borderRadius: R.pill,
-    backgroundColor: 'rgba(255,255,255,0.22)',
+    ...glassFace,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -153,7 +156,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 7,
     maxWidth: 175,
-    backgroundColor: 'rgba(255,255,255,0.20)',
+    ...glassFace,
     borderRadius: R.pill,
     paddingVertical: 5,
     paddingLeft: 5,
@@ -166,7 +169,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     paddingHorizontal: 13,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.5)',
+    borderColor: C.glassLine,
   },
   orgFindText: { fontFamily: F.uiBold, fontSize: 12, color: C.paperWarm },
   pressed: { opacity: 0.75 },

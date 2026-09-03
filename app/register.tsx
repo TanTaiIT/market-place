@@ -8,7 +8,7 @@ import { Field, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useRegister } from '@/queries/auth';
 import { useSignIn } from '@/stores/auth';
-import { C, F, shadow } from '@/theme';
+import { C, F, G, shadow } from '@/theme';
 
 export default function Register() {
   const router = useRouter();
@@ -36,7 +36,7 @@ export default function Register() {
     );
 
   return (
-    <LinearGradient colors={[C.cork, C.corkDark]} style={{ flex: 1 }}>
+    <LinearGradient colors={G.auth} style={{ flex: 1 }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView
           contentContainerStyle={[styles.wrap, { paddingTop: insets.top + 30, paddingBottom: 40 }]}

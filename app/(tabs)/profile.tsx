@@ -13,7 +13,7 @@ import { useSignOut } from '@/queries/auth';
 import { useProfile } from '@/queries/listings';
 import { useMyGrants } from '@/queries/admin';
 import { canOpenAdmin, isMaster, topRole } from '@/api/admin';
-import { C, F, shadow } from '@/theme';
+import { C, F, G, shadow } from '@/theme';
 
 export default function Profile() {
   const router = useRouter();
@@ -53,7 +53,7 @@ export default function Profile() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 24 }}>
-      <LinearGradient colors={[C.cork, C.paper]} style={[styles.hero, { paddingTop: insets.top + 24 }]}>
+      <LinearGradient colors={G.hero} style={[styles.hero, { paddingTop: insets.top + 24 }]}>
         <Avatar text={profile.avatar} url={profile.avatarUrl} size={76} ring />
         <Text style={styles.name}>{profile.name}</Text>
         <Text style={styles.org}>{profile.org}</Text>

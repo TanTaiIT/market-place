@@ -98,11 +98,17 @@ export const adminContentApi = {
   /**
    * Tạo danh mục (chỉ master). Không gửi `slug`: BE tự sinh từ tên, và một slug gõ tay lệch với
    * tên là thứ chỉ lộ ra nhiều tháng sau, lúc đã có tin trỏ vào nó.
+   *
+   * `icon` là điều kiện của BE (`categoryIconSchema`), chặn lại ở đây để lỗi nói được phải làm
+   * gì — thông điệp của validator chỉ nói field nào sai, không nói bấm vào đâu.
    */
   async addCategory(input: CategoryDraft): Promise<AdminCategory> {
-    const { name, ...rest } = categoryBody(input);
+    // Bóc `icon` ra khỏi spread: guard chỉ thu hẹp được biến, không thu hẹp field trong object
+    // spread — để nguyên thì `CreateCategory.icon` (required sau khi BE siết) không nhận.
+    const { name, icon, ...rest } = categoryBody(input);
     if (!name) throw new Error('Nhập tên danh mục trước đã');
-    const res = await withAuthRetry(() => createCategory({ body: { ...rest, name } }));
+    if (!icon) throw new Error('Chọn một biểu tượng cho danh mục');
+    const res = await withAuthRetry(() => createCategory({ body: { ...rest, name, icon } }));
     return unwrap(res, 'Không tạo được danh mục');
   },
 

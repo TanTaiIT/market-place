@@ -6,7 +6,7 @@ import { FeedSearchCard } from './FeedSearchCard';
 import type { MyOrg } from '@/api/org';
 import type { Category } from '@/api/db';
 import type { ProvinceName } from '@/api/location';
-import { C, F, R } from '@/theme';
+import { C, F, G, R } from '@/theme';
 
 /**
  * Phần đầu bảng tin: khối chào nền xanh tràn lên đỉnh máy (dòng chào + nhóm + thẻ tìm), rồi hàng
@@ -62,7 +62,7 @@ export function FeedBar({
     <>
       <View onLayout={(e) => onTitleLayout(e.nativeEvent.layout.height)}>
         <LinearGradient
-          colors={[C.brand, C.brandDark]}
+          colors={G.brand}
           start={{ x: 0.15, y: 0 }}
           end={{ x: 0.9, y: 1 }}
           style={[styles.hero, { paddingTop: topInset + 10 }]}
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
     width: 230,
     height: 230,
     borderRadius: 115,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: C.glass,
   },
   // Xem `rail` bên `FeedGreeting`: RN gán sẵn `flexGrow/flexShrink: 1` cho mọi ScrollView.
   rail: { flexGrow: 0, flexShrink: 0 },

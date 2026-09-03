@@ -8,6 +8,8 @@ import {
   listJoinRequests,
   listOrgUnits,
   membershipList,
+  membershipMove,
+  membershipRemove,
   myJoinRequests,
   myOrganizations,
   organizationByCode,
@@ -150,6 +152,25 @@ export const orgApi = {
   async members(): Promise<Member[]> {
     const res = await withAuthRetry(() => membershipList({ query: { limit: 100 } }));
     return unwrap(res, 'Không tải được danh bạ thành viên');
+  },
+
+  /**
+   * Gỡ một người khỏi tổ chức đang thao tác.
+   *
+   * BE lưu trữ chứ không xoá bản ghi — danh bạ cũ là dữ liệu của tổ chức. Hai chốt bên đó:
+   * không tự gỡ mình (400), và không gỡ người cũng đang giữ quyền quản trị (403, cần master).
+   */
+  async removeMember(userId: string): Promise<void> {
+    const res = await withAuthRetry(() => membershipRemove({ path: { userId } }));
+    unwrap(res, 'Không gỡ được thành viên');
+  },
+
+  /** `unitId: null` = bỏ khỏi mọi nhóm con. KHÔNG đụng tới quyền — xem `membershipMove`. */
+  async moveMember(userId: string, unitId: string | null): Promise<Member> {
+    const res = await withAuthRetry(() =>
+      membershipMove({ path: { userId }, body: { unitId } }),
+    );
+    return unwrap(res, 'Không chuyển được nhóm con');
   },
 
   async joinRequests(status?: JoinRequestStatus): Promise<JoinRequestRow[]> {

@@ -76,8 +76,13 @@ type SdkResult<TPayload> = { data?: ApiEnvelope<TPayload>; error?: unknown };
  */
 export function unwrap<TPayload>(res: SdkResult<TPayload>, fallback: string): TPayload {
   if (res.error) {
-    const message = (res.error as { message?: unknown }).message;
-    throw new Error(typeof message === 'string' && message ? message : fallback);
+    const err = res.error as { message?: unknown; details?: { message?: string }[] };
+    // Lỗi validation của BE mang câu trả lời THẬT trong `details`, còn `message` chỉ là
+    // "Validation failed" — hiện mỗi câu đó thì người dùng không biết sửa gì. Lấy chi tiết
+    // đầu tiên: một lỗi đọc được còn hơn ba lỗi in đè nhau trong một toast.
+    const detail = err.details?.find((d) => d.message)?.message;
+    const message = typeof err.message === 'string' && err.message ? err.message : fallback;
+    throw new Error(detail ? `${message}: ${detail}` : message);
   }
   if (!res.data) throw new Error(fallback);
   return res.data.data;

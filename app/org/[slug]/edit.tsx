@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
   },
   coverEmptyText: { fontFamily: F.ui, fontSize: 13, color: C.inkSoft },
   coverBusy: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.35)',
     alignItems: 'center',
     justifyContent: 'center',

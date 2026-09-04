@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
   rowExact: { borderWidth: 2, borderColor: C.moss },
 
   cover: { width: 52, height: 52, borderRadius: 8, overflow: 'hidden', justifyContent: 'flex-end' },
-  coverImg: { ...StyleSheet.absoluteFillObject },
+  coverImg: { ...StyleSheet.absoluteFill },
   /** Nửa dưới đậm hơn — đủ để dải màu trông có chiều, không cần thư viện gradient. */
   coverHalf: { height: '55%', opacity: 0.85 },
   lock: {

@@ -244,7 +244,7 @@ function Rise({
 
 const styles = StyleSheet.create({
   root: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: C.desk,
     alignItems: 'center',
     justifyContent: 'center',

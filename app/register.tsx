@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -42,7 +42,10 @@ export default function Register() {
           contentContainerStyle={[styles.wrap, { paddingTop: insets.top + 30, paddingBottom: 40 }]}
           keyboardShouldPersistTaps="handled"
         >
-          <Animated.View entering={FadeInDown.duration(420).springify()} style={styles.card}>
+          {/* `entering` và `transform` (góc nghiêng trong styles.card) phải ở hai lớp khác nhau,
+              không thì layout animation ghi đè transform — Reanimated 4 cảnh báo lúc chạy. */}
+          <Animated.View entering={FadeInDown.duration(420).springify()}>
+          <View style={styles.card}>
             <Text style={styles.brand}>Tạo tài khoản</Text>
             <Text style={styles.tagline}>Tham gia bảng tin trường bạn</Text>
 
@@ -77,6 +80,7 @@ export default function Register() {
                 Đăng nhập
               </Text>
             </Text>
+          </View>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import type { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRequireAuth } from './GuestGate';
 import { useConversations } from '@/queries/chat';
@@ -25,7 +25,12 @@ const META: Record<string, { icon: string; label: string }> = {
   profile: { icon: '👤', label: 'Cá nhân' },
 };
 
-export function TabBar({ state, navigation }: BottomTabBarProps) {
+// Lấy type props của tab bar thẳng từ prop `tabBar` của `Tabs` thay vì import
+// `BottomTabBarProps` từ `@react-navigation/bottom-tabs`: expo-router (SDK 57+) vendor
+// bản react-navigation riêng, hai bộ type trùng tên nhưng không gán được cho nhau.
+type TabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>>[0];
+
+export function TabBar({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const requireAuth = useRequireAuth();

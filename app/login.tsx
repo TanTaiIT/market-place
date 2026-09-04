@@ -51,7 +51,10 @@ export default function Login() {
         >
           <Animated.View style={[styles.pinDrop, pinStyle]} />
 
-          <Animated.View entering={FadeInDown.delay(320).duration(450).springify()} style={styles.card}>
+          {/* `entering` và `transform` (góc nghiêng trong styles.card) phải ở hai lớp khác nhau,
+              không thì layout animation ghi đè transform — Reanimated 4 cảnh báo lúc chạy. */}
+          <Animated.View entering={FadeInDown.delay(320).duration(450).springify()}>
+          <View style={styles.card}>
             <Text style={styles.brand}>
               Ghim<Text style={{ color: C.pin }}>.</Text>
             </Text>
@@ -92,6 +95,7 @@ export default function Login() {
                 Đăng ký ngay
               </Text>
             </Text>
+          </View>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>

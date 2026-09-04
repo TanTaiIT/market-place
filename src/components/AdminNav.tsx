@@ -249,7 +249,7 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
 }
 
 const styles = StyleSheet.create({
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: C.scrim },
+  scrim: { ...StyleSheet.absoluteFill, backgroundColor: C.scrim },
   panel: {
     position: 'absolute',
     left: 0,

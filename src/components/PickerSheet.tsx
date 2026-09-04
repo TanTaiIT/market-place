@@ -160,7 +160,7 @@ function Row({
 }
 
 const styles = StyleSheet.create({
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: C.scrim },
+  scrim: { ...StyleSheet.absoluteFill, backgroundColor: C.scrim },
   sheet: {
     position: 'absolute',
     left: 0,

@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
   // Viền trắng chứ không phải `C.brand`: mặt thẻ đã là màu, thêm một màu nữa để đánh dấu thì hai
   // màu tranh nhau. (`'#fff'` là ngoại lệ được tha trong style.convention §1.)
   ring: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderWidth: 2,
     borderColor: '#fff',
     borderRadius: R.lg,

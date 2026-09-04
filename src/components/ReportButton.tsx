@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   trigger: { alignSelf: 'flex-start', marginTop: 8 },
   triggerText: { fontFamily: F.uiSemi, fontSize: 12, color: C.inkSoft },
 
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: C.scrim },
+  scrim: { ...StyleSheet.absoluteFill, backgroundColor: C.scrim },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   card: {
     width: '100%',

@@ -92,7 +92,6 @@ export const qk = {
   // đổi tổ chức xong vẫn đọc trúng cache của tổ chức cũ.
   joinRequestQueue: (orgSlug: string, status: string) =>
     ['join-requests', 'queue', orgSlug, status] as const,
-  orgUnits: (orgSlug: string) => ['orgs', 'units', orgSlug] as const,
   /** Danh bạ thành viên. Theo slug vì đổi tổ chức là đổi hẳn tập người, không phải lọc lại. */
   orgMembers: (orgSlug: string) => ['orgs', 'members', orgSlug] as const,
   /** Mang cả slug đang gõ, cùng lý do với `orgByCode` — mỗi slug là một câu trả lời khác. */
@@ -105,7 +104,7 @@ export const qk = {
   adminRoot: () => ['admin'] as const,
   /*
    * Bốn key dưới đây mang `orgSlug` vì dữ liệu của chúng scope theo `X-Org-Slug` — cùng lý do
-   * đã ghi ở `joinRequestQueue`/`orgUnits`. Thiếu slug thì master bấm "Thao tác trong" sang tổ
+   * đã ghi ở `joinRequestQueue`/`orgMembers`. Thiếu slug thì master bấm "Thao tác trong" sang tổ
    * chức khác vẫn đọc trúng cache của tổ chức cũ: thẻ số, hàng đợi và báo cáo của nơi khác hiện
    * dưới tên nơi này, và không có gì trên màn hình nói ra điều đó.
    */

@@ -1,16 +1,16 @@
 import React from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AdminScreen } from '@/components/AdminScreen';
-import { AdminPickerField, AdminSmallBtn } from '@/components/AdminPicker';
+import { AdminSmallBtn } from '@/components/AdminPicker';
 import { Avatar, EmptyState, Loading } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { initialsOf } from '@/api/client';
-import { useMoveMember, useOrgRoster, useOrgUnits, useRemoveMember } from '@/queries/org';
+import { useOrgRoster, useRemoveMember } from '@/queries/org';
 import type { Member } from '@/api/org';
 import { C, F } from '@/theme';
 
 /**
- * Danh bạ thành viên của tổ chức đang thao tác — gỡ người, và xếp người vào nhóm con.
+ * Danh bạ thành viên của tổ chức đang thao tác — ai đang ở trong nhóm, và gỡ người ra.
  *
  * Trước màn này, vòng đời thành viên chỉ có chiều VÀO: duyệt đơn, nhận lời mời, master trao
  * quyền chủ. Chiều ra thì không có đường nào ngoài xoá tài khoản, nên một người vào nhầm nhóm
@@ -30,15 +30,11 @@ const ROLE_LABEL: Record<Member['role'], string> = {
 export default function AdminMembers() {
   const toast = useToast();
   const roster = useOrgRoster();
-  const { data: units } = useOrgUnits();
   const remove = useRemoveMember();
-  const move = useMoveMember();
-
-  const unitName = (id: string | null) => units?.find((u) => u.id === id)?.name;
 
   const confirmRemove = (m: Member) =>
     // Gỡ người là thao tác CẮT quyền đọc mọi tin nội bộ của họ, có hiệu lực ngay — cùng hạng
-    // với khoá tổ chức, nên nó hỏi lại. Chuyển nhóm con thì không: nó không lấy đi của ai gì cả.
+    // với khoá tổ chức, nên nó hỏi lại.
     Alert.alert(
       'Gỡ khỏi nhóm?',
       `${m.name} sẽ mất quyền xem tin nội bộ ngay lập tức. Họ vẫn xin vào lại được.`,
@@ -75,33 +71,10 @@ export default function AdminMembers() {
                     </Text>
                     <Text style={styles.meta}>
                       {ROLE_LABEL[m.role]}
-                      {unitName(m.unitId) ? ` · ${unitName(m.unitId)}` : ''}
                       {m.trustLevel !== undefined ? ` · uy tín ${m.trustLevel}` : ''}
                     </Text>
                   </View>
                 </View>
-
-                {/* Chỉ dựng khi tổ chức CÓ nhóm con: org phẳng (`capabilities.hasUnits: false`)
-                    thì BE từ chối mọi nhóm con, và một ô chọn rỗng chỉ để người ta bấm vào lỗi. */}
-                {!!units?.length && (
-                  <AdminPickerField
-                    label=""
-                    title="Xếp vào nhóm con"
-                    placeholder={unitName(m.unitId) ?? 'Chưa thuộc nhóm con nào'}
-                    items={units.map((u) => ({ key: u.id, label: u.name }))}
-                    emptyLabel="Bỏ khỏi nhóm con"
-                    value={m.unitId}
-                    onChange={(unitId) =>
-                      move.mutate(
-                        { userId: m.userId, unitId },
-                        {
-                          onSuccess: () => toast('✓ Đã chuyển nhóm con'),
-                          onError: (e: Error) => toast(`⚠️ ${e.message}`),
-                        },
-                      )
-                    }
-                  />
-                )}
 
                 <View style={styles.acts}>
                   <AdminSmallBtn label="Gỡ khỏi nhóm" onPress={() => confirmRemove(m)} />

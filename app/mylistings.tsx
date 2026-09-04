@@ -6,15 +6,44 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ListingPhoto } from '@/components/ListingPhoto';
 import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
-import { useDeleteListing, useMyListings, useQuota } from '@/queries/listings';
+import { expiryLabel } from '@/api/client';
+import type { Listing } from '@/api/db';
+import {
+  useDeleteListing,
+  useMarkListingSold,
+  useMyListings,
+  useQuota,
+  useRenewListing,
+} from '@/queries/listings';
 import { C, F, shadow } from '@/theme';
+
+/**
+ * Nhãn + bảng màu cho BỐN trạng thái người bán thấy được.
+ *
+ * Một bảng tra chứ không chuỗi ba tầng ternary trong JSX: thêm trạng thái thứ năm ở đây là
+ * thêm một dòng, còn trong JSX là sửa ba biểu thức lồng nhau ở ba chỗ khác nhau.
+ */
+const BADGE: Record<Listing['status'], { label: string; bg: string; fg: string }> = {
+  live: { label: 'Đang hiển thị', bg: C.mossLight, fg: C.moss },
+  pending: { label: 'Chờ duyệt', bg: '#FDEFD9', fg: C.corkDark },
+  expired: { label: 'Hết hạn', bg: C.dangerLt, fg: C.pinDark },
+  sold: { label: 'Đã bán', bg: C.sand, fg: C.inkSoft },
+};
 
 export default function MyListings() {
   const router = useRouter();
   const toast = useToast();
   const { data, error, isLoading } = useMyListings();
   const del = useDeleteListing();
+  const renew = useRenewListing();
+  const sold = useMarkListingSold();
   const quota = useQuota();
+
+  /*
+   * Cùng một cửa lỗi cho ba mutation — toast, không alert. Ba nút này đều là hành động một
+   * bước trên một dòng, không có gì để xác nhận lại.
+   */
+  const showError = (e: Error) => toast(`⚠️ ${e.message}`);
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -52,23 +81,38 @@ export default function MyListings() {
                 {item.title}
               </Text>
               <Text style={styles.price}>{item.price}</Text>
-              <View
-                style={[
-                  styles.badge,
-                  { backgroundColor: item.status === 'live' ? C.mossLight : '#FDEFD9' },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.badgeText,
-                    { color: item.status === 'live' ? C.moss : C.corkDark },
-                  ]}
-                >
-                  {item.status === 'live' ? 'Đang hiển thị' : 'Chờ duyệt'}
-                </Text>
+              <View style={styles.badgeRow}>
+                <View style={[styles.badge, { backgroundColor: BADGE[item.status].bg }]}>
+                  <Text style={[styles.badgeText, { color: BADGE[item.status].fg }]}>
+                    {BADGE[item.status].label}
+                  </Text>
+                </View>
+                {/* Chỉ hiện khi hạn đã tới hoặc còn dưới 7 ngày — `expiryLabel` tự trả
+                    `undefined` cho tin còn dài hạn, đừng nhắc thứ chưa cần nhắc. */}
+                {item.status === 'live' || item.status === 'expired' ? (
+                  <Text style={styles.due}>{expiryLabel(item.expiresAt, item.status === 'expired')}</Text>
+                ) : null}
               </View>
             </View>
             <View style={{ gap: 6, justifyContent: 'center' }}>
+              {/* Hết hạn thì gia hạn; đang hiển thị thì đánh dấu đã bán. Tin `sold`/`pending`
+                  không có phép chuyển nào của chủ tin — BE trả 400, nên đừng vẽ nút. */}
+              {item.status === 'expired' ? (
+                <Pressable
+                  style={[styles.iconBtn, { backgroundColor: C.brandLt }]}
+                  onPress={() => renew.mutate(item.id, { onError: showError })}
+                >
+                  <Text style={{ fontSize: 12 }}>↻</Text>
+                </Pressable>
+              ) : null}
+              {item.status === 'live' ? (
+                <Pressable
+                  style={[styles.iconBtn, { backgroundColor: C.mossLight }]}
+                  onPress={() => sold.mutate(item.id, { onError: showError })}
+                >
+                  <Text style={{ fontSize: 12 }}>✓</Text>
+                </Pressable>
+              ) : null}
               <Pressable
                 style={styles.iconBtn}
                 onPress={() => router.push(`/listing/edit/${item.id}`)}
@@ -129,7 +173,9 @@ const styles = StyleSheet.create({
   photoRadius: { borderRadius: 6 },
   title: { fontFamily: F.uiBold, fontSize: 13, color: C.ink, marginBottom: 3 },
   price: { fontFamily: F.monoBold, fontSize: 12, color: C.moss, marginBottom: 4 },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   badge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
+  due: { fontFamily: F.ui, fontSize: 10, color: C.inkSoft },
   badgeText: { fontFamily: F.uiBold, fontSize: 9.5 },
   iconBtn: {
     width: 28,

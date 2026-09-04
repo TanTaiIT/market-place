@@ -150,6 +150,7 @@ export type MyOrganization = {
     role: string;
     unitId: string | null;
     feedLayout: 'feed' | 'grid';
+    status: 'active' | 'suspended' | 'pending_admin';
 };
 
 export type UpdateOrganization = {
@@ -234,6 +235,17 @@ export type PostingStanding = {
     } | null;
 };
 
+export type StaleListing = {
+    _id: string;
+    title: string;
+    /**
+     * Ảnh bìa; rỗng nếu tin không có ảnh nào
+     */
+    image: string;
+    status: 'draft' | 'pending' | 'pending_unverified' | 'active' | 'sold' | 'expired' | 'rejected' | 'hidden';
+    expiresAt: string | null;
+};
+
 export type QuotaStatus = {
     allowed: boolean;
     limit: number;
@@ -242,6 +254,10 @@ export type QuotaStatus = {
     reason?: 'blocked_by_rejections' | 'quota_full';
     fee: PostingFee;
     standing: PostingStanding;
+    /**
+     * Tin đã hết hạn hoặc sắp hết hạn trong 7 ngày, cũ nhất trước, tối đa 20 tin. Client dùng để chặn lại và hỏi về tin cũ trước khi cho đăng tin mới.
+     */
+    needsReconcile: Array<StaleListing>;
 };
 
 export type PostingStats = {
@@ -330,25 +346,6 @@ export type Listing = {
 export type FavoriteStatus = {
     listingId: string;
     favorited: boolean;
-};
-
-export type CreateOrgUnit = {
-    name: string;
-    moderatorId?: string | null;
-    parentUnitId?: string | null;
-};
-
-export type UpdateOrgUnit = {
-    name?: string;
-    moderatorId?: string | null;
-    parentUnitId?: string | null;
-};
-
-export type OrgUnit = {
-    id: string;
-    name: string;
-    moderatorId: string | null;
-    parentUnitId: string | null;
 };
 
 export type CreateJoinRequest = {
@@ -798,10 +795,6 @@ export type SetOrgVisibility = {
     isPublic: boolean;
 };
 
-export type MoveMember = {
-    unitId: string | null;
-};
-
 export type BannedPhrase = {
     _id: string;
     phrase: string;
@@ -1219,6 +1212,135 @@ export type UserSetStatusResponses = {
 };
 
 export type UserSetStatusResponse = UserSetStatusResponses[keyof UserSetStatusResponses];
+
+export type ListingBumpData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/listings/{id}/bump';
+};
+
+export type ListingBumpErrors = {
+    /**
+     * Tin không ở trạng thái hiển thị trên bảng tin
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Không đủ hạng để đẩy tin ở trục của tin này
+     */
+    403: ErrorResponse;
+    /**
+     * Tin không tồn tại, hoặc thuộc tổ chức bạn không có phần nào trong đó
+     */
+    404: ErrorResponse;
+};
+
+export type ListingBumpError = ListingBumpErrors[keyof ListingBumpErrors];
+
+export type ListingBumpResponses = {
+    /**
+     * Đã đẩy tin
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Listing;
+    };
+};
+
+export type ListingBumpResponse = ListingBumpResponses[keyof ListingBumpResponses];
+
+export type ListingRenewData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/listings/{id}/renew';
+};
+
+export type ListingRenewErrors = {
+    /**
+     * Tin không ở trạng thái gia hạn được
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Tin không phải của bạn
+     */
+    403: ErrorResponse;
+    /**
+     * Tin không tồn tại
+     */
+    404: ErrorResponse;
+};
+
+export type ListingRenewError = ListingRenewErrors[keyof ListingRenewErrors];
+
+export type ListingRenewResponses = {
+    /**
+     * Đã gia hạn
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Listing;
+    };
+};
+
+export type ListingRenewResponse = ListingRenewResponses[keyof ListingRenewResponses];
+
+export type ListingMarkSoldData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/listings/{id}/sold';
+};
+
+export type ListingMarkSoldErrors = {
+    /**
+     * Tin không ở trạng thái đánh dấu được
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Tin không phải của bạn
+     */
+    403: ErrorResponse;
+    /**
+     * Tin không tồn tại
+     */
+    404: ErrorResponse;
+};
+
+export type ListingMarkSoldError = ListingMarkSoldErrors[keyof ListingMarkSoldErrors];
+
+export type ListingMarkSoldResponses = {
+    /**
+     * Đã đánh dấu đã bán
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Listing;
+    };
+};
+
+export type ListingMarkSoldResponse = ListingMarkSoldResponses[keyof ListingMarkSoldResponses];
 
 export type ListingListData = {
     body?: never;
@@ -2174,121 +2296,6 @@ export type OrganizationSlugAvailabilityResponses = {
 
 export type OrganizationSlugAvailabilityResponse = OrganizationSlugAvailabilityResponses[keyof OrganizationSlugAvailabilityResponses];
 
-export type ListOrgUnitsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/org-units';
-};
-
-export type ListOrgUnitsResponses = {
-    /**
-     * Danh sách nhóm
-     */
-    200: {
-        success: true;
-        message: string;
-        data: Array<OrgUnit>;
-    };
-};
-
-export type ListOrgUnitsResponse = ListOrgUnitsResponses[keyof ListOrgUnitsResponses];
-
-export type CreateOrgUnitData = {
-    body?: CreateOrgUnit;
-    path?: never;
-    query?: never;
-    url: '/org-units';
-};
-
-export type CreateOrgUnitErrors = {
-    /**
-     * Cần quyền quản lý tổ chức
-     */
-    403: ErrorResponse;
-    /**
-     * Trùng tên nhóm trong tổ chức
-     */
-    409: ErrorResponse;
-};
-
-export type CreateOrgUnitError = CreateOrgUnitErrors[keyof CreateOrgUnitErrors];
-
-export type CreateOrgUnitResponses = {
-    /**
-     * Đã tạo
-     */
-    201: {
-        success: true;
-        message: string;
-        data: OrgUnit;
-    };
-};
-
-export type CreateOrgUnitResponse = CreateOrgUnitResponses[keyof CreateOrgUnitResponses];
-
-export type DeleteOrgUnitData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/org-units/{id}';
-};
-
-export type DeleteOrgUnitErrors = {
-    /**
-     * Cần quyền quản lý tổ chức
-     */
-    403: ErrorResponse;
-};
-
-export type DeleteOrgUnitError = DeleteOrgUnitErrors[keyof DeleteOrgUnitErrors];
-
-export type DeleteOrgUnitResponses = {
-    /**
-     * Đã xoá
-     */
-    200: {
-        success: true;
-        message: string;
-        data: OrgUnit;
-    };
-};
-
-export type DeleteOrgUnitResponse = DeleteOrgUnitResponses[keyof DeleteOrgUnitResponses];
-
-export type UpdateOrgUnitData = {
-    body?: UpdateOrgUnit;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/org-units/{id}';
-};
-
-export type UpdateOrgUnitErrors = {
-    /**
-     * Cần quyền quản lý tổ chức
-     */
-    403: ErrorResponse;
-};
-
-export type UpdateOrgUnitError = UpdateOrgUnitErrors[keyof UpdateOrgUnitErrors];
-
-export type UpdateOrgUnitResponses = {
-    /**
-     * Đã cập nhật
-     */
-    200: {
-        success: true;
-        message: string;
-        data: OrgUnit;
-    };
-};
-
-export type UpdateOrgUnitResponse = UpdateOrgUnitResponses[keyof UpdateOrgUnitResponses];
-
 export type ListJoinRequestsData = {
     body?: never;
     path?: never;
@@ -2523,7 +2530,7 @@ export type MembershipListErrors = {
      */
     401: ErrorResponse;
     /**
-     * Cần quyền owner hoặc moderator của tổ chức
+     * Không phải thành viên, và cũng không có quyền quản tổ chức này
      */
     403: ErrorResponse;
 };
@@ -2593,45 +2600,6 @@ export type MembershipRemoveResponses = {
 };
 
 export type MembershipRemoveResponse = MembershipRemoveResponses[keyof MembershipRemoveResponses];
-
-export type MembershipMoveData = {
-    body?: MoveMember;
-    path: {
-        userId: string;
-    };
-    query?: never;
-    url: '/memberships/{userId}';
-};
-
-export type MembershipMoveErrors = {
-    /**
-     * Thiếu hoặc sai access token
-     */
-    401: ErrorResponse;
-    /**
-     * Cần quyền quản trị tổ chức
-     */
-    403: ErrorResponse;
-    /**
-     * Người này không còn trong nhóm
-     */
-    404: ErrorResponse;
-};
-
-export type MembershipMoveError = MembershipMoveErrors[keyof MembershipMoveErrors];
-
-export type MembershipMoveResponses = {
-    /**
-     * Đã chuyển
-     */
-    200: {
-        success: true;
-        message: string;
-        data: Member;
-    };
-};
-
-export type MembershipMoveResponse = MembershipMoveResponses[keyof MembershipMoveResponses];
 
 export type InviteListData = {
     body?: never;

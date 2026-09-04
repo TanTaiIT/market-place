@@ -98,8 +98,28 @@ function refreshOnce(): Promise<string | null> {
  * KHÔNG còn gộp "không thuộc org này" vào đây như bản v1: ở v2 quan hệ thành viên là thứ đổi
  * được trong lúc dùng (bị gỡ khỏi tổ chức), mà PHIÊN ĐĂNG NHẬP thì vẫn tốt nguyên. Đăng xuất
  * người ta vì lý do đó là phản ứng sai — đúng ra chỉ cần bỏ chọn org.
+ *
+ * Chính lý lẽ đó áp cho org BỊ KHOÁ, nên nó cũng không còn là một đường đăng xuất: xem
+ * `isOrgGone` và nhánh xử nó trong `withAuthRetry`.
  */
 const ORG_GONE_ERRORS = ['Organization đã bị khoá', 'Organization không tồn tại'];
+
+/**
+ * Bỏ chọn org đang thao tác. Do `queries/auth` đẩy vào — `src/api/**` không được import
+ * `stores/**` (folder.convention §6), cùng cách `setSessionRefresher` làm.
+ */
+let orgGoneHandler: (() => void) | null = null;
+
+export function setOrgGoneHandler(next: (() => void) | null): void {
+  orgGoneHandler = next;
+}
+
+/** Org đang chọn đã bị khoá/xoá — LỰA CHỌN cũ, không phải phiên chết. */
+function isOrgGone(outcome: SdkOutcome): boolean {
+  if (outcome.response?.status !== 403) return false;
+  const message = errorMessage(outcome);
+  return ORG_GONE_ERRORS.some((s) => message.includes(s));
+}
 
 /**
  * Endpoint DUY NHẤT mà 404 mang nghĩa "phiên trỏ tới một user không còn tồn tại". Ở mọi đường
@@ -115,29 +135,24 @@ function errorMessage(outcome: SdkOutcome): string {
 }
 
 /**
- * Phiên không còn dùng được nữa — hoặc vì token hết hạn (cứu được bằng refresh), hoặc vì thứ
- * đứng sau token đã biến mất (user/org bị xoá; chỉ còn đường đăng xuất). Gộp chung vì cả hai
- * đi qua đúng một lối: thử refresh một lần, refresh hỏng thì `refreshSession` dọn phiên.
+ * Phiên KHÔNG còn dùng được: token hết hạn (cứu được bằng refresh), hoặc danh tính đứng sau
+ * token đã biến mất (chỉ còn đường đăng xuất). Gộp hai ca vì chúng đi cùng một lối: thử refresh
+ * một lần, refresh hỏng thì `refreshSession` dọn phiên.
  *
- * BE trả bốn dạng khác nhau, phải nhận đủ:
+ * Đúng hai dạng, và cả hai đều nói về NGƯỜI DÙNG:
  *  - **401** — route có `authenticate`, hoặc `/auth/refresh` khi user đã bị xoá
  *    (`User no longer valid`).
- *  - **400** `Missing tenant context` — route đọc collection có tenant mà `resolveTenant`
- *    không mở được scope; `tenantPlugin` fail-closed ném trước khi tới `authenticate` nào cả.
- *  - **403** — org trong token đã bị xoá/khoá, hoặc token thuộc org khác.
- *  - **404 trên `/users/me`** — user bị xoá khỏi DB **nhưng org vẫn còn**. Đây là trường hợp
- *    duy nhất không có mã 4xx nào khác báo hiệu: `authenticate` dựng `req.user` thẳng từ JWT
- *    mà không tra DB, nên `GET /listings` vẫn trả **200** như thường và app không hề hay biết
- *    mình đang chạy bằng danh tính của một người không còn tồn tại.
+ *  - **404 trên `/users/me`** — user bị xoá khỏi DB. Đây là trường hợp duy nhất không có mã
+ *    4xx nào khác báo hiệu: `authenticate` dựng `req.user` thẳng từ JWT mà không tra DB, nên
+ *    `GET /listings` vẫn trả **200** như thường và app không hề hay biết mình đang chạy bằng
+ *    danh tính của một người không còn tồn tại.
+ *
+ * 403 org-bị-khoá KHÔNG nằm ở đây — đó là lựa chọn org cũ, không phải phiên chết (`isOrgGone`).
+ * 400 `Missing tenant context` cũng không: chưa chọn org là trạng thái hợp lệ, không phải lỗi phiên.
  */
 function isDeadSession(outcome: SdkOutcome): boolean {
   const status = outcome.response?.status;
   if (status === 401) return true;
-
-  if (status === 403) {
-    const message = errorMessage(outcome);
-    return ORG_GONE_ERRORS.some((s) => message.includes(s));
-  }
 
   // `response.url` là URL tuyệt đối đã resolve, nên so bằng `includes` chứ không phải `===`.
   if (status === 404) return (outcome.response?.url ?? '').includes(ME_ENDPOINT);
@@ -156,7 +171,24 @@ function isDeadSession(outcome: SdkOutcome): boolean {
 export async function withAuthRetry<T extends SdkOutcome>(call: () => Promise<T>): Promise<T> {
   const sentWith = generation;
   const first = await call();
-  // Chưa đăng nhập thì 401/403/404 là lỗi thật của request, không phải phiên hỏng.
+
+  /*
+   * Org đang chọn đã bị khoá: bỏ chọn nó rồi trả lỗi về cho call-site, KHÔNG refresh.
+   *
+   * Refresh ở đây vừa vô nghĩa vừa tự sát: `auth.service.refresh` bên BE không đọc org, mà
+   * request refresh thì cũng mang đúng cái `X-Org-Slug` đó nên nó hỏng y hệt — rồi
+   * `refreshSession` dọn phiên và app đăng xuất người dùng vì một lý do không liên quan gì
+   * tới phiên của họ. (BE giờ cũng miễn tenant cho `/auth/*`; đây là chốt thứ hai.)
+   *
+   * Không gọi lại ngay: header org đọc từ `activeOrgSlug` của module này, mà giá trị đó chỉ
+   * đổi sau khi store re-render đẩy xuống — gọi lại lập tức là gửi đúng slug vừa bị từ chối.
+   */
+  if (isOrgGone(first)) {
+    orgGoneHandler?.();
+    return first;
+  }
+
+  // Chưa đăng nhập thì 401/404 là lỗi thật của request, không phải phiên hỏng.
   if (!session || !isDeadSession(first)) return first;
 
   // Phiên đã được làm mới trong lúc request này đang bay: nó chỉ hỏng vì mang token cũ, gọi lại

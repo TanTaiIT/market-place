@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ApproveJoinRequestData, ApproveJoinRequestErrors, ApproveJoinRequestResponses, AuthLoginData, AuthLoginErrors, AuthLoginResponses, AuthRefreshData, AuthRefreshErrors, AuthRefreshResponses, AuthRegisterData, AuthRegisterErrors, AuthRegisterResponses, BannedPhraseCreateData, BannedPhraseCreateErrors, BannedPhraseCreateResponses, BannedPhraseListData, BannedPhraseListErrors, BannedPhraseListResponses, BannedPhraseRemoveData, BannedPhraseRemoveErrors, BannedPhraseRemoveResponses, BulkApproveJoinRequestsData, BulkApproveJoinRequestsErrors, BulkApproveJoinRequestsResponses, CancelJoinRequestData, CancelJoinRequestErrors, CancelJoinRequestResponses, CategoryGetByIdData, CategoryGetByIdErrors, CategoryGetByIdResponses, CategoryGetTemplateData, CategoryGetTemplateErrors, CategoryGetTemplateResponses, CategoryListData, CategoryListErrors, CategoryListResponses, CategoryTemplateCreateDraftData, CategoryTemplateCreateDraftErrors, CategoryTemplateCreateDraftResponses, CategoryTemplatePublishData, CategoryTemplatePublishErrors, CategoryTemplatePublishResponses, CategoryTemplateUpdateDraftData, CategoryTemplateUpdateDraftErrors, CategoryTemplateUpdateDraftResponses, ChangeOrganizationSlugData, ChangeOrganizationSlugErrors, ChangeOrganizationSlugResponses, ChatGetByIdData, ChatGetByIdErrors, ChatGetByIdResponses, ChatListData, ChatListErrors, ChatListResponses, ChatMarkReadData, ChatMarkReadErrors, ChatMarkReadResponses, ChatMessagesData, ChatMessagesErrors, ChatMessagesResponses, ChatOpenData, ChatOpenErrors, ChatOpenResponses, ChatSendData, ChatSendErrors, ChatSendResponses, CreateCategoryData, CreateCategoryErrors, CreateCategoryResponses, CreateJoinRequestData, CreateJoinRequestErrors, CreateJoinRequestResponses, CreateOrganizationData, CreateOrganizationErrors, CreateOrganizationResponses, CreateOrgUnitData, CreateOrgUnitErrors, CreateOrgUnitResponses, CreateRoleGrantData, CreateRoleGrantErrors, CreateRoleGrantResponses, DefaultTemplateCreateDraftData, DefaultTemplateCreateDraftErrors, DefaultTemplateCreateDraftResponses, DefaultTemplateGetData, DefaultTemplateGetErrors, DefaultTemplateGetResponses, DefaultTemplatePublishData, DefaultTemplatePublishErrors, DefaultTemplatePublishResponses, DefaultTemplateUpdateDraftData, DefaultTemplateUpdateDraftErrors, DefaultTemplateUpdateDraftResponses, DeleteOrgUnitData, DeleteOrgUnitErrors, DeleteOrgUnitResponses, FavoriteAddData, FavoriteAddErrors, FavoriteAddResponses, FavoriteIdsData, FavoriteIdsErrors, FavoriteIdsResponses, FavoriteListData, FavoriteListErrors, FavoriteListResponses, FavoriteRemoveData, FavoriteRemoveErrors, FavoriteRemoveResponses, FieldDefinitionCreateData, FieldDefinitionCreateErrors, FieldDefinitionCreateResponses, FieldDefinitionListData, FieldDefinitionListErrors, FieldDefinitionListResponses, InviteAcceptData, InviteAcceptErrors, InviteAcceptResponses, InviteCreateData, InviteCreateErrors, InviteCreateResponses, InviteListData, InviteListErrors, InviteListResponses, InviteMineData, InviteMineErrors, InviteMineResponses, InvitePreviewData, InvitePreviewErrors, InvitePreviewResponses, InviteRevokeData, InviteRevokeErrors, InviteRevokeResponses, ListingCreateData, ListingCreateErrors, ListingCreateResponses, ListingGetByIdData, ListingGetByIdErrors, ListingGetByIdResponses, ListingListData, ListingListErrors, ListingListResponses, ListingMineData, ListingMineErrors, ListingMineResponses, ListingNearbyData, ListingNearbyErrors, ListingNearbyResponses, ListingPostingStatsData, ListingPostingStatsErrors, ListingPostingStatsResponses, ListingProductAdminListData, ListingProductAdminListErrors, ListingProductAdminListResponses, ListingProductCreateData, ListingProductCreateErrors, ListingProductCreateResponses, ListingProductRemoveData, ListingProductRemoveErrors, ListingProductRemoveResponses, ListingProductsData, ListingProductsResponses, ListingProductUpdateData, ListingProductUpdateErrors, ListingProductUpdateResponses, ListingQuotaData, ListingQuotaResponses, ListingRemoveData, ListingRemoveErrors, ListingRemoveResponses, ListingUpdateData, ListingUpdateErrors, ListingUpdateResponses, ListJoinRequestsData, ListJoinRequestsErrors, ListJoinRequestsResponses, ListOrganizationsData, ListOrganizationsErrors, ListOrganizationsResponses, ListOrgUnitsData, ListOrgUnitsResponses, LocationProvincesData, LocationProvincesResponses, LocationWardsData, LocationWardsErrors, LocationWardsResponses, MembershipListData, MembershipListErrors, MembershipListResponses, MembershipMoveData, MembershipMoveErrors, MembershipMoveResponses, MembershipRemoveData, MembershipRemoveErrors, MembershipRemoveResponses, ModerationActivityData, ModerationActivityErrors, ModerationActivityResponses, ModerationCoverageData, ModerationCoverageErrors, ModerationCoverageResponses, ModerationListingsData, ModerationListingsErrors, ModerationListingsResponses, ModerationOverviewData, ModerationOverviewErrors, ModerationOverviewResponses, ModerationPublicOverviewData, ModerationPublicOverviewErrors, ModerationPublicOverviewResponses, ModerationPublicQueueData, ModerationPublicQueueErrors, ModerationPublicQueueResponses, ModerationRemoveListingData, ModerationRemoveListingErrors, ModerationRemoveListingResponses, ModerationRerouteListingData, ModerationRerouteListingErrors, ModerationRerouteListingResponses, ModerationSetListingStatusData, ModerationSetListingStatusErrors, ModerationSetListingStatusResponses, MyJoinRequestsData, MyJoinRequestsResponses, MyOrganizationsData, MyOrganizationsErrors, MyOrganizationsResponses, MyRoleGrantsData, MyRoleGrantsResponses, NotificationCreateData, NotificationCreateErrors, NotificationCreateResponses, NotificationListData, NotificationListErrors, NotificationListResponses, NotificationMarkReadData, NotificationMarkReadErrors, NotificationMarkReadResponses, OrganizationByCodeData, OrganizationByCodeErrors, OrganizationByCodeResponses, OrganizationGrantAdminData, OrganizationGrantAdminErrors, OrganizationGrantAdminResponses, OrganizationLookupData, OrganizationLookupErrors, OrganizationLookupResponses, OrganizationPublicProfileData, OrganizationPublicProfileErrors, OrganizationPublicProfileResponses, OrganizationRotateJoinCodeData, OrganizationRotateJoinCodeErrors, OrganizationRotateJoinCodeResponses, OrganizationSlugAvailabilityData, OrganizationSlugAvailabilityErrors, OrganizationSlugAvailabilityResponses, OrganizationUpdateData, OrganizationUpdateErrors, OrganizationUpdateResponses, RejectJoinRequestData, RejectJoinRequestErrors, RejectJoinRequestResponses, ReportCreateData, ReportCreateErrors, ReportCreateResponses, ReportListData, ReportListErrors, ReportListResponses, ReportResolveData, ReportResolveErrors, ReportResolveResponses, RevokeRoleGrantData, RevokeRoleGrantErrors, RevokeRoleGrantResponses, SetOrganizationStatusData, SetOrganizationStatusErrors, SetOrganizationStatusResponses, SetOrganizationVisibilityData, SetOrganizationVisibilityErrors, SetOrganizationVisibilityResponses, UpdateCategoryData, UpdateCategoryErrors, UpdateCategoryResponses, UpdateOrgUnitData, UpdateOrgUnitErrors, UpdateOrgUnitResponses, UserClearRejectionsData, UserClearRejectionsErrors, UserClearRejectionsResponses, UserDeleteMeData, UserDeleteMeErrors, UserDeleteMeResponses, UserGetByIdData, UserGetByIdErrors, UserGetByIdResponses, UserGetMeData, UserGetMeErrors, UserGetMeResponses, UserListForAdminData, UserListForAdminErrors, UserListForAdminResponses, UserSetStatusData, UserSetStatusErrors, UserSetStatusResponses, UserUpdateMeData, UserUpdateMeErrors, UserUpdateMeResponses, WalletAdjustData, WalletAdjustErrors, WalletAdjustResponses, WalletGetData, WalletGetErrors, WalletGetResponses, WalletHistoryData, WalletHistoryErrors, WalletHistoryResponses } from './types.gen';
+import type { ApproveJoinRequestData, ApproveJoinRequestErrors, ApproveJoinRequestResponses, AuthLoginData, AuthLoginErrors, AuthLoginResponses, AuthRefreshData, AuthRefreshErrors, AuthRefreshResponses, AuthRegisterData, AuthRegisterErrors, AuthRegisterResponses, BannedPhraseCreateData, BannedPhraseCreateErrors, BannedPhraseCreateResponses, BannedPhraseListData, BannedPhraseListErrors, BannedPhraseListResponses, BannedPhraseRemoveData, BannedPhraseRemoveErrors, BannedPhraseRemoveResponses, BulkApproveJoinRequestsData, BulkApproveJoinRequestsErrors, BulkApproveJoinRequestsResponses, CancelJoinRequestData, CancelJoinRequestErrors, CancelJoinRequestResponses, CategoryGetByIdData, CategoryGetByIdErrors, CategoryGetByIdResponses, CategoryGetTemplateData, CategoryGetTemplateErrors, CategoryGetTemplateResponses, CategoryListData, CategoryListErrors, CategoryListResponses, CategoryTemplateCreateDraftData, CategoryTemplateCreateDraftErrors, CategoryTemplateCreateDraftResponses, CategoryTemplatePublishData, CategoryTemplatePublishErrors, CategoryTemplatePublishResponses, CategoryTemplateUpdateDraftData, CategoryTemplateUpdateDraftErrors, CategoryTemplateUpdateDraftResponses, ChangeOrganizationSlugData, ChangeOrganizationSlugErrors, ChangeOrganizationSlugResponses, ChatGetByIdData, ChatGetByIdErrors, ChatGetByIdResponses, ChatListData, ChatListErrors, ChatListResponses, ChatMarkReadData, ChatMarkReadErrors, ChatMarkReadResponses, ChatMessagesData, ChatMessagesErrors, ChatMessagesResponses, ChatOpenData, ChatOpenErrors, ChatOpenResponses, ChatSendData, ChatSendErrors, ChatSendResponses, CreateCategoryData, CreateCategoryErrors, CreateCategoryResponses, CreateJoinRequestData, CreateJoinRequestErrors, CreateJoinRequestResponses, CreateOrganizationData, CreateOrganizationErrors, CreateOrganizationResponses, CreateRoleGrantData, CreateRoleGrantErrors, CreateRoleGrantResponses, DefaultTemplateCreateDraftData, DefaultTemplateCreateDraftErrors, DefaultTemplateCreateDraftResponses, DefaultTemplateGetData, DefaultTemplateGetErrors, DefaultTemplateGetResponses, DefaultTemplatePublishData, DefaultTemplatePublishErrors, DefaultTemplatePublishResponses, DefaultTemplateUpdateDraftData, DefaultTemplateUpdateDraftErrors, DefaultTemplateUpdateDraftResponses, FavoriteAddData, FavoriteAddErrors, FavoriteAddResponses, FavoriteIdsData, FavoriteIdsErrors, FavoriteIdsResponses, FavoriteListData, FavoriteListErrors, FavoriteListResponses, FavoriteRemoveData, FavoriteRemoveErrors, FavoriteRemoveResponses, FieldDefinitionCreateData, FieldDefinitionCreateErrors, FieldDefinitionCreateResponses, FieldDefinitionListData, FieldDefinitionListErrors, FieldDefinitionListResponses, InviteAcceptData, InviteAcceptErrors, InviteAcceptResponses, InviteCreateData, InviteCreateErrors, InviteCreateResponses, InviteListData, InviteListErrors, InviteListResponses, InviteMineData, InviteMineErrors, InviteMineResponses, InvitePreviewData, InvitePreviewErrors, InvitePreviewResponses, InviteRevokeData, InviteRevokeErrors, InviteRevokeResponses, ListingBumpData, ListingBumpErrors, ListingBumpResponses, ListingCreateData, ListingCreateErrors, ListingCreateResponses, ListingGetByIdData, ListingGetByIdErrors, ListingGetByIdResponses, ListingListData, ListingListErrors, ListingListResponses, ListingMarkSoldData, ListingMarkSoldErrors, ListingMarkSoldResponses, ListingMineData, ListingMineErrors, ListingMineResponses, ListingNearbyData, ListingNearbyErrors, ListingNearbyResponses, ListingPostingStatsData, ListingPostingStatsErrors, ListingPostingStatsResponses, ListingProductAdminListData, ListingProductAdminListErrors, ListingProductAdminListResponses, ListingProductCreateData, ListingProductCreateErrors, ListingProductCreateResponses, ListingProductRemoveData, ListingProductRemoveErrors, ListingProductRemoveResponses, ListingProductsData, ListingProductsResponses, ListingProductUpdateData, ListingProductUpdateErrors, ListingProductUpdateResponses, ListingQuotaData, ListingQuotaResponses, ListingRemoveData, ListingRemoveErrors, ListingRemoveResponses, ListingRenewData, ListingRenewErrors, ListingRenewResponses, ListingUpdateData, ListingUpdateErrors, ListingUpdateResponses, ListJoinRequestsData, ListJoinRequestsErrors, ListJoinRequestsResponses, ListOrganizationsData, ListOrganizationsErrors, ListOrganizationsResponses, LocationProvincesData, LocationProvincesResponses, LocationWardsData, LocationWardsErrors, LocationWardsResponses, MembershipListData, MembershipListErrors, MembershipListResponses, MembershipRemoveData, MembershipRemoveErrors, MembershipRemoveResponses, ModerationActivityData, ModerationActivityErrors, ModerationActivityResponses, ModerationCoverageData, ModerationCoverageErrors, ModerationCoverageResponses, ModerationListingsData, ModerationListingsErrors, ModerationListingsResponses, ModerationOverviewData, ModerationOverviewErrors, ModerationOverviewResponses, ModerationPublicOverviewData, ModerationPublicOverviewErrors, ModerationPublicOverviewResponses, ModerationPublicQueueData, ModerationPublicQueueErrors, ModerationPublicQueueResponses, ModerationRemoveListingData, ModerationRemoveListingErrors, ModerationRemoveListingResponses, ModerationRerouteListingData, ModerationRerouteListingErrors, ModerationRerouteListingResponses, ModerationSetListingStatusData, ModerationSetListingStatusErrors, ModerationSetListingStatusResponses, MyJoinRequestsData, MyJoinRequestsResponses, MyOrganizationsData, MyOrganizationsErrors, MyOrganizationsResponses, MyRoleGrantsData, MyRoleGrantsResponses, NotificationCreateData, NotificationCreateErrors, NotificationCreateResponses, NotificationListData, NotificationListErrors, NotificationListResponses, NotificationMarkReadData, NotificationMarkReadErrors, NotificationMarkReadResponses, OrganizationByCodeData, OrganizationByCodeErrors, OrganizationByCodeResponses, OrganizationGrantAdminData, OrganizationGrantAdminErrors, OrganizationGrantAdminResponses, OrganizationLookupData, OrganizationLookupErrors, OrganizationLookupResponses, OrganizationPublicProfileData, OrganizationPublicProfileErrors, OrganizationPublicProfileResponses, OrganizationRotateJoinCodeData, OrganizationRotateJoinCodeErrors, OrganizationRotateJoinCodeResponses, OrganizationSlugAvailabilityData, OrganizationSlugAvailabilityErrors, OrganizationSlugAvailabilityResponses, OrganizationUpdateData, OrganizationUpdateErrors, OrganizationUpdateResponses, RejectJoinRequestData, RejectJoinRequestErrors, RejectJoinRequestResponses, ReportCreateData, ReportCreateErrors, ReportCreateResponses, ReportListData, ReportListErrors, ReportListResponses, ReportResolveData, ReportResolveErrors, ReportResolveResponses, RevokeRoleGrantData, RevokeRoleGrantErrors, RevokeRoleGrantResponses, SetOrganizationStatusData, SetOrganizationStatusErrors, SetOrganizationStatusResponses, SetOrganizationVisibilityData, SetOrganizationVisibilityErrors, SetOrganizationVisibilityResponses, UpdateCategoryData, UpdateCategoryErrors, UpdateCategoryResponses, UserClearRejectionsData, UserClearRejectionsErrors, UserClearRejectionsResponses, UserDeleteMeData, UserDeleteMeErrors, UserDeleteMeResponses, UserGetByIdData, UserGetByIdErrors, UserGetByIdResponses, UserGetMeData, UserGetMeErrors, UserGetMeResponses, UserListForAdminData, UserListForAdminErrors, UserListForAdminResponses, UserSetStatusData, UserSetStatusErrors, UserSetStatusResponses, UserUpdateMeData, UserUpdateMeErrors, UserUpdateMeResponses, WalletAdjustData, WalletAdjustErrors, WalletAdjustResponses, WalletGetData, WalletGetErrors, WalletGetResponses, WalletHistoryData, WalletHistoryErrors, WalletHistoryResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -129,6 +129,39 @@ export const userSetStatus = <ThrowOnError extends boolean = false>(options: Opt
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * Đẩy tin lên đầu bảng tin
+ *
+ * Đặt lại `rankAt` = hiện tại; bảng tin xếp theo khoá đó. MIỄN PHÍ, không qua gói nào — chỉ master, người phụ trách danh mục của tin (tin công khai), hoặc quản trị nhóm sở hữu tin (tin nội bộ). Người duyệt tin cấp staff KHÔNG đẩy được. Chỉ áp dụng cho tin `active`.
+ */
+export const listingBump = <ThrowOnError extends boolean = false>(options: Options<ListingBumpData, ThrowOnError>) => (options.client ?? client).post<ListingBumpResponses, ListingBumpErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/listings/{id}/bump',
+    ...options
+});
+
+/**
+ * Gia hạn tin thêm 30 ngày
+ *
+ * Đường của CHÍNH CHỦ — câu trả lời "vẫn còn" cho tin hết hạn. Đặt lại `expiresAt` = hiện tại + 30 ngày và bật `expired` về `active`. KHÔNG chạm `rankAt`: gia hạn không phải đẩy tin. Chỉ nhận tin `active` hoặc `expired`.
+ */
+export const listingRenew = <ThrowOnError extends boolean = false>(options: Options<ListingRenewData, ThrowOnError>) => (options.client ?? client).post<ListingRenewResponses, ListingRenewErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/listings/{id}/renew',
+    ...options
+});
+
+/**
+ * Đánh dấu tin đã bán
+ *
+ * Đường của CHÍNH CHỦ — câu trả lời "đã bán". Idempotent: tin đã `sold` trả 200 nguyên trạng. Chỉ nhận tin `active` hoặc `expired`.
+ */
+export const listingMarkSold = <ThrowOnError extends boolean = false>(options: Options<ListingMarkSoldData, ThrowOnError>) => (options.client ?? client).post<ListingMarkSoldResponses, ListingMarkSoldErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/listings/{id}/sold',
+    ...options
 });
 
 /**
@@ -421,52 +454,6 @@ export const organizationLookup = <ThrowOnError extends boolean = false>(options
 export const organizationSlugAvailability = <ThrowOnError extends boolean = false>(options: Options<OrganizationSlugAvailabilityData, ThrowOnError>) => (options.client ?? client).get<OrganizationSlugAvailabilityResponses, OrganizationSlugAvailabilityErrors, ThrowOnError>({ url: '/organizations/slug-availability', ...options });
 
 /**
- * Nhóm con của tổ chức hiện tại
- *
- * Tổ chức phẳng thì trả mảng rỗng — không phải lỗi, chỉ là không có tầng trung gian.
- */
-export const listOrgUnits = <ThrowOnError extends boolean = false>(options?: Options<ListOrgUnitsData, ThrowOnError>) => (options?.client ?? client).get<ListOrgUnitsResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/org-units',
-    ...options
-});
-
-/**
- * Tạo nhóm con
- */
-export const createOrgUnit = <ThrowOnError extends boolean = false>(options?: Options<CreateOrgUnitData, ThrowOnError>) => (options?.client ?? client).post<CreateOrgUnitResponses, CreateOrgUnitErrors, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/org-units',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers
-    }
-});
-
-/**
- * Xoá mềm một nhóm con
- */
-export const deleteOrgUnit = <ThrowOnError extends boolean = false>(options: Options<DeleteOrgUnitData, ThrowOnError>) => (options.client ?? client).delete<DeleteOrgUnitResponses, DeleteOrgUnitErrors, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/org-units/{id}',
-    ...options
-});
-
-/**
- * Đổi tên nhóm hoặc gán người phụ trách
- */
-export const updateOrgUnit = <ThrowOnError extends boolean = false>(options: Options<UpdateOrgUnitData, ThrowOnError>) => (options.client ?? client).patch<UpdateOrgUnitResponses, UpdateOrgUnitErrors, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/org-units/{id}',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
  * Hàng đợi đơn của tổ chức hiện tại
  */
 export const listJoinRequests = <ThrowOnError extends boolean = false>(options?: Options<ListJoinRequestsData, ThrowOnError>) => (options?.client ?? client).get<ListJoinRequestsResponses, ListJoinRequestsErrors, ThrowOnError>({
@@ -571,21 +558,6 @@ export const membershipRemove = <ThrowOnError extends boolean = false>(options: 
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/memberships/{userId}',
     ...options
-});
-
-/**
- * Chuyển thành viên sang nhóm con khác (quản trị nhóm)
- *
- * KHÔNG đụng tới quyền: nhóm con chỉ nói người này thuộc lớp/phòng ban nào. Grant phạm vi `org_unit` của họ vẫn trỏ vào nhóm con cũ — đó là việc của màn Phân quyền.
- */
-export const membershipMove = <ThrowOnError extends boolean = false>(options: Options<MembershipMoveData, ThrowOnError>) => (options.client ?? client).patch<MembershipMoveResponses, MembershipMoveErrors, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/memberships/{userId}',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
 });
 
 /**

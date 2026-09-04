@@ -6,6 +6,7 @@ import { RerouteSheet } from '@/components/RerouteSheet';
 import { EmptyState, Loading } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import {
+  useBumpListing,
   useMyGrants,
   usePublicQueue,
   useRerouteListing,
@@ -40,6 +41,7 @@ export default function PublicQueue() {
   const { data: grants } = useMyGrants();
   const setStatus = useSetListingStatus();
   const reroute = useRerouteListing();
+  const bump = useBumpListing();
 
   const rows = data ?? [];
   // Chuyển ô là quyền của master. Manager thấy nút này chỉ để bấm rồi nhận 403.
@@ -75,6 +77,17 @@ export default function PublicQueue() {
           <AdminListingRow item={item}>
             {canReroute && (
               <RowAction glyph="⇄" onPress={() => setMoving({ id: item.id, title: item.title })} />
+            )}
+            {/*
+              Không gác bằng grant ở đây: hàng đợi này ĐÃ được BE thu về đúng ô của người gọi,
+              nên mọi tin họ thấy đều nằm trong phạm vi họ phụ trách — khác `admin/listings`,
+              nơi một staff nhóm cũng mở được màn.
+            */}
+            {item.status === 'active' && (
+              <RowAction
+                glyph="🔝"
+                onPress={() => bump.mutate(item.id, act(`Đã đẩy "${item.title}" lên đầu bảng`))}
+              />
             )}
             {item.status !== 'active' && (
               <RowAction

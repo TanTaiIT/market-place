@@ -19,7 +19,9 @@ import {
   listingList,
   listingMine,
   listingQuota,
+  listingMarkSold,
   listingRemove,
+  listingRenew,
   listingUpdate,
   locationProvinces,
   locationWards,
@@ -48,6 +50,7 @@ import type {
   ListingAttributes,
   Message,
   Notif,
+  PostingQuota,
   Profile,
   PublicProfile,
   SearchFilter,
@@ -129,11 +132,45 @@ export function relativeTime(iso: string): string {
 }
 
 /**
+ * Nhãn hạn hiển thị, nói theo NGÀY.
+ *
+ * Ngày chứ không giờ: hạn tin là 30 ngày nên "còn 2 ngày" là thông tin, còn "còn 47 giờ" là
+ * đố người đọc tự chia. Trả `undefined` khi tin còn dài hạn — call-site giấu dòng đó đi thay
+ * vì hiện một con số không ai cần.
+ */
+export function expiryLabel(expiresAt: string | undefined, expired: boolean, within = 7) {
+  if (!expiresAt) return expired ? 'Đã hết hạn' : undefined;
+
+  const days = Math.round((new Date(expiresAt).getTime() - Date.now()) / 86_400_000);
+  if (expired) {
+    if (days >= 0) return 'Đã hết hạn';
+    return days === -1 ? 'Hết hạn hôm qua' : `Hết hạn ${-days} ngày trước`;
+  }
+  if (days > within) return undefined;
+  if (days <= 0) return 'Hết hạn hôm nay';
+  return days === 1 ? 'Còn 1 ngày' : `Còn ${days} ngày`;
+}
+
+/**
  * `seller` và `category` chỉ là ObjectId dạng chuỗi: BE cố tình **không** populate chúng —
  * populate `seller` sẽ đọc xuyên org và lách mất cách ly tenant, còn model `Category` thì chưa
  * tồn tại. Tên/liên hệ người đăng vì thế lấy từ snapshot `posterName`/`posterContact` mà BE chốt
  * lúc tạo tin, đúng như `listing.repository.ts` ghi.
  */
+/**
+ * 8 trạng thái BE → 4 trạng thái UI.
+ *
+ * `expired` và `sold` phải đi RIÊNG vì mỗi cái mở ra một hành động khác: hết hạn thì hiện nút
+ * gia hạn, đã bán thì không hiện gì. Gộp chúng vào `pending` (như bản trước) là hứa với chủ
+ * tin rằng tin đang chờ duyệt, và họ ngồi đợi một hàng đợi không tồn tại.
+ */
+function toStatus(status: ListingDto['status']): Listing['status'] {
+  if (status === 'active') return 'live';
+  if (status === 'expired') return 'expired';
+  if (status === 'sold') return 'sold';
+  return 'pending';
+}
+
 function toListing(dto: ListingDto, names: Map<string, string>): Listing {
   const isMine = dto.seller === getCurrentUserId();
   const sellerName = isMine ? 'Bạn' : dto.posterName || 'Người bán';
@@ -165,8 +202,8 @@ function toListing(dto: ListingDto, names: Map<string, string>): Listing {
     // kiểu để switch và dropdown chọn lại được lựa chọn cũ.
     attributes: dto.attributes as ListingAttributes | undefined,
     templateVersion: dto.templateRef?.version,
-    // UI chỉ có hai trạng thái; 5 trạng thái còn lại của BE đều là "chưa hiển thị".
-    status: dto.status === 'active' ? 'live' : 'pending',
+    status: toStatus(dto.status),
+    expiresAt: dto.expiresAt ?? undefined,
     mine: isMine,
     viewCount: dto.viewCount,
     favoriteCount: dto.favoriteCount,
@@ -611,9 +648,42 @@ export const api = {
    * cho người duyệt khi việc cũ đã được xử lý. Không hiện con số này ra thì lúc bị chặn họ chỉ
    * thấy một lỗi 409 và đổ cho app hỏng.
    */
-  async getQuota(): Promise<{ limit: number; pending: number; remaining: number; allowed: boolean }> {
+  async getQuota(): Promise<PostingQuota> {
     const res = await withAuthRetry(() => listingQuota());
-    return unwrap(res, 'Không đọc được hạn mức đăng tin');
+    const dto = unwrap(res, 'Không đọc được hạn mức đăng tin');
+    return {
+      allowed: dto.allowed,
+      limit: dto.limit,
+      pending: dto.pending,
+      remaining: dto.remaining,
+      needsReconcile: dto.needsReconcile.map((l) => ({
+        id: l._id,
+        title: l.title,
+        image: l.image || undefined,
+        // BE chỉ đưa vào danh sách này tin `active` hoặc `expired` — mọi thứ khác là `live`.
+        status: l.status === 'expired' ? 'expired' : 'live',
+        expiresAt: l.expiresAt ?? undefined,
+      })),
+    };
+  },
+
+  /**
+   * "Vẫn còn" — gia hạn thêm 30 ngày, và bật lại tin đã hết hạn.
+   *
+   * KHÔNG phải đẩy tin: BE cố tình không chạm `rankAt`, nên tin quay lại bảng ở đúng vị trí
+   * cũ. Đừng hứa với người bán là tin "lên đầu bảng" sau khi gia hạn.
+   */
+  async renewListing(id: string) {
+    const res = await withAuthRetry(() => listingRenew({ path: { id } }));
+    unwrap(res, 'Không gia hạn được tin này');
+    return { id };
+  },
+
+  /** "Đã bán" — idempotent ở BE, nên bấm lại không thành lỗi đỏ. */
+  async markListingSold(id: string) {
+    const res = await withAuthRetry(() => listingMarkSold({ path: { id } }));
+    unwrap(res, 'Không đánh dấu được tin này');
+    return { id };
   },
 
   /* ---------------- địa giới hành chính ---------------- */

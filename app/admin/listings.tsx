@@ -5,7 +5,15 @@ import { AdminListingSheet } from '@/components/AdminListingSheet';
 import { AdminFilter, AdminScreen } from '@/components/AdminScreen';
 import { EmptyState, Loading } from '@/components/ui';
 import { useToast } from '@/components/Toast';
-import { useAdminListings, useRemoveModListing, useSetListingStatus } from '@/queries/admin';
+import {
+  useAdminListings,
+  useBumpListing,
+  useMyGrants,
+  useRemoveModListing,
+  useSetListingStatus,
+} from '@/queries/admin';
+import { canAdminOrg } from '@/api/admin';
+import { useActiveOrg } from '@/queries/org-discover';
 import { useCategories } from '@/queries/listings';
 import type { ModListing } from '@/api/admin';
 import { C, F } from '@/theme';
@@ -27,6 +35,16 @@ export default function AdminListings() {
   const { data, error, isLoading } = useAdminListings();
   const setStatus = useSetListingStatus();
   const remove = useRemoveModListing();
+  const bump = useBumpListing();
+
+  /*
+   * Đẩy tin là quyền của QUẢN TRỊ nhóm, không phải người duyệt tin — staff mở được màn này
+   * (`requireOrgReadOrMaster`) nhưng BE sẽ từ chối cú bấm. Ẩn nút thay vì để họ bấm rồi ăn
+   * 403, cùng cách `public-queue` ẩn nút chuyển ô khỏi manager.
+   */
+  const { data: grants } = useMyGrants();
+  const { id: activeOrgId } = useActiveOrg();
+  const canBump = canAdminOrg(grants, activeOrgId);
 
   const all = data ?? [];
   const q = term.trim().toLowerCase();
@@ -86,6 +104,13 @@ export default function AdminListings() {
           <AdminListingRow item={item} onPress={() => setSheet(item)}>
             {item.status !== 'pending' && (
               <RowAction glyph={item.status === 'hidden' ? '▲' : '▼'} onPress={() => hide(item)} />
+            )}
+            {/* Chỉ tin ĐANG hiển thị: đẩy tin ẩn/chờ duyệt không dịch được gì, BE trả 400. */}
+            {canBump && item.status === 'active' && (
+              <RowAction
+                glyph="🔝"
+                onPress={() => bump.mutate(item.id, act(`Đã đẩy "${item.title}" lên đầu bảng`))}
+              />
             )}
             <RowAction
               glyph="🗑"

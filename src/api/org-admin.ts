@@ -148,7 +148,9 @@ export function scopesForRole(
   const byRole: RoleGrant['scopeType'][] =
     role === 'manager'
       ? ['org', 'category_province', 'category_ward']
-      : ['org', 'org_unit', 'category_province', 'category_ward'];
+      // Không còn `org_unit`: bề mặt nhóm con đã gỡ, không có đường nào chọn ra một nhóm để
+      // áp quyền vào. BE vẫn hiểu phạm vi này nên bật lại chỉ là thêm nó vào đây.
+      : ['org', 'category_province', 'category_ward'];
   if (isMaster(grants)) return byRole;
 
   const mine = (grants ?? []).filter((g) => g.role === 'manager');
@@ -160,7 +162,7 @@ export function scopesForRole(
         return scope === 'category_province' || scope === 'category_ward';
       }
       if (g.scopeType === 'category_ward') return scope === 'category_ward';
-      return g.scopeType === 'org' && (scope === 'org' || scope === 'org_unit');
+      return g.scopeType === 'org' && scope === 'org';
     }),
   );
 }

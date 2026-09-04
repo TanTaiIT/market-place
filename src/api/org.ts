@@ -3,12 +3,8 @@ import {
   bulkApproveJoinRequests,
   cancelJoinRequest,
   createJoinRequest,
-  createOrgUnit,
-  deleteOrgUnit,
   listJoinRequests,
-  listOrgUnits,
   membershipList,
-  membershipMove,
   membershipRemove,
   myJoinRequests,
   myOrganizations,
@@ -17,21 +13,17 @@ import {
   organizationPublicProfile,
   organizationUpdate,
   rejectJoinRequest,
-  updateOrgUnit,
 } from './generated';
 import type {
-  CreateOrgUnit,
   JoinRequest,
   Member,
   OrganizationLookup,
   OrganizationProfile,
-  OrgUnit,
   UpdateOrganization,
-  UpdateOrgUnit,
 } from './generated';
 
-/** Màn hình dùng nhóm con đi qua đây, không import thẳng `generated` — `app/**` chỉ biết tới `api/**`. */
-export type { Member, OrgUnit };
+/** Màn hình đi qua đây, không import thẳng `generated` — `app/**` chỉ biết tới `api/**`. */
+export type { Member };
 /** Phần hồ sơ nhóm mà quản trị sửa được — màn sửa dùng type này, không import `generated`. */
 export type { UpdateOrganization as OrgPatch };
 /** Một thẻ nhóm trong danh sách khám phá, và hồ sơ đầy đủ của một nhóm. */
@@ -93,6 +85,11 @@ export type MyOrg = {
   unitId: string | null;
   /** Bảng tin của nhóm này bày một cột hay hai — do quản trị nhóm đặt. */
   feedLayout: 'feed' | 'grid';
+  /**
+   * Org bị khoá VẪN nằm trong danh sách này (BE cố ý giữ, để phân biệt "khoá" với "không còn").
+   * Đọc nó trước khi chọn: gửi slug của một org không ACTIVE là ăn 403 ở mọi request.
+   */
+  status: 'active' | 'suspended' | 'pending_admin';
 };
 
 /**
@@ -110,38 +107,6 @@ export type JoinRequestRow = JoinRequest & {
 };
 
 export const orgApi = {
-  /** Nhóm con của tổ chức đang hoạt động — để duyệt kèm xếp nhóm luôn, đúng ý §7.2a của BE. */
-  async orgUnits(): Promise<OrgUnit[]> {
-    const res = await withAuthRetry(() => listOrgUnits());
-    return unwrap(res, 'Không đọc được danh sách nhóm con');
-  },
-
-  /**
-   * Tạo nhóm con. `parentUnitId` bỏ trống = nhóm nằm thẳng dưới tổ chức.
-   *
-   * Không gửi `moderatorId: null` khi chưa chọn ai: BE phân biệt "không đụng tới" với "gỡ người
-   * phụ trách", mà lúc TẠO thì chỉ có nghĩa thứ nhất là đúng.
-   */
-  async createUnit(input: CreateOrgUnit): Promise<OrgUnit> {
-    const res = await withAuthRetry(() => createOrgUnit({ body: input }));
-    return unwrap(res, 'Không tạo được nhóm con');
-  },
-
-  /**
-   * Đổi tên nhóm hoặc gán/gỡ người phụ trách. Ở đây `null` mang nghĩa thật: gỡ người phụ trách —
-   * nên màn hình phải gửi `null` tường minh chứ không phải bỏ trống field.
-   */
-  async updateUnit({ id, ...patch }: UpdateOrgUnit & { id: string }): Promise<OrgUnit> {
-    const res = await withAuthRetry(() => updateOrgUnit({ path: { id }, body: patch }));
-    return unwrap(res, 'Không cập nhật được nhóm con');
-  },
-
-  /** Xoá mềm. Thành viên đang thuộc nhóm không mất chỗ — họ về lại mức tổ chức. */
-  async deleteUnit(id: string): Promise<OrgUnit> {
-    const res = await withAuthRetry(() => deleteOrgUnit({ path: { id } }));
-    return unwrap(res, 'Không xoá được nhóm con');
-  },
-
   /**
    * Danh bạ thành viên của tổ chức đang hoạt động.
    *
@@ -163,14 +128,6 @@ export const orgApi = {
   async removeMember(userId: string): Promise<void> {
     const res = await withAuthRetry(() => membershipRemove({ path: { userId } }));
     unwrap(res, 'Không gỡ được thành viên');
-  },
-
-  /** `unitId: null` = bỏ khỏi mọi nhóm con. KHÔNG đụng tới quyền — xem `membershipMove`. */
-  async moveMember(userId: string, unitId: string | null): Promise<Member> {
-    const res = await withAuthRetry(() =>
-      membershipMove({ path: { userId }, body: { unitId } }),
-    );
-    return unwrap(res, 'Không chuyển được nhóm con');
   },
 
   async joinRequests(status?: JoinRequestStatus): Promise<JoinRequestRow[]> {

@@ -6,6 +6,7 @@ import {
   moderationRerouteListing,
   moderationOverview,
   moderationPublicOverview,
+  listingBump,
   moderationRemoveListing,
   moderationSetListingStatus,
   myRoleGrants,
@@ -262,6 +263,19 @@ export const adminApi = {
       }),
     );
     unwrap(res, 'Không cập nhật được trạng thái tin');
+    return { id };
+  },
+
+  /**
+   * Đẩy tin lên đầu bảng — MIỄN PHÍ, không qua gói nào.
+   *
+   * Nằm ở `/listings/:id/bump` chứ không dưới `/moderation`: đây không phải một phán quyết
+   * về nội dung, mà là một quyết định phân phối. BE chốt thẩm quyền theo TRỤC CỦA TIN — tin
+   * công khai thuộc người phụ trách danh mục, tin nội bộ thuộc quản trị nhóm.
+   */
+  async bump(id: string) {
+    const res = await withAuthRetry(() => listingBump({ path: { id } }));
+    unwrap(res, 'Không đẩy được tin này lên đầu bảng');
     return { id };
   },
 

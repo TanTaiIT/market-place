@@ -9,7 +9,6 @@ import {
   useApproveJoinRequest,
   useBulkApproveJoinRequests,
   useJoinRequestQueue,
-  useOrgUnits,
   useRejectJoinRequest,
 } from '@/queries/org';
 import type { JoinRequestRow, JoinRequestStatus } from '@/api/org';
@@ -26,19 +25,14 @@ const TABS: { value: JoinRequestStatus; label: string }[] = [
  *
  * Duyệt một đơn = tạo membership, nên nó nằm ở nhóm "Cộng đồng" chứ không phải "Duyệt tin":
  * hai thứ khác hẳn nhau về hệ quả, gộp một màn là mời người duyệt bấm nhầm.
- *
- * Nhóm con chọn MỘT LẦN ở đầu màn rồi áp cho mọi lượt duyệt sau đó, thay vì hỏi lại từng đơn.
- * Người duyệt thật xử theo lô cùng một khoá/lớp; hỏi lại mỗi đơn là 30 lần chọn cùng một giá trị.
  */
 export default function JoinRequests() {
   const toast = useToast();
   const [tab, setTab] = useState<JoinRequestStatus>('pending');
-  const [unitId, setUnitId] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [rejecting, setRejecting] = useState<JoinRequestRow | null>(null);
 
   const { data, error, isLoading } = useJoinRequestQueue(tab);
-  const { data: units } = useOrgUnits();
   const approve = useApproveJoinRequest();
   const reject = useRejectJoinRequest();
   const bulk = useBulkApproveJoinRequests();
@@ -51,13 +45,13 @@ export default function JoinRequests() {
 
   const approveOne = (row: JoinRequestRow) =>
     approve.mutate(
-      { id: row.id, unitId },
+      { id: row.id, unitId: null },
       { onSuccess: () => toast(`✓ ${row.claimedName} đã vào tổ chức`), onError: fail },
     );
 
   const approvePicked = () =>
     bulk.mutate(
-      { ids: picked, unitId },
+      { ids: picked, unitId: null },
       {
         onSuccess: (r) => {
           setPicked([]);
@@ -79,23 +73,6 @@ export default function JoinRequests() {
             setPicked([]);
           }}
         />
-
-        {tab === 'pending' && !!units?.length && (
-          <View style={styles.units}>
-            <Text style={styles.unitsLabel}>Duyệt vào nhóm</Text>
-            <View style={styles.chips}>
-              <UnitChip label="Không xếp nhóm" on={unitId === null} onPress={() => setUnitId(null)} />
-              {units.map((u) => (
-                <UnitChip
-                  key={u.id}
-                  label={u.name}
-                  on={unitId === u.id}
-                  onPress={() => setUnitId(u.id)}
-                />
-              ))}
-            </View>
-          </View>
-        )}
       </View>
 
       <FlatList
@@ -175,31 +152,8 @@ export default function JoinRequests() {
   );
 }
 
-function UnitChip({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.chip, on && styles.chipOn, pressed && { opacity: 0.7 }]}
-    >
-      <Text style={[styles.chipText, on && { color: C.paper }]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   head: { paddingHorizontal: 16, paddingTop: 12, gap: 10 },
-  units: { gap: 6 },
-  unitsLabel: { fontFamily: F.mono, fontSize: 9.5, letterSpacing: 1.2, color: C.deskTxtDim },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  chip: {
-    borderWidth: 1,
-    borderColor: C.deskLineStrong,
-    borderRadius: 20,
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-  },
-  chipOn: { borderColor: C.mossBright, backgroundColor: C.okTint },
-  chipText: { fontFamily: F.ui, fontSize: 11.5, color: C.deskTxtSoft },
 
   row: {
     flexDirection: 'row',

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,7 +12,6 @@ import { AdminPanel, AdminScreen } from '@/components/AdminScreen';
 import { Field, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useSendNotice, useSentNotices } from '@/queries/admin-content';
-import { useOrgUnits } from '@/queries/org';
 import { C, F, shadow } from '@/theme';
 
 /**
@@ -23,29 +21,24 @@ import { C, F, shadow } from '@/theme';
  * lượng — tất cả đều là fixture, BE không có khái niệm nào trong đó: `chain` đã bị xoá khỏi
  * hệ thống ở v2, và `POST /notifications` chỉ nhận `{ title, body, unitId }`.
  *
- * Thứ còn lại là thứ có thật: gửi cho cả tổ chức, hoặc gửi cho một nhóm con. Người chỉ phụ
- * trách một nhóm sẽ bị BE chặn nếu chọn "cả tổ chức" — nên ô đó vẫn hiện, để họ nhận được lời
- * từ chối rõ ràng thay vì không hiểu vì sao mình thiếu một lựa chọn.
+ * Giờ chỉ còn một người nhận: CẢ tổ chức. Bề mặt nhóm con đã gỡ nên không có đường nào chọn ra
+ * một nhóm để gửi riêng — `unitId` vì thế luôn gửi `null`. BE vẫn nhận field đó, nên mở lại
+ * lựa chọn chỉ là dựng lại ô chọn ở đây.
  */
 export default function AdminNotice() {
   const toast = useToast();
   const send = useSendNotice();
   const { data: sent } = useSentNotices();
-  const { data: units } = useOrgUnits();
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  /** `null` = cả tổ chức. */
-  const [unitId, setUnitId] = useState<string | null>(null);
-
-  const unitName = (id: string | null) => units?.find((u) => u.id === id)?.name ?? null;
 
   const submit = () =>
     send.mutate(
-      { title, body, unitId },
+      { title, body, unitId: null },
       {
         onSuccess: () => {
-          toast(unitId ? `Đã gửi cho nhóm ${unitName(unitId)}` : 'Đã gửi cho cả tổ chức');
+          toast('Đã gửi cho cả tổ chức');
           setTitle('');
           setBody('');
         },
@@ -54,7 +47,7 @@ export default function AdminNotice() {
     );
 
   return (
-    <AdminScreen title="Gửi thông báo" note="cả tổ chức, hoặc một nhóm" org>
+    <AdminScreen title="Gửi thông báo" note="cho cả tổ chức" org>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
@@ -78,36 +71,6 @@ export default function AdminNotice() {
               Viết ngắn, một ý. Học sinh đọc thông báo này trên điện thoại giữa giờ ra chơi.
             </Text>
 
-            <Text style={styles.label}>GỬI CHO</Text>
-            <View style={styles.pills}>
-              <Pressable
-                onPress={() => setUnitId(null)}
-                style={({ pressed }) => [
-                  styles.pill,
-                  unitId === null && styles.pillOn,
-                  pressed && { opacity: 0.7 },
-                ]}
-              >
-                <Text style={[styles.pillText, unitId === null && { color: C.paper }]}>
-                  🏫 Cả tổ chức
-                </Text>
-              </Pressable>
-              {(units ?? []).map((u) => (
-                <Pressable
-                  key={u.id}
-                  onPress={() => setUnitId(u.id)}
-                  style={({ pressed }) => [
-                    styles.pill,
-                    unitId === u.id && styles.pillOn,
-                    pressed && { opacity: 0.7 },
-                  ]}
-                >
-                  <Text style={[styles.pillText, unitId === u.id && { color: C.paper }]}>
-                    👥 {u.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
             <Text style={styles.hint}>
               Không có &quot;số người nhận&quot;: thông báo là bản ghi của tổ chức, ai thuộc phạm
               vi thì đọc được. Con số duy nhất đo được là bao nhiêu người đã mở nó.
@@ -127,12 +90,12 @@ export default function AdminNotice() {
                 </View>
                 <View style={styles.preview}>
                   <View style={[styles.previewIcon, { backgroundColor: C.mossDeep }]}>
-                    <Text style={{ fontSize: 15 }}>{unitId ? '👥' : '🏫'}</Text>
+                    <Text style={{ fontSize: 15 }}>🏫</Text>
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <View style={styles.previewTag}>
                       <Text style={styles.previewTagText}>
-                        {unitId ? `Nhóm ${unitName(unitId) ?? ''}` : 'Toàn tổ chức'}
+                        Toàn tổ chức
                       </Text>
                     </View>
                     <Text style={styles.previewTitle}>{title || 'Chưa có tiêu đề'}</Text>
@@ -154,8 +117,11 @@ export default function AdminNotice() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.sentTitle}>
                       {notice.title}{' '}
+                      {/* Chỉ nói CÓ thuộc nhóm con hay không, không nói tên: bề mặt nhóm con đã
+                          gỡ nên không còn đường tra tên, mà thông báo cũ thì vẫn giữ `unitId`
+                          thật — bịa "cả tổ chức" cho chúng là nói sai phạm vi đã gửi. */}
                       <Text style={styles.sentAudience}>
-                        · {unitName(notice.unitId) ?? 'cả tổ chức'}
+                        · {notice.unitId ? 'một nhóm con' : 'cả tổ chức'}
                       </Text>
                     </Text>
                     <Text style={styles.sentMeta}>
@@ -182,17 +148,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 8,
   },
-  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  pill: {
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: C.desk,
-    borderWidth: 1,
-    borderColor: C.deskLineStrong,
-  },
-  pillOn: { backgroundColor: C.deskHi, borderColor: C.cork },
-  pillText: { fontFamily: F.uiSemi, fontSize: 12.5, color: C.deskTxtSoft },
   textarea: {
     minHeight: 96,
     textAlignVertical: 'top',

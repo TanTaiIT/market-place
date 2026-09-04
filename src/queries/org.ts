@@ -45,6 +45,10 @@ export function useOrgByCode(code: string) {
  *
  * Chỉ ghi khi CHƯA có lựa chọn nào: người đã tự chọn (hoặc master mượn slug nhóm khác) thì
  * không bị ghi đè. Có từ hai nhóm trở lên thì im lặng — lúc đó phải để họ chọn.
+ *
+ * Và chỉ tự chọn org đang ACTIVE: org bị khoá vẫn nằm trong danh sách, tự chọn nó là mọi
+ * request mang một slug BE chắc chắn ném 403 — người dùng không hề bấm gì mà app tự đưa mình
+ * vào trạng thái không dùng được.
  */
 export function useMyOrgs() {
   const isAuthenticated = useIsAuthenticated();
@@ -58,7 +62,8 @@ export function useMyOrgs() {
 
   const activeSlug = useOrgSlug();
   const setActiveOrg = useSetActiveOrg();
-  const only = query.data?.length === 1 ? query.data[0].slug : undefined;
+  const single = query.data?.length === 1 ? query.data[0] : undefined;
+  const only = single?.status === 'active' ? single.slug : undefined;
 
   useEffect(() => {
     if (!activeSlug && only) setActiveOrg(only);
@@ -141,28 +146,6 @@ export function useRemoveMember() {
   });
 }
 
-export function useMoveMember() {
-  const qc = useQueryClient();
-  const orgSlug = useOrgSlug();
-  return useMutation({
-    mutationFn: (v: { userId: string; unitId: string | null }) =>
-      orgApi.moveMember(v.userId, v.unitId),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: qk.orgMembers(orgSlug ?? '-') }),
-  });
-}
-
-/** Nhóm con để duyệt kèm xếp nhóm. Đổi rất ít nên cache lâu, cùng lý do với `useMyOrgs`. */
-export function useOrgUnits() {
-  const orgSlug = useOrgSlug();
-  return useQuery({
-    queryKey: qk.orgUnits(orgSlug ?? '-'),
-    queryFn: orgApi.orgUnits,
-    enabled: Boolean(orgSlug),
-    staleTime: 5 * 60_000,
-  });
-}
-
 /**
  * Danh bạ thành viên của tổ chức — nguồn là `GET /memberships`.
  *
@@ -185,32 +168,6 @@ export function useOrgRoster() {
   });
 
   return { ...query, members: query.data ?? [] };
-}
-
-/**
- * Refetch contract của ba mutation nhóm con: invalidate đúng key nhóm con của tổ chức đang hoạt
- * động. Không quét `['orgs']`: `myOrgs` và `orgLookup` cũng nằm dưới prefix đó và không hề lệch
- * khi thêm một nhóm.
- */
-function useOrgUnitMutation<TVars, TData>(fn: (v: TVars) => Promise<TData>) {
-  const qc = useQueryClient();
-  const orgSlug = useOrgSlug();
-  return useMutation({
-    mutationFn: fn,
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.orgUnits(orgSlug ?? '-') }),
-  });
-}
-
-export function useCreateOrgUnit() {
-  return useOrgUnitMutation(orgApi.createUnit);
-}
-
-export function useUpdateOrgUnit() {
-  return useOrgUnitMutation(orgApi.updateUnit);
-}
-
-export function useDeleteOrgUnit() {
-  return useOrgUnitMutation(orgApi.deleteUnit);
 }
 
 /**

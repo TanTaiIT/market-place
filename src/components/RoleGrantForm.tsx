@@ -4,7 +4,7 @@ import { AdminChip, AdminPickerField, adminFormStyles } from './AdminPicker';
 import { RoleGrantGeoFields } from './RoleGrantGeoFields';
 import { Field, PinButton } from './ui';
 import { useToast } from './Toast';
-import { useMyOrgs, useOrgRoster, useOrgUnits } from '@/queries/org';
+import { useMyOrgs, useOrgRoster } from '@/queries/org';
 import { useAdminUsers } from '@/queries/admin-people';
 import { isMaster } from '@/api/admin';
 import type { ProvinceName } from '@/api/location';
@@ -77,12 +77,8 @@ export function RoleGrantForm({
     : roster.members.map((m) => ({
         key: m.userId,
         label: m.name,
-        // Tên nhóm con tra từ `units`: danh bạ chỉ mang `unitId`, và nhóm là thứ đổi tên
-        // được — nhắc lại tên đã lưu ở chỗ khác là hai bản dễ lệch nhau.
-        note: units?.find((u) => u.id === m.unitId)?.name,
       }));
   const peopleLoading = master ? allUsers.isLoading : roster.isLoading;
-  const { data: units } = useOrgUnits();
   const { data: orgs, isPending: orgsPending } = useMyOrgs();
 
   const patch = (fields: Partial<typeof EMPTY>) => setForm((prev) => ({ ...prev, ...fields }));
@@ -115,7 +111,6 @@ export function RoleGrantForm({
     if (scope === 'org' && !orgId) {
       return toast('⚠️ Bạn không thuộc tổ chức nào — chọn phạm vi khác');
     }
-    if (scope === 'org_unit' && !form.unitId) return toast('⚠️ Chọn nhóm con áp quyền');
     if (scope === 'category_province') {
       if (!form.categoryId) return toast('⚠️ Chọn danh mục cho trục này');
       if (form.provinceCodes.length === 0) return toast('⚠️ Chọn ít nhất một tỉnh');
@@ -215,19 +210,6 @@ export function RoleGrantForm({
           ))}
         </View>
       </View>
-
-      {scope === 'org_unit' && (
-        <View style={{ marginTop: 18 }}>
-          <AdminPickerField
-            label="Nhóm con"
-            title="Chọn nhóm con"
-            placeholder="Chưa chọn nhóm"
-            items={(units ?? []).map((u) => ({ key: u.id, label: u.name }))}
-            value={form.unitId}
-            onChange={(unitId) => patch({ unitId })}
-          />
-        </View>
-      )}
 
       {(scope === 'category_province' || scope === 'category_ward') && (
         <RoleGrantGeoFields scope={scope} value={form} onChange={patch} />

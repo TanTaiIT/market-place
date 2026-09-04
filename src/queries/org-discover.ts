@@ -95,6 +95,11 @@ export function useActiveOrg() {
 
   return {
     slug,
+    /**
+     * `undefined` với master: họ không nằm trong `myOrgs` nên không tra ra id. Không phải
+     * thiếu sót — `canAdminOrg` short-circuit ở `isMaster` trước khi cần tới id.
+     */
+    id: mine?.id,
     name: mine?.name ?? profile.data?.name,
     layout: mine?.feedLayout ?? profile.data?.feedLayout ?? ('feed' as const),
     // `isLoading` chứ không `isPending`: query đang `enabled: false` (chưa có slug) đứng

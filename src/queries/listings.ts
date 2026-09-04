@@ -215,6 +215,42 @@ export function useDeleteListing() {
   });
 }
 
+/**
+ * "Vẫn còn" — gia hạn tin.
+ *
+ * Refetch contract: `qk.listings()` (bao cả `listingQuota()` vì key quota nằm dưới prefix đó —
+ * chính danh sách `needsReconcile` phải rụng dòng vừa trả lời, nếu không màn chặn hỏi lại đúng
+ * tin đó), `qk.listing(id)` cho trang chi tiết, `savedRoot()` vì tin đã lưu được cache thành
+ * `Listing` đầy đủ dưới nhánh riêng và sẽ còn treo badge "Hết hạn" cũ.
+ *
+ * KHÔNG optimistic: BE có thể từ chối (tin `hidden`/`pending`), mà vẽ trước là hứa với người
+ * bán rằng tin đã trở lại bảng trong khi nó chưa.
+ */
+export function useRenewListing() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.renewListing(id),
+    onSettled: (_d, _e, id) => {
+      qc.invalidateQueries({ queryKey: qk.listings() });
+      qc.invalidateQueries({ queryKey: qk.listing(id) });
+      qc.invalidateQueries({ queryKey: qk.savedRoot() });
+    },
+  });
+}
+
+/** "Đã bán" — cùng refetch contract với `useRenewListing`. */
+export function useMarkListingSold() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.markListingSold(id),
+    onSettled: (_d, _e, id) => {
+      qc.invalidateQueries({ queryKey: qk.listings() });
+      qc.invalidateQueries({ queryKey: qk.listing(id) });
+      qc.invalidateQueries({ queryKey: qk.savedRoot() });
+    },
+  });
+}
+
 export function useUpdateProfile() {
   const qc = useQueryClient();
   return useMutation({

@@ -136,6 +136,25 @@ export function useSetListingStatus() {
 }
 
 /**
+ * Đẩy tin lên đầu bảng.
+ *
+ * Refetch contract KHÁC ba mutation trên: ngoài `adminRoot()` còn phải quét `qk.listings()`
+ * — đẩy tin không đổi trạng thái gì, nó chỉ đổi THỨ TỰ của bảng tin, mà bảng tin nằm ngoài cụm
+ * `admin`. Thiếu vế đó thì bàn quản trị hiện đúng còn bảng tin vẫn xếp như cũ tới lần refetch
+ * kế tiếp, và người bấm tưởng nút không có tác dụng.
+ */
+export function useBumpListing() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => adminApi.bump(id),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: qk.adminRoot() });
+      void qc.invalidateQueries({ queryKey: qk.listings() });
+    },
+  });
+}
+
+/**
  * Chuyển tin sang ô (danh mục × tỉnh) khác — quyền của master.
  *
  * Refetch contract: cùng `adminRoot()` như các mutation trên, cộng thêm `adminCoverage()` nằm

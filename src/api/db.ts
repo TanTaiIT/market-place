@@ -60,7 +60,18 @@ export type Listing = {
    * không phải bộ mới nhất — nếu không, tin cũ hiện field chưa từng có.
    */
   templateVersion?: number;
-  status: 'live' | 'pending';
+  /**
+   * BỐN trạng thái, không phải hai: tin hết hạn và tin đã bán là hai câu trả lời KHÁC nhau mà
+   * chủ tin phải phân biệt được ("gia hạn đi" vs "xong rồi"). 4 trạng thái BE còn lại
+   * (`draft`/`rejected`/`hidden`/`pending_unverified`) vẫn gộp về `pending` — với người bán
+   * chúng đều là "chưa lên bảng".
+   */
+  status: 'live' | 'pending' | 'expired' | 'sold';
+  /**
+   * Mốc hết hạn hiển thị, ISO. Vắng ở tin đăng trước ngày có hạn — màn nào đọc nó phải chịu
+   * được `undefined` chứ không hiện "Invalid Date".
+   */
+  expiresAt?: string;
   mine: boolean;
   /** Lượt xem BE đếm, hiện trên thẻ tin. */
   viewCount: number;
@@ -74,6 +85,30 @@ export type Listing = {
    * tên trong danh sách của mình. Tra không ra thì giấu dòng đó đi, không bịa.
    */
   organizationId: string | null;
+};
+
+/**
+ * Một tin cũ mà màn chặn-trước-khi-đăng đem ra hỏi. RÚT GỌN có chủ đích — chỉ đủ vẽ một dòng
+ * kèm hai nút, không phải một `Listing` đầy đủ: BE cũng chỉ trả đúng bấy nhiêu field.
+ */
+export type StaleListing = {
+  id: string;
+  title: string;
+  /** Ảnh bìa; rỗng = tin không có ảnh, dòng đó rơi về ô màu. */
+  image?: string;
+  /** `expired` = đã rơi khỏi bảng tin; `live` = còn hiển thị nhưng sắp hết hạn. */
+  status: 'live' | 'expired';
+  /** ISO. Vắng ở tin cũ chưa có hạn — hiện "chưa rõ hạn" chứ không "Invalid Date". */
+  expiresAt?: string;
+};
+
+/** Hạn mức đăng tin + những tin cũ cần trả lời trước khi được đăng tiếp. */
+export type PostingQuota = {
+  allowed: boolean;
+  limit: number;
+  pending: number;
+  remaining: number;
+  needsReconcile: StaleListing[];
 };
 
 /** `from` suy từ `senderId` so với người đang đăng nhập — UI chỉ cần biết bên nào. */

@@ -9,7 +9,7 @@ import Animated, {
 // `runOnJS` đã deprecated từ worklets 0.5 — cùng đường vào như `AdminReviewDesk`.
 import { scheduleOnRN } from 'react-native-worklets';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassSheen, glassFace } from './GlassSurface';
 import { Surface } from './Surface';
 import { EmptyState, Loading, ScreenHeader } from './ui';
@@ -56,7 +56,7 @@ const RISE_STEP_MS = 55;
  *
  * Dựng bằng `Modal` chứ không phải một route riêng: form đăng tin giữ state của nó (`categoryId`
  * quyết định template, tức là quyết định luôn bộ field) — tách màn chọn thành route là phải đẩy
- * lựa chọn qua param rồi dựng lại form từ đầu. Vỏ ngoài vẫn là `Surface` + `SafeAreaView` +
+ * lựa chọn qua param rồi dựng lại form từ đầu. Vỏ ngoài vẫn là `Surface` + lề an toàn +
  * `ScreenHeader` giống mọi route khác nên người dùng không phân biệt được.
  *
  * `onSelect` KHÔNG kèm nghĩa đóng màn, và `onDismiss` là đường ra DUY NHẤT khi chưa chọn: người
@@ -82,6 +82,11 @@ export function CategoryPicker({
    * được thẻ khác: cả hai gọi `onSelect`, thẻ bấm sau ghi đè lựa chọn mà người dùng vừa thấy nảy
    * lên, rồi form mở ra với danh mục họ không chọn.
    */
+  /*
+   * `useSafeAreaInsets()` chứ KHÔNG `<SafeAreaView>` — bên trong `<Modal>` thì component đó
+   * không chừa được lề an toàn (xem ghi chú ở chỗ dùng bên dưới).
+   */
+  const insets = useSafeAreaInsets();
   const picked = useRef(false);
   useEffect(() => {
     if (visible) picked.current = false;
@@ -95,8 +100,8 @@ export function CategoryPicker({
 
   /*
    * `statusBarTranslucent` như `PhotoViewer`: thiếu nó thì trên Android cửa sổ Modal không trùm
-   * lên thanh trạng thái, mà `SafeAreaView` bên trong vẫn báo inset của CẢ màn — thành ra cộng
-   * thêm một khoảng trống bằng thanh trạng thái ở đỉnh.
+   * lên thanh trạng thái, mà `insets.top` bên trong vẫn báo lề của CẢ màn — thành ra cộng thêm
+   * một khoảng trống bằng thanh trạng thái ở đỉnh.
    */
   return (
     <Modal
@@ -106,7 +111,21 @@ export function CategoryPicker({
       onRequestClose={onDismiss}
     >
       <Surface>
-        <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        {/*
+          Lề an toàn tự cộng tay, KHÔNG dùng `<SafeAreaView>`.
+
+          `SafeAreaView` là một native view: nó đo lề của CỬA SỔ mà nó nằm trong. Bên trong
+          `<Modal>` — một cửa sổ khác — nó trả về 0 trên iOS, nên nút quay lại của `ScreenHeader`
+          rơi lên đúng chỗ đồng hồ và Dynamic Island, và iOS không chuyển cú chạm ở đó xuống app.
+          Người dùng bấm mãi không được.
+
+          `useSafeAreaInsets()` thì đọc giá trị từ `SafeAreaProvider` qua React context, mà
+          context thì XUYÊN QUA `Modal` (Modal vẫn là con trong cây React). Đây cũng là cách
+          `PhotoViewer` đang làm — modal duy nhất trong app chưa từng gặp lỗi này.
+        */}
+        <View
+          style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
+        >
           <ScreenHeader title="Đăng tin gì?" onBack={onDismiss} />
 
           {loading ? (
@@ -134,7 +153,7 @@ export function CategoryPicker({
               </ScrollView>
             </>
           )}
-        </SafeAreaView>
+        </View>
       </Surface>
     </Modal>
   );

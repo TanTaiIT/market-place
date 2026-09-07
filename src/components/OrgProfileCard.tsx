@@ -1,6 +1,7 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { initialsOf } from '@/api/client';
+import { displayUrl } from '@/api/cloudinary';
 import { Avatar } from './ui';
 import type { Member, OrgProfile } from '@/api/org';
 import { C, F, shadow } from '@/theme';
@@ -36,12 +37,23 @@ export function Header({
     <View>
       {/* `coverUrl` có thì vẽ ảnh, không thì một dải màu — không dựng khung ảnh rỗng. */}
       {org.coverUrl ? (
-        <Image source={{ uri: org.coverUrl }} style={styles.cover} resizeMode="cover" />
+        <Image source={{ uri: displayUrl(org.coverUrl, 800) }} style={styles.cover} resizeMode="cover" />
       ) : (
         <View style={[styles.cover, { backgroundColor: C.moss }]} />
       )}
 
       <View style={[styles.card, styles.overCover, styles.inset]}>
+        {/*
+          Avatar đè lên mép trên thẻ, nửa trong nửa ngoài ảnh bìa — vị trí quen thuộc của
+          mọi trang hồ sơ. Trước bản này nhóm đặt được avatar mà KHÔNG chỗ nào trên trang
+          của chính nó hiện ra: người quản trị tải ảnh lên rồi tưởng mình làm hỏng.
+
+          Không rơi về ảnh bìa như các danh sách nhóm (`orgFace`): ở đây ảnh bìa đang nằm
+          ngay phía trên, lặp lại nó trong vòng tròn là hai lần cùng một ảnh.
+        */}
+        <View style={styles.avatarWrap}>
+          <Avatar text={initialsOf(org.name)} url={org.avatarUrl ?? undefined} size={64} />
+        </View>
         <Text style={styles.name}>{org.name}</Text>
         <Text style={styles.meta}>
           🌐 Công khai · {org.memberCount.toLocaleString('vi-VN')} thành viên ·{' '}
@@ -161,6 +173,15 @@ const styles = StyleSheet.create({
    */
   cover: { width: '100%', aspectRatio: 16 / 9 },
   card: { backgroundColor: C.paperWarm, borderRadius: 10, padding: 18, gap: 9, ...shadow },
+  /** Viền cùng màu thẻ để vòng tròn tách khỏi ảnh bìa phía sau, không dính vào nhau. */
+  avatarWrap: {
+    marginTop: -50,
+    marginBottom: 10,
+    borderWidth: 3,
+    borderColor: C.paperWarm,
+    borderRadius: 999,
+    alignSelf: 'flex-start',
+  },
   /** Đè lên mép dưới ảnh bìa, đúng cách thẻ nổi trên nền trong bản thiết kế. */
   overCover: { marginTop: -22 },
   /*

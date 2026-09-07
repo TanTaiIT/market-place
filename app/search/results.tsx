@@ -49,11 +49,18 @@ export default function SearchResults() {
   const applyFilter = (next: SearchFilter) =>
     router.replace({ pathname: '/search/results', params: searchToParams(next) });
 
-  /** Mở lại form. Vào bằng deep link thì không có gì để back — dựng form từ đúng bộ lọc đang xem. */
+  /**
+   * Mở form lọc, mang theo đúng bộ lọc đang xem.
+   *
+   * `push` chứ KHÔNG `back()`. Bản trước dùng `back()` với lý do "form nằm ngay dưới trong
+   * stack" — điều đó chỉ đúng hồi luồng là `bảng tin → form → kết quả`. Từ khi bảng tin đi
+   * thẳng vào kết quả, thứ nằm dưới là chính bảng tin, nên bấm "Bộ lọc" lại nhảy về trang chủ.
+   *
+   * Đường về do `dismissTo` ở form lo (xem `search/index.tsx`): nó pop lại đúng màn kết quả này
+   * và áp params mới, nên `push` ở đây không làm stack phình theo mỗi vòng sửa bộ lọc.
+   */
   const openForm = () =>
-    router.canGoBack()
-      ? router.back()
-      : router.replace({ pathname: '/search', params: searchToParams(filter) });
+    router.push({ pathname: '/search', params: searchToParams(filter) });
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -97,7 +104,13 @@ export default function SearchResults() {
               text="Không có tin nào khớp. Thử bỏ một tiêu chí ở trên, hoặc mở rộng khoảng giá."
             />
           ) : (
-            <EmptyState icon="🎚️" text="Chọn khu vực, danh mục hoặc nhập từ khoá để bắt đầu tìm." />
+            /*
+             * Bộ lọc rỗng mà vẫn không có tin: cả chợ đang trống, không phải người dùng thiếu
+             * nhập gì. Bản trước ghi "Chọn khu vực, danh mục hoặc nhập từ khoá để bắt đầu tìm"
+             * — câu đó chỉ đúng hồi lượt tìm rỗng bị chặn; giờ nó sẽ đổ lỗi cho người dùng về
+             * một cái kho rỗng.
+             */
+            <EmptyState icon="📭" text="Chưa có tin nào đang đăng." />
           )
         }
       />

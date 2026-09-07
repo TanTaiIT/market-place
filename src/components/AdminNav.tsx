@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAdminListings, useAdminReports, useMyGrants } from '@/queries/admin';
 import { canModerateOrg, canModeratePublicAxis, isMaster, topRole } from '@/api/admin';
 import { useJoinRequestQueue, useMyOrgs } from '@/queries/org';
@@ -100,6 +100,11 @@ const GROUPS: { label: string; org?: boolean; items: NavItem[] }[] = [
 ];
 
 export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void }) {
+  /*
+   * `useSafeAreaInsets()` chứ KHÔNG `<SafeAreaView>` — bên trong `<Modal>` thì component đó
+   * không chừa được lề an toàn (xem ghi chú ở chỗ dùng bên dưới).
+   */
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const pathname = usePathname();
   const { data: queue } = useAdminListings('pending');
@@ -158,7 +163,7 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.scrim} onPress={onClose} />
 
-      <SafeAreaView style={styles.panel} edges={['top', 'bottom']}>
+      <View style={[styles.panel, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <View style={styles.brand}>
           <View style={styles.brandPin} />
           <View>
@@ -242,7 +247,7 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
           </View>
           <Text style={styles.exit}>Thoát ›</Text>
         </Pressable>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }

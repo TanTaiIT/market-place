@@ -14,7 +14,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ListingRow } from '@/components/ListingRow';
 import { PinButton, ScreenHeader } from '@/components/ui';
 import { SearchFilterPanel } from '@/components/SearchFilterPanel';
-import { useToast } from '@/components/Toast';
 import { useCategories, useListings } from '@/queries/listings';
 import {
   activeFilterCount,
@@ -36,20 +35,19 @@ const SUGGEST_MAX = 6;
  * Màn TIÊU CHÍ tìm kiếm — không có kết quả nào ở đây.
  *
  * Bản trước gộp cả hai: ngăn lọc nằm trong `ListHeaderComponent` của danh sách kết quả, và mỗi
- * ký tự gõ vào là một lượt gọi mạng sau 300ms. Hai hệ quả:
+ * ký tự gõ vào là một lượt gọi mạng sau 300ms. Không ai biết khi nào "xong" — kết quả tự đổi
+ * dưới tay trong lúc còn đang chỉnh bộ lọc, nên không có mốc nào để dừng lại. Nút "Tìm kiếm"
+ * dính đáy màn này là mốc đó.
  *
- * 1. **Thanh trượt giá kéo không được.** Nó là cú kéo NGANG nằm trong một danh sách cuộn DỌC,
- *    nên `FlatList` giành cú chạm. Ở đây thanh trượt nằm trong màn của chính nó, và màn tạm khoá
- *    cuộn trong lúc ngón tay còn trên thumb (`onPriceDragChange`).
- * 2. **Không ai biết khi nào "xong".** Kết quả tự đổi dưới tay trong lúc còn đang chỉnh bộ lọc,
- *    nên không có mốc nào để dừng lại. Một nút "Tìm kiếm" là mốc đó.
+ * Lý do thứ hai của việc tách màn — "thanh trượt giá bị `FlatList` giành cú kéo" — đã tự tiêu:
+ * bộ lọc giá nay là ô nhập (`PriceField`), không còn cử chỉ nào để tranh chấp. Việc tách vẫn
+ * đúng vì lý do đầu.
  *
  * Tiêu chí đi sang trang kết quả bằng ROUTE PARAMS (`searchToParams`), không qua store: back trả
  * đúng bộ lọc cũ, và link kết quả gửi được cho người khác.
  */
 export default function SearchForm() {
   const router = useRouter();
-  const toast = useToast();
   /*
    * Mồi từ params, không phải từ rỗng.
    *
@@ -61,8 +59,6 @@ export default function SearchForm() {
   const [filter, setFilter] = useState<SearchFilter>(() =>
     paramsToSearch(params as Record<string, string | string[] | undefined>),
   );
-  /** Ngón tay đang trên thumb giá → khoá cuộn dọc, xem ghi chú đầu file. */
-  const [priceDragging, setPriceDragging] = useState(false);
 
   // Cùng query mà bảng tin dùng, nên đổi chip danh mục là đọc từ cache chứ không gọi lại mạng.
   const { data: suggestions } = useListings(filter.categoryId ?? '');
@@ -71,16 +67,30 @@ export default function SearchForm() {
   const suggested = (suggestions ?? []).slice(0, SUGGEST_MAX);
 
   const count = activeFilterCount(filter);
-  const ready = hasSearchCriteria(filter);
 
-  const submit = () => {
-    if (!ready) {
-      // Không chặn im lặng: nút mờ mà bấm không ra gì là người dùng bấm lại lần nữa.
-      toast('Nhập từ khoá hoặc chọn ít nhất một bộ lọc');
-      return;
-    }
-    router.push({ pathname: '/search/results', params: searchToParams(filter) });
-  };
+  /**
+   * Không còn cửa chặn nào: bộ lọc rỗng là một lượt tìm hợp lệ, trả về tất cả tin.
+   *
+   * Trước đây nút bị `disabled` kèm một toast "Nhập từ khoá hoặc chọn ít nhất một bộ lọc". Cửa
+   * đó chỉ hợp lý khi form là màn ĐẦU của luồng tìm; giờ nó là màn thứ hai (mở ra từ trang kết
+   * quả), nên "xoá hết bộ lọc rồi tìm lại" là thao tác bình thường — mà nút mờ thì không làm
+   * được, và người dùng mắc lại đúng cái tờ khai họ vừa muốn dọn.
+   */
+  /*
+   * `dismissTo` chứ không `push`: form này gần như luôn được mở TỪ trang kết quả, nên đường
+   * đúng là quay lại chính màn đó với bộ lọc mới, không phải xếp thêm một màn kết quả nữa lên
+   * trên. `push` mỗi vòng sửa bộ lọc là một tầng stack — sửa năm lần thì phải bấm back sáu lần
+   * mới về được bảng tin, đúng cái bẫy mà `applyFilter` bên kia đã dùng `replace` để tránh.
+   *
+   * Nó cũng phủ nốt ca deep link thẳng vào `/search`: khi `/search/results` không có trong
+   * stack, `dismissTo` tự chuyển thành `replace` (hành vi khai trong typings) — nên không cần
+   * nhánh `canGoBack()` viết tay như bản trước.
+   *
+   * Params VẪN được áp: `dismissTo` là `linkTo(href, { event: 'POP_TO' })`, tức là đi qua đúng
+   * đường phân giải href kèm params, không phải một lượt pop trần.
+   */
+  const submit = () =>
+    router.dismissTo({ pathname: '/search/results', params: searchToParams(filter) });
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -97,7 +107,6 @@ export default function SearchForm() {
         <ScreenHeader title="Tìm kiếm" />
 
         <ScrollView
-          scrollEnabled={!priceDragging}
           contentContainerStyle={styles.body}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -121,11 +130,7 @@ export default function SearchForm() {
             )}
           </View>
 
-          <SearchFilterPanel
-            filter={filter}
-            onChange={setFilter}
-            onPriceDragChange={setPriceDragging}
-          />
+          <SearchFilterPanel filter={filter} onChange={setFilter} />
 
           {/*
             Dải gợi ý — giữ lại danh sách tin mà bản gộp trước đây vẫn hiện ở màn này.
@@ -162,11 +167,22 @@ export default function SearchForm() {
               <Text style={styles.clear}>Xoá lọc</Text>
             </Pressable>
           )}
+          {/*
+            Nhãn nói ra thứ sắp xảy ra. Chưa có tiêu chí nào thì bấm là mở TẤT CẢ tin — gọi nó
+            là "Tìm kiếm" thì người dùng tưởng mình quên nhập gì đó và ngồi lại điền.
+            `activeFilterCount` cố tình không đếm từ khoá (ô riêng, ngoài ngăn lọc), nên phải
+            hỏi `hasSearchCriteria` chứ không dựa vào `count`.
+          */}
           <PinButton
             tone="ok"
-            label={count > 0 ? `Tìm kiếm · ${count} bộ lọc` : 'Tìm kiếm'}
+            label={
+              !hasSearchCriteria(filter)
+                ? 'Xem tất cả tin'
+                : count > 0
+                  ? `Tìm kiếm · ${count} bộ lọc`
+                  : 'Tìm kiếm'
+            }
             onPress={submit}
-            disabled={!ready}
             style={styles.cta}
           />
         </View>

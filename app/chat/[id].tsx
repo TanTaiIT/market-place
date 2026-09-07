@@ -10,10 +10,10 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar, EmptyState, Loading } from '@/components/ui';
+import { ListingPhoto } from '@/components/ListingPhoto';
 import { chatColor } from '@/api/client';
 import {
   useConversation,
@@ -93,11 +93,19 @@ export default function Chat() {
             onPress={() => router.push(`/listing/${listing.id}`)}
             style={({ pressed }) => [styles.context, pressed && { opacity: 0.8 }]}
           >
-            <LinearGradient
-              colors={listing.photo}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+            {/*
+              Ảnh THẬT của tin, không phải dải màu.
+
+              Chỗ này vốn vẽ thẳng `LinearGradient` — tức là luôn hiện bậc cuối cùng, dù
+              `useListing` ở trên đã tải về đủ `photoUrls`. Người dùng mở chat về một món đồ có
+              ảnh hẳn hoi mà thấy một ô màu trơn. `ListingPhoto` giữ nguyên nhánh dải màu cho
+              tin không ảnh, nên đổi sang nó không mất gì.
+            */}
+            <ListingPhoto
+              photo={listing.photo}
+              photoUrl={listing.photoUrls?.[0]}
               style={styles.contextPhoto}
+              imageStyle={styles.contextPhotoRadius}
             />
             <View style={{ flex: 1 }}>
               <Text numberOfLines={1} style={styles.contextTitle}>
@@ -193,7 +201,9 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     ...shadow,
   },
-  contextPhoto: { width: 38, height: 38, borderRadius: 6 },
+  contextPhoto: { width: 38, height: 38, borderRadius: 6, overflow: 'hidden' },
+  /** `ListingPhoto` đặt ảnh bằng `absoluteFill` nên View cha không bo góc hộ được. */
+  contextPhotoRadius: { borderRadius: 6 },
   contextTitle: { fontFamily: F.uiBold, fontSize: 11.5, color: C.ink },
   contextPrice: { fontFamily: F.monoBold, fontSize: 11, color: C.moss },
   msgRow: { alignItems: 'flex-start' },

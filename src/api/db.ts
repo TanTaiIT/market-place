@@ -132,6 +132,13 @@ export type Conversation = {
   listingId: string;
   /** Snapshot BE chốt lúc mở hội thoại — tin bị gỡ thì vẫn còn tiêu đề để hiện. */
   listingTitle: string;
+  /**
+   * Ảnh tin, cũng là snapshot. `undefined` = tin không ảnh, hoặc hội thoại mở trước khi BE có
+   * field này — cả hai đều rơi về `listingPhoto`.
+   */
+  listingImage?: string;
+  /** Dải màu suy từ id TIN, dùng khi không có ảnh — cùng cặp màu với thẻ tin trên bảng. */
+  listingPhoto: Grad;
   /** Người còn lại trong hội thoại. */
   name: string;
   avatar: string;
@@ -156,6 +163,17 @@ export type Notif = {
   body: string;
   time: string;
   unread: boolean;
+  /**
+   * Nhóm mà việc này xảy ra trong. `undefined` = ngoài mọi nhóm (tin trục danh mục được duyệt,
+   * lời mời từ nhóm mình chưa tham gia). Dùng để gộp các dòng cùng nhóm và tra tên nhóm.
+   */
+  orgId?: string;
+  /** Tên người gây ra — có thì dòng đọc thành "Tài vừa đăng…", vắng thì `title` tự đủ nghĩa. */
+  actorName?: string;
+  /** Tin để bấm vào mở. `undefined` = dòng này không dẫn tới tin nào. */
+  listingId?: string;
+  /** Mốc thật, để gộp theo NGÀY — `time` đã là chuỗi "3 giờ trước", không so được. */
+  at: string;
 };
 
 /**
@@ -196,6 +214,18 @@ export type Profile = {
   province?: ProvinceName;
   ward?: string;
   address?: string;
+  /**
+   * Khu vực ĐÃ GIẢI, do BE quyết — dùng cho mọi khối "quanh bạn", KHÔNG dùng `province` ở trên.
+   *
+   * Khác nhau ở chỗ `province` là thứ người dùng tự khai và phần lớn để trống, còn cái này rơi
+   * tiếp xuống bậc hai: tỉnh suy ra từ nơi họ đã đăng tin. `null` = chưa đủ căn cứ, và ở trạng
+   * thái đó phải ẨN hẳn khối theo vị trí chứ không thay bằng một tỉnh mặc định.
+   *
+   * Thang ưu tiên nằm ở BE (`userService.resolveArea`) chứ không ở đây, cố ý: mỗi màn tự nối
+   * `province ?? suyRa` là mỗi màn một bản sao của cùng luật, và sót một chỗ thì hai màn cạnh
+   * nhau nói hai khu vực khác nhau về cùng một người.
+   */
+  area: { province: ProvinceName; source: 'profile' | 'listings' } | null;
   /** Cho hiện SĐT trên tin đăng MỚI. Tin đã đăng giữ nguyên vì `posterContact` là snapshot. */
   showPhone: boolean;
   /** Chuỗi chứ không phải số: BE chưa trả thống kê nào, nên `—` là giá trị hợp lệ. */
@@ -234,6 +264,14 @@ export type PublicProfile = {
 export type Category = {
   id: string;
   name: string;
+  /**
+   * Khoá ỔN ĐỊNH của danh mục — dùng khi giao diện cần biết đang xem LOẠI gì, không phải chỉ
+   * hiển thị nó. Hiện có một chỗ đọc: thang chip khoảng giá (`PriceField`), vì bậc giá của Bất
+   * động sản và của Sách vở không có gì chung.
+   *
+   * `id` không thay được: nó là ObjectId sinh lúc seed, đổi theo từng môi trường.
+   */
+  slug: string;
   icon: string;
 };
 

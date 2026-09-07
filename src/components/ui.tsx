@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { displayUrl } from '@/api/cloudinary';
 import { C, F, shadow } from '@/theme';
 
 /* ------------------------------- chips ------------------------------- */
@@ -142,6 +143,19 @@ export function GhostButton({ label, onPress }: { label: string; onPress?: () =>
 
 /* ------------------------------ headers ------------------------------ */
 
+/**
+ * Thanh đầu màn: nút quay lại + tiêu đề + ô phải tuỳ chọn.
+ *
+ * **Người gọi PHẢI bọc nó trong `<SafeAreaView edges={['top', …]}>`.** Component này cố tình
+ * không tự đọc `useSafeAreaInsets()`: `SafeAreaView` của `react-native-safe-area-context` là
+ * một native view, nó KHÔNG thu nhỏ context inset cho con — nên nếu ở đây cũng cộng thêm
+ * `insets.top` thì 9 màn đang bọc đúng sẽ bị đệm hai lần.
+ *
+ * Quên bọc thì `paddingTop: 12` là tất cả những gì có, và nút quay lại nằm ở y=12 — lọt dưới
+ * đồng hồ / Dynamic Island, nơi iOS không chuyển cú chạm xuống app. Người dùng bấm mãi không
+ * được và không có gì trên màn hình cho biết vì sao. Đã xảy ra ở `org/[slug]/index`,
+ * `org/[slug]/edit` và `join-org` — cả ba đều dùng `<View>` trần.
+ */
 export function ScreenHeader({
   title,
   onBack,
@@ -182,15 +196,36 @@ export function EmptyState({
   icon,
   text,
   onDark,
+  onRetry,
 }: {
   icon: string;
   text: string;
   onDark?: boolean;
+  /**
+   * Có thì hiện nút "Thử lại" — truyền `refetch` của query vào.
+   *
+   * Chỉ dùng cho trạng thái LỖI, không dùng cho trạng thái rỗng: "chưa có tin nào" thì thử
+   * lại bao nhiêu lần cũng vẫn rỗng, và một nút không đổi được gì dạy người dùng bỏ qua nó.
+   */
+  onRetry?: () => void;
 }) {
   return (
     <Animated.View entering={FadeIn} style={styles.empty}>
       <Text style={{ fontSize: 32, marginBottom: 8 }}>{icon}</Text>
       <Text style={[styles.emptyText, { color: onDark ? C.paperWarm : C.inkSoft }]}>{text}</Text>
+      {/*
+        Mất mạng thường về lại sau vài giây, nhưng trước bản này không có đường nào thử lại tại
+        chỗ — người dùng phải rời màn rồi vào lại mới kích được một lượt gọi mới.
+      */}
+      {!!onRetry && (
+        <Pressable
+          onPress={onRetry}
+          hitSlop={10}
+          style={({ pressed }) => [styles.emptyRetry, pressed && { opacity: 0.6 }]}
+        >
+          <Text style={[styles.emptyRetryText, onDark && { color: C.paperWarm }]}>Thử lại</Text>
+        </Pressable>
+      )}
     </Animated.View>
   );
 }
@@ -285,7 +320,7 @@ export function Avatar({
       {url ? (
         // '100%' chứ không phải `size`: `ring` thêm border 2px mà RN tính border VÀO width, nên
         // ảnh đúng `size` sẽ tràn 4px và bị `overflow: hidden` cắt mất viền ngoài.
-        <Image source={{ uri: url }} style={{ width: '100%', height: '100%' }} />
+        <Image source={{ uri: displayUrl(url, 200) }} style={{ width: '100%', height: '100%' }} />
       ) : (
         <Text style={{ color: textColor, fontFamily: F.uiBold, fontSize: size * 0.36 }}>
           {text}
@@ -366,6 +401,16 @@ const styles = StyleSheet.create({
 
   empty: { paddingVertical: 40, paddingHorizontal: 20, alignItems: 'center' },
   emptyText: { fontFamily: F.uiSemi, fontSize: 13, textAlign: 'center' },
+  /** Viền thay vì nền đầy: đây là đường phụ của một màn đang lỗi, không phải CTA của màn. */
+  emptyRetry: {
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: C.lineInput,
+    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+  },
+  emptyRetryText: { fontFamily: F.uiBold, fontSize: 12.5, color: C.ink },
 
   field: { marginBottom: 18 },
   fieldLabel: {

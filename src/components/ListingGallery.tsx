@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { ListingPhoto } from './ListingPhoto';
 import { PhotoViewer } from './PhotoViewer';
+import { displayUrl } from '@/api/cloudinary';
 import { C, type Grad } from '@/theme';
 
 /**
@@ -65,7 +66,9 @@ export function ListingGallery({
             // để cao tự động thì cha không có chiều cao và ảnh xẹp còn 0.
             style={{ width, height: '100%' }}
           >
-            <Image source={{ uri: item }} style={styles.photo} resizeMode="cover" />
+            {/* Hero chỉ cao 260pt — 1200px là dư cho màn 3x; bản gốc để dành cho PhotoViewer
+                (nơi duy nhất người dùng zoom soi chi tiết). */}
+            <Image source={{ uri: displayUrl(item, 1200) }} style={styles.photo} resizeMode="cover" />
           </Pressable>
         )}
       />

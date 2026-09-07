@@ -1,14 +1,16 @@
 import { FlatList, Share, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
-import { ListingRow } from '@/components/ListingRow';
+import { ListingCard } from '@/components/ListingCard';
 import { Header } from '@/components/OrgProfileCard';
 import { useToast } from '@/components/Toast';
+import { useRequireAuth } from '@/components/GuestGate';
 import { useMyOrgs, useRequestJoin } from '@/queries/org';
 import { useOrgPeek, useOrgProfile } from '@/queries/org-discover';
 import { useMyGrants } from '@/queries/admin';
 import { canAdminOrg } from '@/api/admin';
-import { useProfile } from '@/queries/listings';
+import { useProfile, useSavedIds, useToggleSaved } from '@/queries/listings';
 import type { OrgProfile } from '@/api/org';
 import { C, F } from '@/theme';
 
@@ -30,14 +32,31 @@ export default function OrgProfileScreen() {
   const { data: me } = useProfile();
   const join = useRequestJoin();
   /*
-   * Bảng tin trong nhóm bày bằng DÒNG GỌN — cùng `ListingRow` với màn tìm kiếm, để ai đã quen
-   * quét danh sách ở đó thì ở đây đọc y như vậy.
+   * Tin trong nhóm bày bằng `ListingCard` — CÙNG một thẻ với mọi bề mặt công khai.
    *
-   * Cố tình KHÔNG đọc `feedLayout` của nhóm: thiết lập đó vẫn điều khiển tab Bảng tin (thẻ lớn
-   * hay lưới), nhưng hồ sơ nhóm là chỗ NGƯỜI TA ĐỌC ĐỂ QUYẾT ĐỊNH xin vào — ở đó cần thấy được
-   * nhiều tin trong một màn hơn là thấy một tin thật lớn.
+   * Trước đây là `ListingRow` (dòng gọn), với lý do "cùng thẻ với màn tìm kiếm". Lý do đó đã
+   * hết đúng: màn kết quả tìm kiếm chuyển sang `ListingCard`, nên hồ sơ nhóm thành bề mặt duy
+   * nhất còn dùng dòng gọn — cùng một tin đọc ở hai nơi ra hai hình dạng khác nhau, và người
+   * dùng đọc ra ngay là "tin trong nhóm" khác loại với "tin ngoài kia".
+   *
+   * Vẫn KHÔNG đọc `feedLayout` của nhóm: thiết lập đó chọn giữa thẻ lớn và lưới hai cột cho
+   * bảng tin của nhóm, còn ở đây thẻ lớn là lựa chọn duy nhất — hồ sơ nhóm là chỗ người ta đọc
+   * để quyết định xin vào, mà lưới hai cột thì cắt mất đúng những thứ dùng để quyết định
+   * (lượt xem, người quan tâm, khu vực).
    */
   const peek = useOrgPeek(slug ?? '', Boolean(org?.joined));
+
+  /*
+   * Ba thứ `ListingCard` cần ngoài `item`, mà `ListingRow` không cần.
+   *
+   * `useSavedIds` tự tắt khi chưa đăng nhập (khách vẫn mở được hồ sơ nhóm công khai) — trái tim
+   * hiện rỗng, chạm vào thì `requireAuth` đưa sang màn đăng nhập. Cùng cách màn kết quả tìm
+   * kiếm đang làm, không dựng thêm luật mới ở đây.
+   */
+  const { data: savedIds } = useSavedIds();
+  const toggleSaved = useToggleSaved();
+  const requireAuth = useRequireAuth();
+  const saved = new Set(savedIds ?? []);
   /*
    * Ai được sửa: master, hoặc người giữ grant `manager` trên ĐÚNG nhóm này — xem `canAdminOrg`.
    *
@@ -82,7 +101,8 @@ export default function OrgProfileScreen() {
       <FlatList
         data={peek.data?.listings ?? []}
         keyExtractor={(l) => l.id}
-        contentContainerStyle={[styles.body, { gap: 10 }]}
+        // `gap: 14` khớp nhịp của màn kết quả tìm kiếm — xem `styles.post`.
+        contentContainerStyle={[styles.body, { gap: 14 }]}
         ListHeaderComponent={
           <Header
             org={org}
@@ -112,10 +132,25 @@ export default function OrgProfileScreen() {
         ListHeaderComponentStyle={{ marginBottom: 4 }}
         renderItem={({ item, index }) => (
           <View style={styles.post}>
-            <ListingRow
+            <ListingCard
               item={item}
               index={index}
+              /*
+               * KHÔNG truyền `orgName`, dù ở đây biết chắc nó là gì.
+               *
+               * Viên "🏫 tên nhóm" có nghĩa ở màn kết quả tìm kiếm vì tin ở đó đến từ nhiều
+               * nguồn — nó trả lời "tin này của nhóm nào". Trên chính hồ sơ nhóm thì câu trả
+               * lời đã nằm ở tiêu đề trang, nên in lại trên từng thẻ chỉ là lặp N lần một
+               * thông tin không ai còn hỏi. `ListingCard` tự giấu viên đó khi prop vắng.
+               */
+              saved={saved.has(item.id)}
               onPress={() => router.push(`/listing/${item.id}`)}
+              onToggleSave={() =>
+                requireAuth(
+                  () => toggleSaved.mutate({ id: item.id, saved: !saved.has(item.id) }),
+                  'Đăng nhập để lưu tin',
+                )
+              }
             />
           </View>
         )}
@@ -146,12 +181,22 @@ function GroupFeed({ org }: { org: OrgProfile }) {
   );
 }
 
+/**
+ * `SafeAreaView edges={['top']}`, không phải `View` trần.
+ *
+ * `ScreenHeader` KHÔNG tự chừa lề trên (xem docblock của nó), nên `View` trần đặt nút quay lại
+ * ở y=0 — nằm dưới đồng hồ và Dynamic Island, và trên iPhone có tai thì vùng đó không nhận
+ * được cú chạm. Đúng lỗi "bấm back không được" ở trang này.
+ *
+ * `['top']` thôi: đáy trang là danh sách tin cuộn được, chừa thêm lề dưới sẽ cắt một dải trống
+ * giữa tin cuối và mép màn.
+ */
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <View style={{ flex: 1, backgroundColor: C.cork }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.cork }} edges={['top']}>
       <ScreenHeader title="Nhóm" />
       {children}
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -159,7 +204,14 @@ const styles = StyleSheet.create({
   /** Khoảng cách hàng do call-site truyền vào — 10, khớp danh sách của màn tìm kiếm. */
   body: { paddingBottom: 32 },
   /** Lề NGOÀI cho thẻ tin, khớp với `inset` của khối hồ sơ phía trên. */
-  post: { marginHorizontal: 14 },
+  /*
+   * Lề đặt trên TỪNG thẻ, không trên `contentContainerStyle`: ảnh bìa + thẻ hồ sơ nhóm ở
+   * `ListHeaderComponent` phải tràn hết bề ngang, mà padding của container thì thụt cả nó vào.
+   *
+   * 16 để khớp `paddingHorizontal` của màn kết quả tìm kiếm — hai trang bày CÙNG một loại thẻ
+   * thì không được lệch nhau vài pixel, người dùng đọc ra ngay là hai màn khác nhau.
+   */
+  post: { marginHorizontal: 16 },
 
   section: { fontFamily: F.mono, fontSize: 10, letterSpacing: 1.2, color: C.sand, marginTop: 4 },
   rule: {

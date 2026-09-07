@@ -18,6 +18,7 @@ import type {
   JoinRequest,
   Member,
   OrganizationLookup,
+  MyOrganization,
   OrganizationProfile,
   UpdateOrganization,
 } from './generated';
@@ -77,20 +78,19 @@ function untilText(iso: string): string {
 }
 
 /** Một tổ chức mà tôi là thành viên — nguồn của bộ chuyển tổ chức. */
-export type MyOrg = {
-  id: string;
-  name: string;
-  slug: string;
-  role: string;
-  unitId: string | null;
-  /** Bảng tin của nhóm này bày một cột hay hai — do quản trị nhóm đặt. */
-  feedLayout: 'feed' | 'grid';
-  /**
-   * Org bị khoá VẪN nằm trong danh sách này (BE cố ý giữ, để phân biệt "khoá" với "không còn").
-   * Đọc nó trước khi chọn: gửi slug của một org không ACTIVE là ăn 403 ở mọi request.
-   */
-  status: 'active' | 'suspended' | 'pending_admin';
-};
+/**
+ * Một tổ chức mình thuộc về. ALIAS thẳng DTO của BE, không khai lại từng field.
+ *
+ * `orgApi.myOrgs` trả nguyên response (`unwrap` không map gì), nên một type viết tay ở đây chỉ
+ * là bản sao — và bản sao thì THIẾU ÂM THẦM: nó bỏ sót `avatarUrl` suốt thời gian qua, nên dữ
+ * liệu vẫn về tới máy mà TypeScript bảo không có, và không màn nào dùng được. Kết quả là nhóm
+ * của chính mình hiện dải màu trơn trong khi nhóm người lạ ở danh sách bên cạnh có ảnh.
+ *
+ * Ghi chú giữ lại từ bản cũ, vì nó là thứ không đọc ra được từ type: org bị KHOÁ vẫn nằm trong
+ * danh sách này (BE cố ý giữ, để phân biệt "khoá" với "không còn"). Đọc `status` trước khi
+ * chọn — gửi slug của một org không ACTIVE là ăn 403 ở mọi request.
+ */
+export type MyOrg = MyOrganization;
 
 /**
  * Một đơn trên bàn duyệt. Khác `MyJoinRequest` ở hai chỗ mà BE cố tình tách schema: có

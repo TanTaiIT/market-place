@@ -1,18 +1,20 @@
-import { formatPrice } from './client';
-
 /**
- * SỐ TẠM CHO GIAO DIỆN MỚI — hardcode có chủ ý, chờ BE.
+ * NỘI DUNG TĨNH CHỜ BE — hardcode có chủ ý, gom một chỗ để gỡ một lượt.
  *
- * Prototype vẽ nhiều khối mà hệ thống chưa có dữ liệu: sao đánh giá, số giao dịch, giá cũ/giảm
- * giá, khoảng cách, giao tận nơi, banner khuyến mãi. Chúng nằm HẾT ở file này, không rải vào
- * component — rải ra thì ba tháng sau không ai còn phân biệt được số thật với số tạm, và lúc BE
- * có thật thì phải đi dò từng màn.
+ * Còn lại ba nhóm, và chúng khác hẳn nhau về mức độ nguy hiểm:
  *
- * Gỡ thế nào: `grep -rn "placeholders" src app` ra đúng danh sách call-site cần đổi sang dữ liệu
- * thật. Mỗi nhóm dưới đây ghi rõ nó chờ cái gì ở BE.
+ * 1. `SHIP` — trang trí trên thẻ tin. Bịa được vì nó không phải bằng chứng về người bán.
+ * 2. `PROMOS` / `BANNERS` — khối quảng bá, chờ hệ chiến dịch. `PROMOS` hứa CON SỐ cụ thể
+ *    ("miễn phí tháng 9", "-30%") mà không có gì thực thi phía sau — đó là rủi ro nghiệp vụ,
+ *    không phải nợ kỹ thuật.
+ * 3. `GUIDE_STEPS` / `PERKS` — chữ giới thiệu sản phẩm. Không phải dữ liệu, và sẽ không bao
+ *    giờ đến từ DB trừ khi marketing cần tự sửa mà không build lại.
  *
- * Vì sao mỗi tin một con số khác nhau: cả bảng tin hiện cùng "5.0 · 12 giao dịch" thì nhìn là
- * biết bịa. Suy từ id nên cùng một tin luôn ra cùng số, không nhảy mỗi lần render.
+ * ĐÃ GỠ HẲN (không phải chuyển đi đâu): sao đánh giá, số giao dịch, % giảm giá, giá cũ gạch
+ * ngang, khoảng cách. Chúng là thứ người mua dựa vào để chọn nhắn cho ai — bịa số trang trí
+ * là một chuyện, bịa bằng chứng về độ tin cậy của một con người là chuyện khác.
+ *
+ * Gỡ tiếp thế nào: `grep -rn "placeholders" src app` ra đúng danh sách call-site.
  */
 
 /** Băm id thành số nguyên ổn định — cùng id, cùng kết quả, mọi phiên. */
@@ -25,50 +27,19 @@ function hash(id: string): number {
 const pick = <T,>(id: string, table: readonly T[], salt = 0): T =>
   table[(hash(id) + salt) % table.length];
 
-/** TODO(be): module `review` đang là stub (`NotImplementedError`) — chưa có `ratingAvg` thật. */
-const RATINGS = ['5.0', '4.9', '4.8', '5.0', '4.7'] as const;
-const DEALS = [12, 7, 31, 4, 19, 9] as const;
-
-/** TODO(be): `Listing` không có giá cũ/khuyến mãi. `0` = không giảm, thẻ tự giấu nhãn. */
-const OFFS = [0, 0, 16, 22, 0, 12] as const;
-
-/** TODO(be): BE đã bỏ GeoJSON nên không tính được khoảng cách thật. */
-const DISTANCES = ['cách 300m', 'cách 120m', 'cách 450m', 'cách 1,2km', 'cách 800m'] as const;
-
-/** TODO(be): không có field vận chuyển trên `Listing`. */
+/**
+ * TODO(be): không có field vận chuyển trên `Listing`.
+ *
+ * Thứ DUY NHẤT còn sót lại của bộ số tạm. Năm thứ kia — sao đánh giá, số giao dịch, % giảm,
+ * giá cũ gạch ngang, khoảng cách — đã gỡ hẳn: chúng là những con số người mua DỰA VÀO ĐỂ
+ * QUYẾT ĐỊNH nhắn cho ai, mà ba trong số đó BE không có đường nào cấp trong tương lai gần
+ * (module `review` còn là stub, `Listing` không có giá cũ, BE đã bỏ GeoJSON). Bịa một con số
+ * trang trí là một chuyện; bịa bằng chứng đáng tin cậy về người bán là chuyện khác.
+ */
 const SHIP = [true, false, false, true, false] as const;
 
-/** TODO(be): tình trạng món đồ chỉ có khi danh mục đã cấu hình `attributes` — đây là bản dự phòng. */
-const CONDITIONS = ['Như mới', 'Đã dùng', 'Mới'] as const;
-
-export interface ListingPlaceholder {
-  rating: string;
-  deals: number;
-  /** Phần trăm giảm; `0` = không có khuyến mãi. */
-  off: number;
-  /** Giá gạch ngang, chỉ có khi `off > 0`. */
-  oldPrice: string;
-  distance: string;
-  ship: boolean;
-  condition: string;
-}
-
-/**
- * Bộ số tạm của MỘT tin. `priceValue` là giá THẬT — giá cũ suy ngược từ nó để hai con số không
- * chửi nhau (giảm 22% mà giá cũ thấp hơn giá mới thì lộ ngay).
- */
-export function listingPlaceholder(id: string, priceValue: number): ListingPlaceholder {
-  const off = pick(id, OFFS, 3);
-  return {
-    rating: pick(id, RATINGS),
-    deals: pick(id, DEALS, 1),
-    off,
-    oldPrice: off > 0 && priceValue > 0 ? formatPrice(Math.round(priceValue / (1 - off / 100))) : '',
-    distance: pick(id, DISTANCES, 2),
-    ship: pick(id, SHIP, 4),
-    condition: pick(id, CONDITIONS, 5),
-  };
-}
+/** Tin này có giao tận nơi không — cùng `id` luôn ra cùng câu trả lời. */
+export const listingShips = (id: string): boolean => pick(id, SHIP, 4);
 
 /** TODO(be): chưa có hệ khuyến mãi/chiến dịch. Banner "Đang diễn ra" ở màn Khám phá. */
 export const PROMOS = [
@@ -85,6 +56,90 @@ export const PROMOS = [
     note: 'Nhường lại cho khoá dưới',
     big: '-30%',
     grad: ['#FF9A5B', '#F2683C'] as const,
+  },
+] as const;
+
+/**
+ * TODO(be): chưa có hệ quảng cáo/chiến dịch. Khối banner lớn giữa trang chủ — thế chỗ
+ * danh sách tin (bảng tin giờ nằm sau tìm kiếm/danh mục). Mỗi banner một mảng gradient
+ * full bề ngang kiểu "Bạn muốn cho thuê xe" của Mioto, bấm vào đi thẳng tới hành động.
+ *
+ * `authMessage`: banner dẫn tới hành động cần đăng nhập thì mang theo lời mời của
+ * chính nó — cùng cơ chế `requireAuth` mọi nút khác đang dùng.
+ */
+export type Banner = {
+  id: string;
+  icon: string;
+  title: string;
+  body: string;
+  cta: string;
+  /** Đường dẫn expo-router mà banner dẫn tới. */
+  route: string;
+  /** Có mặt = hành động cần đăng nhập; chuỗi là lời mời hiện trên cổng `requireAuth`. */
+  authMessage?: string;
+  grad: readonly [string, string];
+};
+
+export const BANNERS: readonly Banner[] = [
+  {
+    id: 'b1',
+    icon: '📌',
+    title: 'Có đồ không dùng tới?',
+    body: 'Chụp một tấm ảnh, đặt giá, ghim lên bảng tin trường — người mua ở ngay lớp bên cạnh.',
+    cta: 'Đăng tin ngay',
+    route: '/post',
+    authMessage: 'Đăng nhập để đăng tin',
+    grad: ['#3ECD7F', '#1F8F55'] as const,
+  },
+  {
+    id: 'b2',
+    icon: '🏫',
+    title: 'Trường bạn đã có bảng tin chưa?',
+    body: 'Tìm nhóm của trường để xem tin nội bộ — chỉ người cùng trường thấy nhau, giao dịch yên tâm hơn.',
+    cta: 'Tìm nhóm của trường',
+    route: '/join-org',
+    authMessage: 'Đăng nhập để vào nhóm',
+    grad: ['#5BA8FF', '#2F6FDD'] as const,
+  },
+  {
+    id: 'b3',
+    icon: '🔎',
+    title: 'Đang cần tìm món gì đó?',
+    body: 'Lọc theo danh mục, khu vực và khoảng giá — vài chạm là ra đúng món trong tầm tiền.',
+    cta: 'Tìm tin ngay',
+    route: '/search',
+    grad: ['#FF9A5B', '#F2683C'] as const,
+  },
+];
+
+/**
+ * Dải "Ghim hoạt động thế nào" — các bước từ đăng tin đến chốt kèo, chữ tĩnh giới thiệu
+ * hệ thống cho người mới. Mỗi bước một thẻ cuộn ngang, số bước là thứ tự trong mảng.
+ */
+export const GUIDE_STEPS = [
+  {
+    id: 'g1',
+    icon: '📸',
+    title: 'Chụp và đăng trong 30 giây',
+    body: 'Chọn ảnh, đặt giá, chọn danh mục — không cần mô tả dài dòng. Tin của bạn lên bảng ngay khi được duyệt.',
+  },
+  {
+    id: 'g2',
+    icon: '🛡️',
+    title: 'Tin nào cũng qua kiểm duyệt',
+    body: 'Quản trị nhóm duyệt từng tin trước khi hiện lên bảng. Không tin rác, không lừa đảo, không nội dung xấu.',
+  },
+  {
+    id: 'g3',
+    icon: '💬',
+    title: 'Nhắn tin ngay trong app',
+    body: 'Hỏi giá, trả giá, hẹn giờ — mọi trao đổi nằm trong khung chat, không cần cho số điện thoại nếu không muốn.',
+  },
+  {
+    id: 'g4',
+    icon: '🤝',
+    title: 'Gặp mặt rồi mới trả tiền',
+    body: 'Hẹn ở cổng trường hay căng tin, xem hàng tận tay. Không cọc trước, không ship xa, không rủi ro.',
   },
 ] as const;
 

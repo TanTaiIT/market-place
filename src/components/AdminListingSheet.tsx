@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ModListing } from '@/api/admin';
 import { ListingPhoto } from './ListingPhoto';
 import { StatusBadge } from './AdminListingRow';
@@ -26,12 +26,18 @@ export function AdminListingSheet({
   onToggleHide: (item: ModListing) => void;
   onRemove: (item: ModListing) => void;
 }) {
+  /*
+   * `useSafeAreaInsets()` chứ KHÔNG `<SafeAreaView>` — bên trong `<Modal>` thì component đó
+   * không chừa được lề an toàn (xem ghi chú ở chỗ dùng bên dưới).
+   */
+  const insets = useSafeAreaInsets();
+
   return (
     <Modal visible={!!item} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.scrim} onPress={onClose} />
 
       {!!item && (
-        <SafeAreaView style={styles.sheet} edges={['bottom']}>
+        <View style={[styles.sheet, { paddingBottom: insets.bottom }]}>
           <View style={styles.head}>
             <Text style={styles.headTitle}>Chi tiết tin đăng</Text>
             <Pressable onPress={onClose} hitSlop={10} style={styles.close}>
@@ -83,7 +89,7 @@ export function AdminListingSheet({
               <Text style={styles.btnDangerText}>Gỡ khỏi bảng</Text>
             </Pressable>
           </View>
-        </SafeAreaView>
+        </View>
       )}
     </Modal>
   );

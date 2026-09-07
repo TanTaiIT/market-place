@@ -40,7 +40,7 @@ import type {
   PublicProfile as PublicProfileDto,
 } from './generated';
 import type { Province, ProvinceName } from './location';
-import { CHAT_COLORS, hasSearchCriteria, NEW_PHOTOS } from './db';
+import { CHAT_COLORS, NEW_PHOTOS } from './db';
 import type {
   AuthSession,
   Category,
@@ -93,10 +93,19 @@ export function unwrap<TPayload>(res: SdkResult<TPayload>, fallback: string): TP
 
 // ── MAPPER: DTO → domain ────────────────────────────────────────────
 
-/** Hermes không có Intl đầy đủ nên `toLocaleString` không tin được — chấm nghìn bằng tay. */
+/**
+ * Chấm nghìn kiểu Việt: `"3500000"` → `"3.500.000"`. Hermes không có Intl đầy đủ nên
+ * `toLocaleString` không tin được — cắt bằng tay.
+ *
+ * Tách khỏi `formatPrice` cho Ô NHẬP giá: ô nhập cần đúng phần chấm nghìn, không cần đuôi "đ"
+ * lẫn nhánh "Miễn phí" — hai thứ đó lọt vào `value` là người dùng phải xoá chúng trước khi gõ.
+ */
+export const groupDigits = (digits: string): string =>
+  digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
 export function formatPrice(price: number): string {
   if (price <= 0) return 'Miễn phí';
-  return `${String(Math.round(price)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}đ`;
+  return `${groupDigits(String(Math.round(price)))}đ`;
 }
 
 /** Chữ viết tắt vẽ trong vòng tròn khi người dùng chưa có ảnh thật — xem `Avatar`. */
@@ -242,6 +251,7 @@ function toProfile(dto: MeProfile): Profile {
     province: dto.location?.province,
     ward: dto.location?.ward,
     address: dto.location?.address,
+    area: dto.area,
     showPhone: dto.showPhone,
     posted: '—',
     sold: '—',
@@ -272,6 +282,10 @@ function toConversation(dto: ConversationDto): Conversation {
     id: dto.id,
     listingId: dto.listingId,
     listingTitle: dto.listingTitle,
+    listingImage: dto.listingImage || undefined,
+    // Dải màu suy từ id TIN, không từ id hội thoại: cùng một tin phải ra cùng một cặp màu ở
+    // thẻ trên bảng và ở dòng tin nhắn, nếu không thì hai chỗ nói về một món đồ mà nhìn như hai.
+    listingPhoto: gradOf(dto.listingId),
     name: dto.partnerName,
     avatar: initialsOf(dto.partnerName),
     avatarUrl: dto.partnerAvatar || undefined,
@@ -473,6 +487,7 @@ export const api = {
     return unwrap(res, 'Không tải được danh mục').map((c) => ({
       id: c.id,
       name: c.name,
+      slug: c.slug,
       icon: c.icon,
     }));
   },
@@ -523,7 +538,18 @@ export const api = {
   async getOrgListings(slug: string, take: number): Promise<Listing[]> {
     const [res, names] = await Promise.all([
       withAuthRetry(() =>
-        listingList({ query: { limit: take }, headers: { [ORG_HEADER]: slug } }),
+        listingList({
+          /*
+           * `visibility: 'org_internal'` là BẮT BUỘC ở đây, không phải tinh chỉnh.
+           *
+           * Scope đọc của BE là "nhánh org HOẶC nhánh công khai" — đúng cho bảng tin chính,
+           * nhưng ở mục "Tin trong nhóm" thì không lọc gì nghĩa là hứng luôn cả trục công khai.
+           * Triệu chứng đã gặp: một nhóm vừa tạo, chưa mời ai, chưa có tin nào, vẫn bày ra 6
+           * tin `organizationId: null` chẳng liên quan gì tới nhóm.
+           */
+          query: { limit: take, visibility: 'org_internal' },
+          headers: { [ORG_HEADER]: slug },
+        }),
       ),
       categoryNames(),
     ]);
@@ -571,10 +597,15 @@ export const api = {
    * xác, gửi "TP. Hồ Chí Minh" thay vì "Hồ Chí Minh" giờ là 400 chứ không còn im lặng trả rỗng.
    */
   async searchListings(filter: SearchFilter): Promise<Listing[]> {
-    // Không ràng buộc nào thì đây là "tất cả tin", không phải một lượt tìm — trả rỗng để màn
-    // hình hiện lời mời nhập, thay vì đổ nguyên bảng tin vào ô kết quả tìm kiếm.
-    if (!hasSearchCriteria(filter)) return [];
-
+    /*
+     * KHÔNG chặn lượt tìm rỗng.
+     *
+     * Bản trước trả `[]` ngay khi chưa có tiêu chí nào, với lý do "đừng đổ nguyên bảng tin vào ô
+     * kết quả tìm kiếm". Nhưng bảng tin đã thôi bày danh sách tin (nó là màn khám phá), nên
+     * "tất cả tin" giờ KHÔNG còn trùng với màn nào — và nó chính là điểm khởi đầu đúng: mở danh
+     * sách đầy đủ trước, thu hẹp bằng `SearchCrumbBar` sau, thay vì buộc người dùng khai tiêu
+     * chí trước khi được thấy bất cứ thứ gì.
+     */
     const term = filter.q.trim();
     const [res, names] = await Promise.all([
       withAuthRetry(() =>
@@ -811,6 +842,10 @@ export const api = {
       body: n.body,
       time: relativeTime(n.createdAt),
       unread: !n.isRead,
+      orgId: n.organizationId ?? undefined,
+      actorName: n.actorName,
+      listingId: n.listingId ?? undefined,
+      at: n.createdAt,
     }));
   },
 

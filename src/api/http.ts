@@ -199,6 +199,29 @@ export async function withAuthRetry<T extends SdkOutcome>(call: () => Promise<T>
   return (await refreshOnce()) ? call() : first;
 }
 
+/**
+ * Câu người dùng đọc khi request KHÔNG tới được server.
+ *
+ * Đây là chỗ duy nhất dịch nhóm lỗi đó, vì `fetch` bên dưới là điểm nghẽn mà MỌI lượt gọi SDK
+ * đi qua — cả đường có token lẫn đường công khai (`categoryList`, `organizationLookup`…). Hơn
+ * hai chục màn đang in thẳng `error.message` vào `EmptyState`, nên không dịch ở đây thì người
+ * dùng đọc nguyên văn thứ mà tầng native ném ra: *"fetch failed: UnexpectedException: Could
+ * not connect to server. (at ExpoModulesCore/Promise.swift:56)"*.
+ *
+ * Nhận diện bằng "fetch có NÉM hay không", không so chuỗi: lỗi HTTP (4xx/5xx) không ném — nó
+ * về dưới dạng response và đã có `unwrap` xử. Fetch mà ném thì chắc chắn là tầng vận chuyển,
+ * và chuỗi báo lỗi khác nhau giữa `expo/fetch` (SDK 52+, WinterCG) và fetch cũ của RN
+ * (`TypeError: Network request failed`) — so chuỗi là hẹn một ngày đổi SDK là hỏng lặng.
+ *
+ * `__DEV__` thì kèm URL đang gọi. Ca hay gặp nhất khi dev là `EXPO_PUBLIC_API_URL` còn trỏ vào
+ * LAN IP cũ sau khi DHCP cấp lại — biết ngay nó đang gọi đâu thì hết phải đoán. Bản release
+ * không hiện: người dùng không cần biết địa chỉ nội bộ, và nó chỉ làm câu thông báo rối.
+ */
+function networkMessage(): string {
+  const base = 'Không kết nối được tới server. Kiểm tra Wi-Fi hoặc 4G rồi thử lại.';
+  return __DEV__ ? `${base}\n(đang gọi ${API_BASE_URL})` : base;
+}
+
 export const createClientConfig: CreateClientConfig = (config) => ({
   ...config,
   baseUrl: API_BASE_URL,
@@ -221,7 +244,7 @@ export const createClientConfig: CreateClientConfig = (config) => ({
    * chức) nên phải đọc đúng lúc gửi. Đây cũng là chỗ duy nhất làm được việc đó mà không phải
    * import `client.gen.ts` vào đây: file đó import ngược lại chính `http.ts` làm runtime config.
    */
-  fetch: (request) => {
+  fetch: async (request) => {
     // Kiểu khai của hey-api rộng hơn thực tế (`string | URL | Request`), nhưng client-fetch
     // luôn dựng sẵn `Request` trước khi gọi. Thu hẹp bằng `instanceof` thay vì ép kiểu: nếu
     // một bản sau đổi cách gọi, header chỉ đơn giản không được gắn thay vì nổ lúc chạy.
@@ -235,6 +258,19 @@ export const createClientConfig: CreateClientConfig = (config) => ({
     if (activeOrgSlug && request instanceof Request && !request.headers.has(ORG_HEADER)) {
       request.headers.set(ORG_HEADER, activeOrgSlug);
     }
-    return globalThis.fetch(request);
+
+    try {
+      return await globalThis.fetch(request);
+    } catch (err) {
+      /*
+       * Request bị HUỶ không phải lỗi mạng: TanStack cancel khi component unmount hoặc khi
+       * query key đổi giữa lúc đang bay. Đổi nó thành lỗi mạng là hiện "mất kết nối" cho một
+       * lượt gọi mà chính app vừa chủ động bỏ.
+       */
+      if (err instanceof Error && err.name === 'AbortError') throw err;
+      // `cause` giữ nguyên lỗi gốc của tầng native: giao diện đọc `message` đã dịch, còn log
+      // và màn ErrorScreen vẫn lần được về đúng chuỗi mà `expo/fetch` ném ra.
+      throw new Error(networkMessage(), { cause: err });
+    }
   },
 });

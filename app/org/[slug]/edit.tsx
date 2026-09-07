@@ -2,7 +2,10 @@ import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { initialsOf } from '@/api/client';
 import { uploadImage } from '@/api/cloudinary';
+import { AvatarPicker } from '@/components/AvatarPicker';
 import { BoxField, FormSection } from '@/components/FormSection';
 import { EmptyState, Loading, PinButton, ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
@@ -70,7 +73,13 @@ export default function OrgEditScreen() {
   return (
     <Shell>
       <Form
-        initial={{ coverUrl: org.coverUrl, description: org.description, rules: org.rules }}
+        name={org.name}
+        initial={{
+          avatarUrl: org.avatarUrl,
+          coverUrl: org.coverUrl,
+          description: org.description,
+          rules: org.rules,
+        }}
         busy={save.isPending}
         onSave={(patch) =>
           save.mutate(patch, {
@@ -86,20 +95,29 @@ export default function OrgEditScreen() {
   );
 }
 
-type Draft = { coverUrl: string | null; description: string; rules: string[] };
+type Draft = {
+  avatarUrl: string | null;
+  coverUrl: string | null;
+  description: string;
+  rules: string[];
+};
 /** Một dòng nội quy trong form. `id` chỉ sống ở client — xem `rules` trong `<Form>`. */
 type Rule = { id: string; text: string };
 
 function Form({
+  name,
   initial,
   busy,
   onSave,
 }: {
+  /** Tên nhóm — chỉ để dựng chữ viết tắt khi chưa có avatar. */
+  name: string;
   initial: Draft;
   busy: boolean;
   onSave: (patch: Draft) => void;
 }) {
   const toast = useToast();
+  const [avatar, setAvatar] = useState(initial.avatarUrl);
   const [cover, setCover] = useState(initial.coverUrl);
   const [desc, setDesc] = useState(initial.description);
   /*
@@ -148,6 +166,7 @@ function Form({
     // Bỏ dòng trống TRƯỚC khi gửi: BE từ chối dòng rỗng, mà một dòng người dùng vừa thêm rồi
     // bỏ trống không phải lỗi của họ — đó là ý "tôi đổi ý", nên lặng lẽ bỏ đúng hơn là báo lỗi.
     onSave({
+      avatarUrl: avatar,
       coverUrl: cover,
       description: desc.trim(),
       rules: rules.map((r) => r.text.trim()).filter(Boolean),
@@ -156,6 +175,27 @@ function Form({
 
   return (
     <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <FormSection
+        title="Ảnh đại diện"
+        hint="Hình vuông, hiện ở mọi danh sách nhóm và trên đầu hồ sơ"
+      />
+
+      {/*
+        Dùng lại `AvatarPicker` của hồ sơ người dùng: nó đã ép cắt vuông ngay lúc chọn và tải
+        lên Cloudinary ngay, nên avatar nhóm không phải một bản sao thứ hai của cùng luồng đó.
+      */}
+      <AvatarPicker
+        initials={initialsOf(name)}
+        url={avatar ?? undefined}
+        onChange={(url) => setAvatar(url)}
+      />
+      {!!avatar && (
+        <Pressable onPress={() => setAvatar(null)} style={styles.avatarRemove}>
+          {/* `null` là lệnh GỠ với BE, khác hẳn không gửi field — xem `orgApi.update`. */}
+          <Text style={[styles.link, { color: C.pin }]}>Gỡ ảnh đại diện</Text>
+        </Pressable>
+      )}
+
       <FormSection title="Ảnh bìa" hint="Khổ ngang, hiện trên đầu hồ sơ nhóm" />
 
       <Pressable onPress={pickCover} disabled={uploading} style={styles.coverBox}>
@@ -243,17 +283,19 @@ function Form({
   );
 }
 
+/** `SafeAreaView` chứ không `View`: `ScreenHeader` không tự chừa lề trên — xem docblock của nó. */
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <View style={{ flex: 1, backgroundColor: C.cork }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.cork }} edges={['top']}>
       <ScreenHeader title="Sửa thông tin nhóm" />
       {children}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   body: { padding: 18, paddingBottom: 40 },
+  avatarRemove: { alignSelf: 'center', marginTop: -14, marginBottom: 20 },
   coverBox: { borderRadius: 10, overflow: 'hidden' },
   coverImg: { width: '100%', aspectRatio: 16 / 9 },
   coverEmpty: {

@@ -22,9 +22,7 @@ import { C, F, G, R } from '@/theme';
  */
 export function FeedBar({
   topInset,
-  name,
-  avatar,
-  avatarUrl,
+  me,
   myOrgs,
   categories,
   categoryId,
@@ -40,15 +38,13 @@ export function FeedBar({
 }: {
   /** Chiều cao tai thỏ. Nền xanh phải chạy lên tận đỉnh, nên inset nằm TRONG nền chứ không ngoài. */
   topInset: number;
-  /** Tên người đang đăng nhập. `undefined` = khách — vẫn xem được bảng tin. */
-  name?: string;
-  avatar: string;
-  avatarUrl?: string;
+  /** Người đang đăng nhập. `undefined` = khách — vẫn xem được bảng tin, xem `FeedGreeting`. */
+  me?: { name: string; avatar: string; avatarUrl?: string };
   myOrgs: MyOrg[];
   categories: Category[];
   categoryId: string;
   onCategory: (id: string) => void;
-  onSearch: (province: ProvinceName | null) => void;
+  onSearch: (q: string, categoryId: string | null, province: ProvinceName | null) => void;
   onProfile: () => void;
   onSignIn: () => void;
   onSaved: () => void;
@@ -72,9 +68,7 @@ export function FeedBar({
           <View pointerEvents="none" style={styles.glow} />
 
           <FeedGreeting
-            name={name}
-            avatar={avatar}
-            avatarUrl={avatarUrl}
+            me={me}
             myOrgs={myOrgs}
             onProfile={onProfile}
             onSignIn={onSignIn}
@@ -84,12 +78,7 @@ export function FeedBar({
             onFindOrg={onFindOrg}
           />
 
-          <FeedSearchCard
-            categories={categories}
-            categoryId={categoryId}
-            onCategory={onCategory}
-            onSearch={onSearch}
-          />
+          <FeedSearchCard categories={categories} onSearch={onSearch} />
         </LinearGradient>
       </View>
 

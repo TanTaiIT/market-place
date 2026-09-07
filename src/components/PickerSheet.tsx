@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Loading } from './ui';
 import { C, F } from '@/theme';
 
@@ -41,11 +41,17 @@ export function PickerSheet<T extends string>({
   onSelect: (value: T | null) => void;
   onClose: () => void;
 }) {
+  /*
+   * `useSafeAreaInsets()` chứ KHÔNG `<SafeAreaView>` — bên trong `<Modal>` thì component đó
+   * không chừa được lề an toàn (xem ghi chú ở chỗ dùng bên dưới).
+   */
+  const insets = useSafeAreaInsets();
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.scrim} onPress={onClose} />
 
-      <SafeAreaView style={styles.sheet} edges={['bottom']}>
+      <View style={[styles.sheet, { paddingBottom: insets.bottom }]}>
         <View style={styles.head}>
           <Text style={styles.headTitle}>{title}</Text>
           <Pressable onPress={onClose} hitSlop={10} style={styles.close}>
@@ -66,7 +72,7 @@ export function PickerSheet<T extends string>({
           }}
           emptyAll={emptyAll}
         />
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated, {
@@ -18,6 +18,7 @@ import { Avatar, EmptyState, Loading, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useRequireAuth } from '@/components/GuestGate';
 import { useIsAuthenticated } from '@/stores/auth';
+import { useRecordRecent } from '@/stores/recent';
 import { useListing, useSavedIds, useToggleSaved } from '@/queries/listings';
 import { useOpenConversation } from '@/queries/chat';
 import { useCreateReport } from '@/queries/report';
@@ -40,6 +41,42 @@ export default function ListingDetail() {
   const report = useCreateReport();
 
   const saved = !!savedIds?.includes(listingId);
+
+  /*
+   * Về đầu trang khi ĐỔI tin.
+   *
+   * `/listing/[id]` là MỘT màn, và dải tin tương tự chuyển tin bằng `router.replace` cùng
+   * route — nên màn không remount, chỉ `id` đổi. Không có lượt cuộn này thì bấm một tin gợi ý
+   * xong người xem vẫn đứng nguyên ở chân trang, tức là nhìn thấy dải gợi ý của tin MỚI mà
+   * chưa từng thấy chính tin đó. Đúng chỗ khó nhận ra vì màn vẫn đổi nội dung như thường.
+   *
+   * `animated: false`: đây là một trang khác, không phải người dùng vừa cuộn — cuộn có hiệu ứng
+   * sẽ trông như trang tự trôi.
+   */
+  // `ComponentRef` chứ không `useRef<ScrollView>`: `ScrollView` là component, còn `scrollTo`
+  // nằm trên INSTANCE của nó — `useRef<FlatList>` ở màn chat may mắn hợp lệ, ở đây thì không.
+  const pageRef = React.useRef<React.ComponentRef<typeof ScrollView>>(null);
+  useEffect(() => {
+    pageRef.current?.scrollTo({ y: 0, animated: false });
+  }, [listingId]);
+
+  /*
+   * Ghi vào "Xem gần đây" khi tin VỀ ĐẾN nơi, không phải khi màn mount: id sai/404 mà cũng
+   * ghi thì dải ở trang chủ sẽ bày một thẻ bấm vào chỉ thấy lỗi. Snapshot đúng các mảnh dải
+   * cần vẽ — xem lý do ở `@/stores/recent`.
+   */
+  const recordRecent = useRecordRecent();
+  useEffect(() => {
+    if (listing) {
+      recordRecent({
+        id: listing.id,
+        title: listing.title,
+        price: listing.price,
+        photo: listing.photo,
+        photoUrl: listing.photoUrls?.[0],
+      });
+    }
+  }, [listing, recordRecent]);
 
   /*
    * Mô tả rút gọn 4 dòng.
@@ -103,7 +140,11 @@ export default function ListingDetail() {
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        ref={pageRef}
+        contentContainerStyle={{ paddingBottom: 120 }}
+        showsVerticalScrollIndicator={false}
+      >
         <ListingGallery photo={listing.photo} photoUrls={listing.photoUrls} style={styles.hero}>
           <Pressable
             onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/feed'))}
@@ -219,7 +260,12 @@ export default function ListingDetail() {
           )}
         </Animated.View>
 
-        <ListingSuggestions current={listing} />
+        {/*
+          `key` theo id, cùng lý do với lượt cuộn về đầu ở trên: màn không remount khi đổi tin,
+          nên dải gợi ý sẽ giữ nguyên số trang đang xem và vị trí lướt ngang của TIN CŨ. Đổi
+          `key` là dựng lại nó sạch — rẻ hơn hẳn việc tự đồng bộ hai thứ trạng thái đó bằng tay.
+        */}
+        <ListingSuggestions key={listing.id} current={listing} />
       </ScrollView>
 
       {/*

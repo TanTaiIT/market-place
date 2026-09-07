@@ -2,16 +2,20 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { Listing } from '@/api/db';
-import { listingPlaceholder } from '@/api/placeholders';
+import { listingShips } from '@/api/placeholders';
 import { ListingPhoto } from './ListingPhoto';
 import { C, F, R, shadow } from '@/theme';
 
 /**
  * Thẻ tin của giao diện mới — dựng theo `.card` trong prototype "Ghim · Mioto style".
  *
- * Số THẬT lấy từ `Listing`: tiêu đề, giá, danh mục, tỉnh/phường, lượt xem, người quan tâm,
- * trạng thái chờ duyệt, số ảnh. Số CHƯA CÓ Ở BE (sao, giao dịch, giảm giá, khoảng cách, giao
- * tận nơi, tình trạng) lấy từ `@/api/placeholders` — một chỗ duy nhất để gỡ khi BE có thật.
+ * MỌI con số trên thẻ đều là số THẬT của `Listing`: tiêu đề, giá, danh mục, tỉnh/phường,
+ * lượt xem, người quan tâm, trạng thái chờ duyệt, số ảnh.
+ *
+ * Ngoại lệ duy nhất là viên "Giao tận nơi" (`listingShips`) — trang trí, không phải thứ
+ * người mua dựa vào để chọn người bán. Sao đánh giá, số giao dịch, % giảm giá, giá cũ và
+ * khoảng cách từng nằm ở đây và đã được gỡ: chúng trông như bằng chứng về người bán, nên
+ * bịa chúng là nói dối đúng chỗ người mua tin nhất.
  *
  * Không có nút nhắn tin như `FeedCard` cũ: bản mẫu chỉ để lại nút lưu trên thẻ, còn nhắn tin
  * nằm ở thanh dính dưới màn chi tiết. Một hành động một chỗ, không nhân đôi bề mặt.
@@ -32,7 +36,7 @@ export function ListingCard({
   onPress: () => void;
   onToggleSave: () => void;
 }) {
-  const ph = listingPlaceholder(item.id, item.priceValue);
+  const ships = listingShips(item.id);
   const photoCount = item.photoUrls?.length ?? 0;
 
   return (
@@ -59,11 +63,6 @@ export function ListingCard({
               <Text style={styles.favGlyph}>{saved ? '❤️' : '🤍'}</Text>
             </Pressable>
 
-            {ph.off > 0 && (
-              <View style={styles.off}>
-                <Text style={styles.offText}>Giảm {ph.off}%</Text>
-              </View>
-            )}
 
             {photoCount > 1 && (
               <View style={styles.dots}>
@@ -78,10 +77,7 @@ export function ListingCard({
 
         <View style={styles.body}>
           <View style={styles.chips}>
-            <View style={[styles.chip, styles.chipGreen]}>
-              <Text style={[styles.chipText, { color: C.brandTx }]}>✅ {ph.condition}</Text>
-            </View>
-            {ph.ship && (
+            {ships && (
               <View style={[styles.chip, styles.chipOrange]}>
                 <Text style={[styles.chipText, { color: C.orange }]}>🚚 Giao tận nơi</Text>
               </View>
@@ -106,19 +102,13 @@ export function ListingCard({
           </View>
 
           <Text style={styles.loc} numberOfLines={1}>
-            📍 {[item.ward, item.province].filter(Boolean).join(', ') || item.cat} · {ph.distance}
+            📍 {[item.ward, item.province].filter(Boolean).join(', ') || item.cat}
           </Text>
 
+          {/* Giá đứng MỘT MÌNH trong hàng chân sau khi gỡ sao/giao dịch — không cân đối hai
+              đầu nữa, nên nó về lề trái theo hướng đọc thay vì lơ lửng bên phải. */}
           <View style={styles.foot}>
-            <View style={styles.meta}>
-              <Text style={styles.rate}>⭐ {ph.rating}</Text>
-              <Text style={styles.metaDot}>•</Text>
-              <Text style={styles.metaText}>{ph.deals} giao dịch</Text>
-            </View>
-            <Text style={styles.price}>
-              {!!ph.oldPrice && <Text style={styles.priceOld}>{ph.oldPrice} </Text>}
-              {item.price}
-            </Text>
+            <Text style={styles.price}>{item.price}</Text>
           </View>
         </View>
       </Pressable>
@@ -155,16 +145,6 @@ const styles = StyleSheet.create({
   },
   pendingText: { fontFamily: F.uiBold, fontSize: 9.5, letterSpacing: 0.8, color: C.paperWarm },
 
-  off: {
-    position: 'absolute',
-    right: 0,
-    bottom: 0,
-    backgroundColor: C.orange,
-    paddingHorizontal: 13,
-    paddingVertical: 6,
-    borderTopLeftRadius: R.md,
-  },
-  offText: { fontFamily: F.uiSemi, fontSize: 12.5, color: '#fff' },
 
   dots: { position: 'absolute', alignSelf: 'center', bottom: 10, flexDirection: 'row', gap: 4 },
   dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.55)' },
@@ -189,9 +169,6 @@ const styles = StyleSheet.create({
   loc: { fontFamily: F.ui, fontSize: 12.5, color: C.inkSoft, marginTop: 10 },
 
   foot: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     borderTopWidth: 1,
     borderTopColor: C.line,
     marginTop: 13,
@@ -199,15 +176,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  meta: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  rate: { fontFamily: F.ui, fontSize: 12.5, color: C.ink },
-  metaDot: { color: C.muted, fontSize: 12 },
-  metaText: { fontFamily: F.ui, fontSize: 12.5, color: C.inkSoft },
   price: { fontFamily: F.uiBold, fontSize: 16, color: C.brandTx },
-  priceOld: {
-    fontFamily: F.ui,
-    fontSize: 12.5,
-    color: C.muted,
-    textDecorationLine: 'line-through',
-  },
 });

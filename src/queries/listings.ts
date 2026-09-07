@@ -5,7 +5,6 @@ import {
   keepPreviousData,
 } from '@tanstack/react-query';
 import { api } from '@/api/client';
-import { hasSearchCriteria } from '@/api/db';
 import type { Listing, Profile, SearchFilter } from '@/api/db';
 import { useIsAuthenticated } from '@/stores/auth';
 import { qk } from './keys';
@@ -67,11 +66,18 @@ export function useListingSuggestions(current: Listing | undefined) {
  * Chỉ chọn danh mục mà không gõ từ khoá cũng là một lượt tìm hợp lệ; `hasSearchCriteria` là
  * nơi duy nhất định nghĩa "đã có ràng buộc chưa", dùng chung với màn hình.
  */
+/**
+ * Kết quả tìm. KHÔNG có `enabled`: bộ lọc rỗng là một lượt tìm HỢP LỆ — nó trả về tất cả tin.
+ *
+ * Bản trước tắt query khi chưa có tiêu chí nào, và đó là bậc chặn thứ ba của cùng một luật (hai
+ * bậc kia ở `openSearch` của bảng tin và trong `api.searchListings`). Ba chỗ cùng nói một điều
+ * thì sửa luật phải sửa cả ba, và bỏ sót một chỗ là query bị tắt trong khi màn đã điều hướng
+ * tới — người dùng thấy màn kết quả trống vĩnh viễn mà không có lỗi nào.
+ */
 export function useSearch(filter: SearchFilter) {
   return useQuery({
     queryKey: qk.search(filter),
     queryFn: () => api.searchListings(filter),
-    enabled: hasSearchCriteria(filter),
     placeholderData: keepPreviousData,
   });
 }

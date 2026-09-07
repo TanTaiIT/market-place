@@ -78,6 +78,10 @@ export type MeProfile = PublicProfile & {
     showPhone: boolean;
     isEmailVerified: boolean;
     isActive: boolean;
+    area: {
+        province: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
+        source: 'profile' | 'listings';
+    } | null;
 };
 
 export type SetUserStatus = {
@@ -116,6 +120,7 @@ export type OrganizationLookup = {
     slug: string;
     joinCode: string;
     avatarUrl: string | null;
+    coverUrl: string | null;
     memberCount: number;
     district: string | null;
     provinceCode: string | null;
@@ -146,6 +151,7 @@ export type MyOrganization = {
     name: string;
     slug: string;
     avatarUrl: string | null;
+    coverUrl: string | null;
     provinceCode: string | null;
     role: string;
     unitId: string | null;
@@ -611,6 +617,7 @@ export type Conversation = {
     id: string;
     listingId: string;
     listingTitle: string;
+    listingImage: string;
     partnerId: string;
     partnerName: string;
     partnerAvatar: string;
@@ -642,6 +649,8 @@ export type Notification = {
     id: string;
     organizationId: string | null;
     unitId: string | null;
+    actorName?: string;
+    listingId: string | null;
     title: string;
     body: string;
     isRead: boolean;
@@ -1353,6 +1362,7 @@ export type ListingListData = {
         seller?: string;
         province?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
         condition?: 'new' | 'like_new' | 'used';
+        visibility?: 'org_internal' | 'public';
         minPrice?: number | null;
         maxPrice?: number | null;
         attrs?: string;
@@ -1441,6 +1451,7 @@ export type ListingMineData = {
         seller?: string;
         province?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
         condition?: 'new' | 'like_new' | 'used';
+        visibility?: 'org_internal' | 'public';
         minPrice?: number | null;
         maxPrice?: number | null;
         attrs?: string;

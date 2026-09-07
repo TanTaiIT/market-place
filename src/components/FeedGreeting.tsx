@@ -1,9 +1,10 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { GlassSheen, glassFace } from './GlassSurface';
 import { Avatar } from './ui';
 import type { MyOrg } from '@/api/org';
-import { gradOf } from '@/api/client';
+import { gradOf, initialsOf } from '@/api/client';
+import { squareUrl } from '@/api/cloudinary';
 import { C, F, R } from '@/theme';
 
 /**
@@ -17,9 +18,7 @@ import { C, F, R } from '@/theme';
  * và đưa MỘT lối vào đăng nhập, thay vì hai nút mà bấm cái nào cũng ra màn đăng nhập.
  */
 export function FeedGreeting({
-  name,
-  avatar,
-  avatarUrl,
+  me,
   myOrgs,
   onProfile,
   onSignIn,
@@ -28,10 +27,15 @@ export function FeedGreeting({
   onOrg,
   onFindOrg,
 }: {
-  /** Tên người đang đăng nhập. `undefined` = khách. */
-  name?: string;
-  avatar: string;
-  avatarUrl?: string;
+  /**
+   * Người đang đăng nhập — `undefined` = khách.
+   *
+   * Ba mảnh danh tính đi CHUNG một object thay vì ba prop rời: chúng luôn cùng đến từ một
+   * `profile`, và tách rời thì dựng được trạng thái không có thật — khách mà vẫn có avatar.
+   * Đó đúng là lỗi bản trước: `avatar` là prop bắt buộc nên call-site phải bịa ra một dấu
+   * chấm cho khách, và khối này vẽ nó ra thành một vòng tròn rỗng bấm được.
+   */
+  me?: { name: string; avatar: string; avatarUrl?: string };
   myOrgs: MyOrg[];
   onProfile: () => void;
   onSignIn: () => void;
@@ -42,37 +46,41 @@ export function FeedGreeting({
 }) {
   return (
     <>
+      {/*
+        MỘT nhánh cho cả hàng, không phải ba ternary trên ba mảnh.
+
+        Khách và người đã đăng nhập khác nhau ở cả ba chỗ (avatar, lời chào, nút bên phải),
+        nên tách ra ba phép rẽ là ba chỗ phải nhớ cùng một điều kiện — quên một chỗ thì ra
+        đúng trạng thái lai đã có: avatar của người chưa đăng nhập.
+      */}
       <View style={styles.hi}>
-        <Pressable onPress={onProfile} hitSlop={6}>
-          <Avatar text={avatar} url={avatarUrl} size={40} ring />
-        </Pressable>
-
-        {name ? (
-          <View style={styles.hiText}>
-            <Text style={styles.hiSmall}>Chào bạn</Text>
-            <Text style={styles.hiName} numberOfLines={1}>
-              {name}
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.hiText}>
-            <Text style={styles.hiName}>Chào bạn 👋</Text>
-            <Text style={styles.hiSmall}>Xem tin không cần đăng nhập</Text>
-          </View>
-        )}
-
-        {name ? (
+        {me ? (
           <>
+            <Pressable onPress={onProfile} hitSlop={6}>
+              <Avatar text={me.avatar} url={me.avatarUrl} size={40} ring />
+            </Pressable>
+            <View style={styles.hiText}>
+              <Text style={styles.hiSmall}>Chào bạn</Text>
+              <Text style={styles.hiName} numberOfLines={1}>
+                {me.name}
+              </Text>
+            </View>
             <Icon glyph="♡" onPress={onSaved} />
             <Icon glyph="📋" onPress={onMyListings} />
           </>
         ) : (
-          <Pressable
-            onPress={onSignIn}
-            style={({ pressed }) => [styles.signIn, pressed && styles.pressed]}
-          >
-            <Text style={styles.signInText}>Đăng nhập</Text>
-          </Pressable>
+          <>
+            <View style={styles.hiText}>
+              <Text style={styles.hiName}>Chào bạn 👋</Text>
+              <Text style={styles.hiSmall}>Xem tin không cần đăng nhập</Text>
+            </View>
+            <Pressable
+              onPress={onSignIn}
+              style={({ pressed }) => [styles.signIn, pressed && styles.pressed]}
+            >
+              <Text style={styles.signInText}>Đăng nhập</Text>
+            </Pressable>
+          </>
         )}
       </View>
 
@@ -84,19 +92,33 @@ export function FeedGreeting({
         contentContainerStyle={styles.orgRow}
         keyboardShouldPersistTaps="handled"
       >
-        {myOrgs.map((o) => (
+        {myOrgs.map((o) => {
+          const face = o.avatarUrl || o.coverUrl;
+          return (
           <Pressable
             key={o.id}
             onPress={() => onOrg(o.slug)}
             style={({ pressed }) => [styles.orgChip, pressed && styles.pressed]}
           >
             <GlassSheen />
-            <View style={[styles.orgDot, { backgroundColor: gradOf(o.slug)[1] }]} />
+            {/*
+              Avatar thật nếu có, không thì ảnh bìa, cuối cùng mới là chấm màu suy từ slug.
+              Chấm màu là thứ dựng được khi KHÔNG có ảnh nào — dùng nó cả khi nhóm đã có
+              ảnh là vứt đi thứ duy nhất phân biệt được hai nhóm bằng mắt.
+            */}
+            {face ? (
+              <Image source={{ uri: squareUrl(face, 60) }} style={styles.orgDot} />
+            ) : (
+              <View style={[styles.orgDot, styles.orgDotCenter, { backgroundColor: gradOf(o.slug)[1] }]}>
+                <Text style={styles.orgDotText}>{initialsOf(o.name)}</Text>
+              </View>
+            )}
             <Text numberOfLines={1} style={styles.orgChipText}>
               {o.name}
             </Text>
           </Pressable>
-        ))}
+          );
+        })}
         <Pressable
           onPress={onFindOrg}
           style={({ pressed }) => [styles.orgFind, pressed && styles.pressed]}
@@ -163,6 +185,9 @@ const styles = StyleSheet.create({
     paddingRight: 12,
   },
   orgDot: { width: 20, height: 20, borderRadius: 10 },
+  orgDotCenter: { alignItems: 'center', justifyContent: 'center' },
+  /** Hai chữ trong vòng 20px: nhỏ nhất còn đọc được, và chỉ là bậc cuối khi không có ảnh. */
+  orgDotText: { fontFamily: F.uiBold, fontSize: 8.5, color: '#fff' },
   orgChipText: { flexShrink: 1, fontFamily: F.uiBold, fontSize: 12, color: C.paperWarm },
   orgFind: {
     borderRadius: R.pill,

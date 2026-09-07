@@ -19,7 +19,7 @@ export default function Profile() {
   const router = useRouter();
   const toast = useToast();
   const insets = useSafeAreaInsets();
-  const { data: profile, error, isLoading } = useProfile();
+  const { data: profile, error, isLoading, refetch } = useProfile();
   const { data: grants } = useMyGrants();
   const master = isMaster(grants);
   const signOut = useSignOut();
@@ -36,7 +36,13 @@ export default function Profile() {
   }
   if (isLoading) return <Loading />;
   if (error || !profile) {
-    return <EmptyState icon="📡" text={(error as Error | null)?.message ?? 'Không tải được hồ sơ'} />;
+    return (
+      <EmptyState
+        icon="📡"
+        text={(error as Error | null)?.message ?? 'Không tải được hồ sơ'}
+        onRetry={() => void refetch()}
+      />
+    );
   }
 
   const menu = [

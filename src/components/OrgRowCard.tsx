@@ -1,6 +1,7 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { gradOf } from '@/api/client';
+import { squareUrl } from '@/api/cloudinary';
 import { C, F, shadow } from '@/theme';
 
 /**
@@ -15,6 +16,7 @@ export function OrgRowCard({
   slug,
   name,
   avatarUrl,
+  coverUrl,
   meta,
   action,
   locked,
@@ -26,6 +28,8 @@ export function OrgRowCard({
   slug: string;
   name: string;
   avatarUrl?: string | null;
+  /** Dự phòng khi nhóm chưa đặt avatar — nhóm có bìa trước avatar là ca thường gặp nhất. */
+  coverUrl?: string | null;
   /** Dòng phụ do người gọi ghép — chỉ nơi đó biết mình đang có những mảnh nào. */
   meta: string;
   action: 'joined' | 'join' | 'closed';
@@ -37,6 +41,7 @@ export function OrgRowCard({
   onJoin?: () => void;
 }) {
   const grad = gradOf(slug);
+  const face = avatarUrl || coverUrl;
 
   return (
     <Pressable
@@ -48,8 +53,9 @@ export function OrgRowCard({
         người. Chưa có ảnh thì rơi về dải màu suy từ slug — trang trí, không phải dữ liệu bịa.
       */}
       <View style={[styles.cover, { backgroundColor: grad[0] }]}>
-        {avatarUrl ? (
-          <Image source={{ uri: avatarUrl }} style={styles.coverImg} resizeMode="cover" />
+        {face ? (
+          // `squareUrl`: ô này vuông, mà bìa thì ngang — cắt theo chủ thể thay vì cắt giữa.
+          <Image source={{ uri: squareUrl(face, 200) }} style={styles.coverImg} resizeMode="cover" />
         ) : (
           <View style={[styles.coverHalf, { backgroundColor: grad[1] }]} />
         )}

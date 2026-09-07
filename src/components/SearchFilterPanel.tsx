@@ -1,7 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ProvinceField } from './LocationPicker';
 import { AttrFilters } from './AttrFilters';
-import { PriceRange } from './PriceRange';
+import { PriceField } from './PriceField';
 import { useCategories } from '@/queries/listings';
 import { useCategoryTemplate } from '@/queries/templates';
 import type { SearchFilter } from '@/api/db';
@@ -16,17 +16,15 @@ import { C, F } from '@/theme';
  *
  * Ba nhóm, theo đúng thứ tự người dùng thu hẹp: khu vực → danh mục (và bộ lọc riêng của nó) →
  * khoảng giá. Giá đứng CUỐI có chủ ý: nó là thứ người ta điều chỉnh sau khi đã biết đang xem
- * loại gì, chứ không phải câu hỏi đầu tiên.
+ * loại gì, chứ không phải câu hỏi đầu tiên — và từ khi chip giá bám theo danh mục, thứ tự đó
+ * còn là điều kiện để chip hiện ra đúng bậc.
  */
 export function SearchFilterPanel({
   filter,
   onChange,
-  onPriceDragChange,
 }: {
   filter: SearchFilter;
   onChange: (next: SearchFilter) => void;
-  /** Chuyển tiếp trạng thái kéo của thanh giá lên màn — màn cần nó để tạm khoá cuộn dọc. */
-  onPriceDragChange?: (dragging: boolean) => void;
 }) {
   const { data: categories } = useCategories();
   const patch = (part: Partial<SearchFilter>) => onChange({ ...filter, ...part });
@@ -71,12 +69,16 @@ export function SearchFilterPanel({
       )}
 
       <Text style={[styles.label, { marginTop: 18 }]}>Khoảng giá</Text>
-      {/* `PriceRange` chặn min > max ngay trong lúc kéo, nên không cần dòng cảnh báo nào. */}
-      <PriceRange
+      {/*
+        Chip gợi ý bám theo DANH MỤC đang chọn, không phải một thang chung — xem `LADDERS`.
+        Truyền `slug` chứ không truyền cả object danh mục: đây là thứ duy nhất `PriceField` cần
+        biết, và nhận nhiều hơn thế là mở đường cho nó đọc thêm thứ không thuộc việc của nó.
+      */}
+      <PriceField
         min={filter.minPrice}
         max={filter.maxPrice}
+        categorySlug={categories?.find((c) => c.id === filter.categoryId)?.slug ?? null}
         onChange={({ min, max }) => patch({ minPrice: min, maxPrice: max })}
-        onDragChange={onPriceDragChange}
       />
     </View>
   );

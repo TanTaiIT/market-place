@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AttrFields } from './AttrFields';
 import { Surface } from './Surface';
 import { EmptyState, ScreenHeader } from './ui';
@@ -31,13 +31,21 @@ export function TemplatePreview({
   dictionary: FieldDefinition[];
   onClose: () => void;
 }) {
+  /*
+   * `useSafeAreaInsets()` chứ KHÔNG `<SafeAreaView>` — bên trong `<Modal>` thì component đó
+   * không chừa được lề an toàn (xem ghi chú ở chỗ dùng bên dưới).
+   */
+  const insets = useSafeAreaInsets();
   const [values, setValues] = useState<ListingAttributes>({});
   const resolved = useMemo(() => draftToResolved(fields, dictionary), [fields, dictionary]);
 
   return (
     <Modal visible={visible} animationType="slide" statusBarTranslucent onRequestClose={onClose}>
       <Surface>
-        <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        {/* Lề an toàn cộng tay: `SafeAreaView` trả 0 bên trong `<Modal>` — xem `CategoryPicker`. */}
+        <View
+          style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
+        >
           <ScreenHeader title="Xem trước" onBack={onClose} />
 
           <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
@@ -54,7 +62,7 @@ export function TemplatePreview({
               )}
             </View>
           </ScrollView>
-        </SafeAreaView>
+        </View>
       </Surface>
     </Modal>
   );

@@ -5,6 +5,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar, EmptyState, Loading, TabHeader } from '@/components/ui';
 import { GuestGate } from '@/components/GuestGate';
+import { ListingPhoto } from '@/components/ListingPhoto';
 import { useIsAuthenticated } from '@/stores/auth';
 import { chatColor } from '@/api/client';
 import { useConversations } from '@/queries/chat';
@@ -12,7 +13,7 @@ import { C, F, shadow } from '@/theme';
 
 export default function ChatList() {
   const router = useRouter();
-  const { data, error, isLoading } = useConversations();
+  const { data, error, isLoading, refetch } = useConversations();
 
   const isAuthenticated = useIsAuthenticated();
 
@@ -53,6 +54,20 @@ export default function ChatList() {
                 </Text>
                 {!!item.listingTitle && <Text style={styles.tag}>Về: {item.listingTitle}</Text>}
               </View>
+              {/*
+                Ảnh món đồ, ở mép PHẢI — trái đã là avatar người kia, và hai ảnh tròn cạnh nhau
+                thì không ai đọc ra cái nào là người, cái nào là hàng. Vuông bo góc cũng là hình
+                dạng mà thẻ tin trên bảng đang dùng, nên mắt nhận ra ngay đó là một tin đăng.
+
+                `ListingPhoto` lo luôn nhánh không ảnh (dải màu suy từ id tin) — dùng lại thay vì
+                tự viết `photoUrl ? … : …` ở đây, để mọi chỗ vẽ ảnh tin rơi về cùng một bậc cuối.
+              */}
+              <ListingPhoto
+                photo={item.listingPhoto}
+                photoUrl={item.listingImage}
+                style={styles.thumb}
+                imageStyle={styles.thumbRadius}
+              />
               {item.unread && <View style={styles.dot} />}
             </Pressable>
           </Animated.View>
@@ -61,7 +76,7 @@ export default function ChatList() {
           isLoading ? (
             <Loading />
           ) : error ? (
-            <EmptyState icon="📡" text={(error as Error).message} />
+            <EmptyState icon="📡" text={(error as Error).message} onRetry={() => void refetch()} />
           ) : (
             <EmptyState icon="💬" text="Chưa có cuộc trò chuyện nào" />
           )
@@ -87,5 +102,8 @@ const styles = StyleSheet.create({
   time: { fontFamily: F.mono, fontSize: 10, color: C.muted },
   preview: { fontFamily: F.ui, fontSize: 12, color: C.inkSoft, marginTop: 3 },
   tag: { fontFamily: F.monoBold, fontSize: 9.5, color: C.moss, marginTop: 2 },
+  /** Vuông 46px, bằng đúng chiều cao avatar bên trái — hai đầu dòng cân nhau. */
+  thumb: { width: 46, height: 46, borderRadius: 8, overflow: 'hidden' },
+  thumbRadius: { borderRadius: 8 },
   dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: C.pin },
 });

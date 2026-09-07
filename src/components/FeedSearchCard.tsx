@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { PickerSheet } from './PickerSheet';
 import type { PickerSearch } from './PickerSheet';
 import { useProvinceSearch } from './LocationPicker';
@@ -8,27 +8,22 @@ import type { ProvinceName } from '@/api/location';
 import { C, F, R, shadowLift } from '@/theme';
 
 /**
- * Thẻ tìm nổi trên khối chào của bảng tin: danh mục · khu vực · nút tìm.
+ * Thẻ tìm nổi trên khối chào của trang chủ: từ khoá · danh mục · khu vực · nút tìm.
  *
- * **Danh mục KHÔNG có bản riêng ở đây** — nó là đúng giá trị mà hàng chip bên dưới đang dùng, đưa
- * vào qua props. Một màn hai nguồn thì có lúc chip "Điện thoại" đang sáng mà thẻ vẫn ghi "Tất cả
- * danh mục", và người dùng không biết cái nào mới là thứ sắp được tìm.
- *
- * **Khu vực thì ngược lại: state riêng của thẻ.** `useListings` không lọc theo tỉnh, nên chọn
- * tỉnh KHÔNG đổi bảng tin bên dưới — nó chỉ đi theo nút "Tìm tin" sang trang kết quả. Đẩy nó lên
- * màn hình sẽ hứa một thứ mà bảng tin không thực hiện.
+ * CẢ BA tiêu chí đều là state riêng của thẻ, chỉ đi theo nút "Tìm tin" sang trang kết quả.
+ * Bản trước danh mục dùng chung giá trị với hàng chip (khi chip còn lọc bảng tại chỗ);
+ * giờ chip là LỐI ĐI — bấm là sang trang kết quả ngay — nên nếu ngăn danh mục còn nối vào
+ * đó thì chọn danh mục trong thẻ sẽ điều hướng tức thì và vứt mất từ khoá vừa gõ.
  */
 export function FeedSearchCard({
   categories,
-  categoryId,
-  onCategory,
   onSearch,
 }: {
   categories: Category[];
-  categoryId: string;
-  onCategory: (id: string) => void;
-  onSearch: (province: ProvinceName | null) => void;
+  onSearch: (q: string, categoryId: string | null, province: ProvinceName | null) => void;
 }) {
+  const [q, setQ] = useState('');
+  const [catId, setCatId] = useState<string | null>(null);
   const [province, setProvince] = useState<ProvinceName | null>(null);
   /** Ngăn chọn đang mở. Một khoá chứ không hai boolean: hai ngăn không bao giờ mở cùng lúc. */
   const [picking, setPicking] = useState<'category' | 'province' | null>(null);
@@ -46,10 +41,30 @@ export function FeedSearchCard({
     [categories],
   );
 
-  const active = categories.find((c) => c.id === categoryId);
+  const active = categories.find((c) => c.id === catId);
 
   return (
     <View style={styles.card}>
+      {/* Ô gõ thẳng tên tin — đường tắt cho người đã biết mình tìm gì; Enter trên bàn phím
+          cũng là "Tìm tin" luôn, khỏi với tay xuống nút. */}
+      <View style={styles.qRow}>
+        <Text style={styles.rowIcon}>🔎</Text>
+        <TextInput
+          value={q}
+          onChangeText={setQ}
+          placeholder="Bạn đang tìm món gì?"
+          placeholderTextColor={C.muted}
+          returnKeyType="search"
+          onSubmitEditing={() => onSearch(q, catId, province)}
+          style={styles.qInput}
+        />
+        {q.length > 0 && (
+          <Pressable onPress={() => setQ('')} hitSlop={8}>
+            <Text style={styles.qClear}>✕</Text>
+          </Pressable>
+        )}
+      </View>
+      <View style={styles.sep} />
       <Row
         icon="🏷️"
         label="Danh mục"
@@ -64,7 +79,7 @@ export function FeedSearchCard({
         onPress={() => setPicking('province')}
       />
       <Pressable
-        onPress={() => onSearch(province)}
+        onPress={() => onSearch(q, catId, province)}
         style={({ pressed }) => [styles.cta, pressed && styles.pressed]}
       >
         <Text style={styles.ctaText}>Tìm tin</Text>
@@ -76,11 +91,9 @@ export function FeedSearchCard({
         placeholder="Gõ tên danh mục..."
         search={categorySearch}
         loading={false}
-        // Chuỗi rỗng là "Tất cả" ở tầng lọc, nhưng `PickerSheet` đọc `null` là "chưa chọn" — hai
-        // cách viết cùng một ý, đổi qua lại đúng ở biên này chứ không để lẫn vào state.
-        value={categoryId || null}
+        value={catId}
         emptyAll="Tất cả danh mục"
-        onSelect={(id) => onCategory(id ?? '')}
+        onSelect={setCatId}
         onClose={() => setPicking(null)}
       />
       <PickerSheet
@@ -136,6 +149,13 @@ const styles = StyleSheet.create({
     ...shadowLift,
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+  qRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+  /*
+   * `paddingVertical: 0`: Android tự cộng padding dọc vào TextInput, để nguyên thì riêng
+   * hàng này cao hơn hai hàng chọn bên dưới dù cùng cỡ chữ.
+   */
+  qInput: { flex: 1, fontFamily: F.uiSemi, fontSize: 15, color: C.ink, paddingVertical: 0 },
+  qClear: { fontFamily: F.ui, fontSize: 14, color: C.muted, paddingHorizontal: 2 },
   rowIcon: { fontSize: 16, width: 22, textAlign: 'center' },
   rowBody: { flex: 1 },
   rowLabel: { fontFamily: F.ui, fontSize: 11.5, color: C.inkSoft },

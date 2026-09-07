@@ -9,6 +9,7 @@
  * Cloud name không phải bí mật — nó nằm sẵn trong mọi URL ảnh Cloudinary trả về.
  */
 import { Image } from 'react-native';
+import { File } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
 const CLOUD_NAME = 'ds4dqc7s5';
@@ -63,12 +64,48 @@ async function downscale(uri: string): Promise<string> {
     );
     const image = await context.renderAsync();
     // JPEG cố định (kể cả nguồn PNG/HEIC): ảnh chụp thật không cần alpha, và HEIC đổi sang
-    // JPEG còn tiện — trước giờ vẫn phải đoán MIME cho nó ở `mimeOf`.
+    // JPEG còn tiện — MIME suy được thẳng từ đuôi file.
     const saved = await image.saveAsync({ compress: RESIZE_JPEG_QUALITY, format: SaveFormat.JPEG });
     return saved.uri;
   } catch {
     return uri;
   }
+}
+
+/**
+ * URL hiển thị cho một bề ngang cho trước — chèn transformation vào URL Cloudinary.
+ *
+ * Thẻ tin, vòng khu vực, dải gợi ý đều chỉ vẽ 74–400px nhưng trước đây tải nguyên ảnh gốc
+ * (tới 2000px sau `downscale`): decode ảnh cỡ đó chạy đúng lúc đang lướt là rớt khung hình —
+ * đây chính là nguồn giựt của các dải cuộn ngang. Cloudinary resize NGAY TRÊN URL nên không
+ * cần upload lại gì cả.
+ *
+ * - `c_limit`: chỉ thu nhỏ, không phóng to ảnh vốn đã nhỏ hơn `width`.
+ * - `q_auto,f_auto`: Cloudinary tự chọn mức nén + định dạng (WebP/AVIF) theo thiết bị.
+ * - URL không phải Cloudinary (không có `/upload/`) trả nguyên vẹn — helper không đoán mò
+ *   cấu trúc của một CDN khác.
+ */
+/**
+ * Bản VUÔNG của một ảnh — dùng khi nhét ảnh ngang (bìa nhóm 16:9) vào ô vuông hoặc tròn.
+ *
+ * `c_fill,g_auto` chứ không phải `c_limit` như `displayUrl`: `c_limit` chỉ co vừa khung, nên
+ * phần cắt do `resizeMode="cover"` của RN quyết định — và nó luôn cắt GIỮA. Ảnh bìa thường
+ * bố cục ngang với chủ thể lệch một bên, cắt giữa ra một mảng tường trống.
+ * `g_auto` để Cloudinary tự tìm chủ thể rồi mới cắt, nên ô tròn còn ra được thứ nhận diện được.
+ */
+export function squareUrl(url: string, size: number): string {
+  return url.includes('/upload/')
+    ? url.replace(
+        '/upload/',
+        `/upload/w_${size},h_${size},c_fill,g_auto,q_auto,f_auto/`,
+      )
+    : url;
+}
+
+export function displayUrl(url: string, width: number): string {
+  return url.includes('/upload/')
+    ? url.replace('/upload/', `/upload/w_${width},c_limit,q_auto,f_auto/`)
+    : url;
 }
 
 type CloudinaryUploadResponse = {
@@ -82,15 +119,6 @@ type CloudinaryUploadResponse = {
   moderation?: Array<{ status?: 'approved' | 'rejected' | 'pending'; kind?: string }>;
 };
 
-/** Suy MIME từ đuôi file; Cloudinary từ chối phần file thiếu `type` hợp lệ. */
-function mimeOf(fileName: string) {
-  const ext = fileName.split('.').pop()?.toLowerCase();
-  if (ext === 'png') return 'image/png';
-  if (ext === 'webp') return 'image/webp';
-  if (ext === 'heic' || ext === 'heif') return 'image/heic';
-  return 'image/jpeg';
-}
-
 /**
  * Tải một ảnh local (`file://…` từ expo-image-picker) lên Cloudinary.
  * @returns `secure_url` — chuỗi HTTPS để lưu xuống BE.
@@ -100,9 +128,11 @@ export async function uploadImage(uri: string): Promise<string> {
   const name = source.split('/').pop() || 'upload.jpg';
 
   const form = new FormData();
-  // React Native nhận `{ uri, name, type }` cho phần file, còn kiểu chuẩn của FormData
-  // chỉ khai `Blob | string` — ép kiểu ở đúng một dòng này thay vì nới lỏng cả file.
-  form.append('file', { uri: source, name, type: mimeOf(name) } as unknown as Blob);
+  // Fetch của SDK 57+ theo chuẩn WinterCG, không còn nhận part kiểu `{ uri, name, type }`
+  // cũ của React Native (ném "Unsupported FormDataPart implementation"). `File` của
+  // expo-file-system tương thích Blob nên append thẳng được; ép kiểu vì lib DOM của TS
+  // khai `Blob | string` chứ không biết class này.
+  form.append('file', new File(source) as unknown as Blob, name);
   form.append('upload_preset', UPLOAD_PRESET);
 
   const res = await fetch(UPLOAD_URL, { method: 'POST', body: form });

@@ -34,10 +34,10 @@ export default function OrgProfileScreen() {
   /*
    * Tin trong nhóm bày bằng `ListingCard` — CÙNG một thẻ với mọi bề mặt công khai.
    *
-   * Trước đây là `ListingRow` (dòng gọn), với lý do "cùng thẻ với màn tìm kiếm". Lý do đó đã
-   * hết đúng: màn kết quả tìm kiếm chuyển sang `ListingCard`, nên hồ sơ nhóm thành bề mặt duy
-   * nhất còn dùng dòng gọn — cùng một tin đọc ở hai nơi ra hai hình dạng khác nhau, và người
-   * dùng đọc ra ngay là "tin trong nhóm" khác loại với "tin ngoài kia".
+   * Trước đây là một thẻ "dòng gọn" riêng, với lý do "cùng thẻ với màn tìm kiếm". Lý do đó đã
+   * hết đúng khi màn kết quả chuyển sang `ListingCard`, và giờ không bề mặt nào còn dùng dòng
+   * gọn nữa (component đó đã xoá). Cùng một tin đọc ở hai nơi ra hai hình dạng khác nhau thì
+   * người dùng đọc ra ngay là "tin trong nhóm" khác loại với "tin ngoài kia".
    *
    * Vẫn KHÔNG đọc `feedLayout` của nhóm: thiết lập đó chọn giữa thẻ lớn và lưới hai cột cho
    * bảng tin của nhóm, còn ở đây thẻ lớn là lựa chọn duy nhất — hồ sơ nhóm là chỗ người ta đọc
@@ -47,7 +47,7 @@ export default function OrgProfileScreen() {
   const peek = useOrgPeek(slug ?? '', Boolean(org?.joined));
 
   /*
-   * Ba thứ `ListingCard` cần ngoài `item`, mà `ListingRow` không cần.
+   * Ba thứ `ListingCard` cần ngoài `item`.
    *
    * `useSavedIds` tự tắt khi chưa đăng nhập (khách vẫn mở được hồ sơ nhóm công khai) — trái tim
    * hiện rỗng, chạm vào thì `requireAuth` đưa sang màn đăng nhập. Cùng cách màn kết quả tìm

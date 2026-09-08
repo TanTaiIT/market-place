@@ -11,10 +11,8 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ListingRow } from '@/components/ListingRow';
 import { PinButton, ScreenHeader } from '@/components/ui';
 import { SearchFilterPanel } from '@/components/SearchFilterPanel';
-import { useCategories, useListings } from '@/queries/listings';
 import {
   activeFilterCount,
   EMPTY_SEARCH,
@@ -24,12 +22,6 @@ import {
 } from '@/api/db';
 import type { SearchFilter } from '@/api/db';
 import { C, F, R } from '@/theme';
-
-/**
- * Bao nhiêu tin gợi ý dưới ngăn lọc. Sáu là đủ để màn không trống trơn khi mới mở, và không đủ
- * để ai tưởng đây là kết quả tìm kiếm — thứ chỉ xuất hiện sau khi bấm nút.
- */
-const SUGGEST_MAX = 6;
 
 /**
  * Màn TIÊU CHÍ tìm kiếm — không có kết quả nào ở đây.
@@ -59,12 +51,6 @@ export default function SearchForm() {
   const [filter, setFilter] = useState<SearchFilter>(() =>
     paramsToSearch(params as Record<string, string | string[] | undefined>),
   );
-
-  // Cùng query mà bảng tin dùng, nên đổi chip danh mục là đọc từ cache chứ không gọi lại mạng.
-  const { data: suggestions } = useListings(filter.categoryId ?? '');
-  const { data: categories } = useCategories();
-  const categoryName = categories?.find((c) => c.id === filter.categoryId)?.name;
-  const suggested = (suggestions ?? []).slice(0, SUGGEST_MAX);
 
   const count = activeFilterCount(filter);
 
@@ -113,8 +99,13 @@ export default function SearchForm() {
         >
           <View style={styles.searchRow}>
             <Text style={styles.glyph}>🔍</Text>
+            {/*
+              KHÔNG `autoFocus`. Bàn phím bật lên ngay lúc mở màn che mất hơn nửa dưới — đúng
+              phần chứa ngăn lọc, tức là gần hết thứ màn này bày ra. Từ khi ô tìm kiếm ở bảng
+              tin đi thẳng vào trang kết quả, màn này là chỗ người ta tới để CHỌN bộ lọc,
+              không phải để gõ — bật bàn phím trước là đoán sai ý định.
+            */}
             <TextInput
-              autoFocus
               value={filter.q}
               onChangeText={(q) => setFilter((f) => ({ ...f, q }))}
               placeholder="Tên món đồ, ví dụ: xe đạp, sách 12…"
@@ -131,32 +122,6 @@ export default function SearchForm() {
           </View>
 
           <SearchFilterPanel filter={filter} onChange={setFilter} />
-
-          {/*
-            Dải gợi ý — giữ lại danh sách tin mà bản gộp trước đây vẫn hiện ở màn này.
-            Nó theo DANH MỤC đang chọn nhưng KHÔNG theo từ khoá/giá/khu vực: đây là chỗ để ngó
-            trong lúc còn đang chỉnh bộ lọc, không phải kết quả. Nhãn nói rõ điều đó.
-          */}
-          {suggested.length > 0 && (
-            <View style={styles.suggest}>
-              <Text style={styles.suggestLabel}>
-                {categoryName ? `Tin mới trong ${categoryName}` : 'Tin mới đăng'}
-              </Text>
-              <Text style={styles.suggestNote}>
-                Chưa phải kết quả — bấm Tìm kiếm để lọc theo tiêu chí ở trên.
-              </Text>
-              <View style={styles.suggestList}>
-                {suggested.map((item, i) => (
-                  <ListingRow
-                    key={item.id}
-                    item={item}
-                    index={i}
-                    onPress={() => router.push(`/listing/${item.id}`)}
-                  />
-                ))}
-              </View>
-            </View>
-          )}
         </ScrollView>
 
         {/* Thanh dính đáy: mốc "xong" của cả màn. Nằm ngoài ScrollView nên luôn thấy. */}
@@ -222,8 +187,4 @@ const styles = StyleSheet.create({
   },
   clear: { fontFamily: F.uiSemi, fontSize: 13, color: C.inkSoft },
   cta: { flex: 1 },
-  suggest: { marginTop: 24 },
-  suggestLabel: { fontFamily: F.uiBold, fontSize: 15, color: C.ink },
-  suggestNote: { fontFamily: F.ui, fontSize: 11.5, color: C.muted, marginTop: 3, marginBottom: 12 },
-  suggestList: { gap: 10 },
 });

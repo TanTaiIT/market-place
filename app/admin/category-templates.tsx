@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Alert, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert } from 'react-native';
 import { reorderItems, type ReorderableListReorderEvent } from 'react-native-reorderable-list';
-import { Surface } from '@/components/Surface';
+import { AdminScreen } from '@/components/AdminScreen';
 import { TemplateCategoryBar } from '@/components/TemplateCategoryBar';
 import { TemplateFieldList } from '@/components/TemplateFieldList';
 import { TemplatePreview } from '@/components/TemplatePreview';
 import { TemplateSaveBar } from '@/components/TemplateSaveBar';
-import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
+import { EmptyState, Loading } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useAdminCategories } from '@/queries/admin-content';
 import {
@@ -43,9 +42,16 @@ const blankField = (): DraftField => ({
  * Một nút "Lưu template" như bản thiết kế, nhưng nó KHÔNG âm thầm phát hành: lưu nháp xong mới
  * hỏi, vì phát hành không lùi lại được và người soạn phải nghe điều đó đúng lúc quyết.
  *
- * Nền giấy sáng chứ không phải nền `desk` của `AdminScreen`: bản thiết kế vẽ nó như một route
- * thường, và đây là màn soạn nội dung dài. Đổi lại là mất thanh điều hướng quản trị — đường ra
- * là nút ← của `ScreenHeader`.
+ * Khung `AdminScreen` như MỌI màn quản trị khác — và đó là một lần sửa lại có chủ ý.
+ *
+ * Bản trước dựng nền giấy sáng + `ScreenHeader` theo bản thiết kế, và cái giá thì lớn hơn hẳn
+ * cái được: màn trông y như một màn phía người dùng, mất thanh ☰ nên vào đây là ngõ cụt, còn
+ * nút ← thì rơi ra ngoài app khách — `AdminNav` điều hướng bằng `router.replace` nên bên dưới
+ * màn này KHÔNG còn màn admin nào trong stack, và `ScreenHeader` lùi về `/(tabs)/feed`.
+ *
+ * `ReorderableList` vẫn kéo được: `AdminScreen` render `children` TRỰC TIẾP, không bọc
+ * `ScrollView` — nên danh sách field vẫn là vùng cuộn duy nhất của màn, đúng điều kiện mà
+ * `TemplateFieldList` đòi.
  *
  * Chỉ master — cùng cửa với màn Danh mục, vì template là từ điển toàn hệ thống.
  */
@@ -172,56 +178,54 @@ export default function AdminCategoryTemplates() {
           : `Bản đang chạy v${liveVersion} đã phát hành nên bất biến — lưu sẽ tạo nháp mới.`;
 
   return (
-    <Surface>
-      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-        <ScreenHeader title="Tạo template danh mục" />
+    <AdminScreen title="Mẫu thuộc tính" note="từ điển field của từng danh mục">
+      <TemplateCategoryBar
+        onDark
+        categories={categories.data ?? []}
+        value={target}
+        status={status}
+        onChange={(next) => {
+          setTarget(next);
+          setDirty(false);
+          setFields([]);
+        }}
+      />
 
-        <TemplateCategoryBar
-          categories={categories.data ?? []}
-          value={target}
-          status={status}
-          onChange={(next) => {
-            setTarget(next);
-            setDirty(false);
-            setFields([]);
+      {!target ? (
+        <EmptyState
+          icon="🗂"
+          onDark
+          text="Chọn một danh mục để xem và sửa bộ thuộc tính của nó"
+        />
+      ) : published.isLoading || draft.isLoading ? (
+        <Loading onDark />
+      ) : (
+        <TemplateFieldList
+          onDark
+          fields={fields}
+          onPatch={patch}
+          onReorder={reorder}
+          onRemove={(i) => {
+            setDirty(true);
+            setFields((prev) => prev.filter((_, idx) => idx !== i));
+          }}
+          onAdd={() => {
+            setDirty(true);
+            setFields((prev) => [...prev, blankField()]);
           }}
         />
+      )}
 
-        {!target ? (
-          <EmptyState icon="🗂" text="Chọn một danh mục để xem và sửa bộ thuộc tính của nó" />
-        ) : published.isLoading || draft.isLoading ? (
-          <Loading />
-        ) : (
-          <TemplateFieldList
-            fields={fields}
-            onPatch={patch}
-            onReorder={reorder}
-            onRemove={(i) => {
-              setDirty(true);
-              setFields((prev) => prev.filter((_, idx) => idx !== i));
-            }}
-            onAdd={() => {
-              setDirty(true);
-              setFields((prev) => [...prev, blankField()]);
-            }}
-          />
-        )}
+      {!!target && (
+        <TemplateSaveBar busy={busy} onPreview={() => setPreview(true)} onSave={save} />
+      )}
 
-        {!!target && (
-          <TemplateSaveBar busy={busy} onPreview={() => setPreview(true)} onSave={save} />
-        )}
-
-        <TemplatePreview
-          visible={preview}
-          fields={fields}
-          dictionary={defs ?? []}
-          onClose={() => setPreview(false)}
-        />
-      </SafeAreaView>
-    </Surface>
+      <TemplatePreview
+        visible={preview}
+        fields={fields}
+        dictionary={defs ?? []}
+        onClose={() => setPreview(false)}
+      />
+    </AdminScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1 },
-});

@@ -255,6 +255,14 @@ export const orgApi = {
    *
    * Muốn xem trước tên tổ chức trước khi gửi thì gọi `orgApi.byCode` — cùng mã, không cần đăng nhập.
    */
+  /**
+   * HAI KẾT CỤC, phân biệt bằng `status` của kết quả trả về:
+   * - `approved` — nhóm CÔNG KHAI: đã là thành viên ngay lúc này, không có ai phải duyệt.
+   * - `pending` — nhóm RIÊNG TƯ: phải chờ người có quyền duyệt trong nhóm xử lý.
+   *
+   * Call-site BẮT BUỘC đọc `status`: báo "đã gửi đơn" cho một người vừa vào nhóm xong là
+   * bắt họ ngồi đợi một hàng đợi không tồn tại.
+   */
   async requestJoin(input: {
     code?: string;
     slug?: string;

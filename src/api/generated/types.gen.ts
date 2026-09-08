@@ -982,6 +982,10 @@ export type UserDeleteMeErrors = {
      * Thiếu hoặc sai access token
      */
     401: ErrorResponse;
+    /**
+     * Master cuối cùng, hoặc quản trị duy nhất của một tổ chức
+     */
+    409: ErrorResponse;
 };
 
 export type UserDeleteMeError = UserDeleteMeErrors[keyof UserDeleteMeErrors];
@@ -2360,7 +2364,7 @@ export type CreateJoinRequestError = CreateJoinRequestErrors[keyof CreateJoinReq
 
 export type CreateJoinRequestResponses = {
     /**
-     * Đã gửi đơn
+     * Đã vào nhóm (công khai) hoặc đã gửi đơn (riêng tư)
      */
     201: {
         success: true;
@@ -2595,6 +2599,10 @@ export type MembershipRemoveErrors = {
      * Người này không còn trong nhóm
      */
     404: ErrorResponse;
+    /**
+     * Đây là quản trị duy nhất của tổ chức
+     */
+    409: ErrorResponse;
 };
 
 export type MembershipRemoveError = MembershipRemoveErrors[keyof MembershipRemoveErrors];
@@ -2904,7 +2912,7 @@ export type RevokeRoleGrantErrors = {
      */
     403: ErrorResponse;
     /**
-     * Phải luôn còn ít nhất một master
+     * Phải luôn còn ít nhất một master, và mỗi tổ chức phải luôn còn ít nhất một quản trị
      */
     409: ErrorResponse;
 };

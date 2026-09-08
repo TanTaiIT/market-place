@@ -56,6 +56,8 @@ export const authRefresh = <ThrowOnError extends boolean = false>(options?: Opti
 
 /**
  * Xoá tài khoản (soft delete)
+ *
+ * Thu hồi mọi quyền và lưu trữ mọi tư cách thành viên trước khi tắt tài khoản. Bị TỪ CHỐI khi tài khoản là master cuối cùng của hệ thống, hoặc là quản trị duy nhất của một tổ chức nào đó — lỗi nêu tên các tổ chức đó để biết phải trao quyền ở đâu.
  */
 export const userDeleteMe = <ThrowOnError extends boolean = false>(options?: Options<UserDeleteMeData, ThrowOnError>) => (options?.client ?? client).delete<UserDeleteMeResponses, UserDeleteMeErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -463,9 +465,9 @@ export const listJoinRequests = <ThrowOnError extends boolean = false>(options?:
 });
 
 /**
- * Gửi đơn xin vào một tổ chức
+ * Xin vào một tổ chức (nhóm công khai: vào ngay)
  *
- * Không cần thuộc tổ chức nào trước đó. Có trần số đơn đang chờ và cooldown sau khi bị từ chối để hàng đợi của tổ chức không bị rải đơn.
+ * Không cần thuộc tổ chức nào trước đó. **Đọc `status` của phản hồi**: nhóm CÔNG KHAI trả `approved` — người gọi đã là thành viên ngay lúc đó, không có bước duyệt; nhóm RIÊNG TƯ trả `pending` và phải chờ người có quyền duyệt trong nhóm xử lý. Trần số đơn đang chờ chỉ áp cho nhóm riêng tư (nhóm công khai không sinh đơn chờ), còn cooldown sau khi bị từ chối áp cho cả hai.
  */
 export const createJoinRequest = <ThrowOnError extends boolean = false>(options?: Options<CreateJoinRequestData, ThrowOnError>) => (options?.client ?? client).post<CreateJoinRequestResponses, CreateJoinRequestErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -552,7 +554,7 @@ export const membershipList = <ThrowOnError extends boolean = false>(options?: O
 /**
  * Gỡ một người khỏi tổ chức (quản trị nhóm)
  *
- * Lưu trữ tư cách thành viên chứ không xoá bản ghi — danh bạ cũ là dữ liệu của tổ chức. KHÔNG gỡ được chính mình, và không gỡ được người cũng đang giữ quyền quản trị tổ chức (cần master), nếu không hai quản trị sẽ gỡ lẫn nhau.
+ * Lưu trữ tư cách thành viên chứ không xoá bản ghi — danh bạ cũ là dữ liệu của tổ chức. KHÔNG gỡ được chính mình, và không gỡ được người cũng đang giữ quyền quản trị tổ chức (cần master), nếu không hai quản trị sẽ gỡ lẫn nhau. Quản trị DUY NHẤT của tổ chức thì không ai gỡ được, kể cả master — phải trao quyền cho người khác trước.
  */
 export const membershipRemove = <ThrowOnError extends boolean = false>(options: Options<MembershipRemoveData, ThrowOnError>) => (options.client ?? client).delete<MembershipRemoveResponses, MembershipRemoveErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

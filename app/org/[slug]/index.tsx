@@ -86,7 +86,13 @@ export default function OrgProfileScreen() {
     join.mutate(
       { slug: org.slug, claimedName: me?.name ?? '' },
       {
-        onSuccess: () => toast(`✓ Đã gửi đơn vào ${org.name}`),
+        // Nhóm công khai vào ngay, nhóm riêng tư mới có đơn chờ — xem `orgApi.requestJoin`.
+        onSuccess: (res) =>
+          toast(
+            res.status === 'approved'
+              ? `✓ Đã tham gia ${org.name}`
+              : `✓ Đã gửi đơn vào ${org.name}`,
+          ),
         onError: (e: Error) => toast(`⚠️ ${e.message}`),
       },
     );

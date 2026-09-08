@@ -13,7 +13,7 @@ import {
   RecentStrip,
 } from '@/components/FeedHighlights';
 import { useRequireAuth } from '@/components/GuestGate';
-import { useHideOnScroll } from '@/components/useHideOnScroll';
+import { useCollapsingHeader } from '@/components/useCollapsingHeader';
 import { useCategories, useListings, useProfile } from '@/queries/listings';
 import { useMyOrgs } from '@/queries/org';
 import { useOrgDiscover } from '@/queries/org-discover';
@@ -61,15 +61,15 @@ export default function Feed() {
     else go();
   };
 
-  // Thanh đầu nổi: khối xanh cuộn đi như nội dung, hàng chip trốn/hiện theo hướng cuộn.
-  const bar = useHideOnScroll();
+  // Thanh đầu nổi: khối xanh cuộn đi như nội dung, hàng chip ở lại cố định.
+  const bar = useCollapsingHeader();
 
   return (
     <Surface>
       <Animated.ScrollView
         onScroll={bar.onScroll}
-        // 16ms = mỗi khung hình — để nhận ra hướng cuộn kịp lúc trên Android (sự kiện mặc
-        // định rất thưa, ngưỡng SCROLL_SLOP sẽ chỉ đạt sau khi đã cuộn qua cả một khối).
+        // 16ms = mỗi khung hình. Thanh bám đúng vị trí cuộn, nên nhịp sự kiện CHÍNH LÀ nhịp
+        // chuyển động: để mặc định (Android bắn rất thưa) là thanh đứng vài khung rồi nhảy.
         scrollEventThrottle={16}
         contentContainerStyle={{
           // Chừa đúng chiều cao thanh nổi: nó nằm NGOÀI cuộn nên không tự đẩy nội dung xuống.

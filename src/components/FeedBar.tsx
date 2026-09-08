@@ -12,13 +12,13 @@ import { C, F, G, R } from '@/theme';
  * Phần đầu bảng tin: khối chào nền xanh tràn lên đỉnh máy (dòng chào + nhóm + thẻ tìm), rồi hàng
  * chip danh mục.
  *
- * **Hai tầng chuyển động, theo đúng hai vai trò.** Khối xanh là NỘI DUNG: nó cuộn đi một lần rồi
- * thôi, nên `onTitleLayout` đo đúng khối đó (xem `collapse` trong `feed.tsx`). Hàng chip là CÔNG
- * CỤ lọc nên nó ở lại, chỉ trốn/hiện theo hướng cuộn — đó là lý do hai thứ không nằm chung một
+ * **Hai vai trò, một chuyển động.** Khối xanh là NỘI DUNG: nó cuộn đi một lần rồi thôi, nên
+ * `onTitleLayout` đo đúng khối đó (xem `useCollapsingHeader`). Hàng chip là CÔNG CỤ lọc nên nó
+ * Ở LẠI cố định — không trốn/hiện theo hướng cuộn nữa. Đó là lý do hai thứ không nằm chung một
  * View đo được.
  *
- * Thuần trình bày, mọi lối đi đều qua props (`component.convention`); hoạt ảnh ẩn/hiện thanh ở
- * lại màn hình, nơi giữ shared value.
+ * Thuần trình bày, mọi lối đi đều qua props (`component.convention`); hoạt ảnh cuộn-đi ở lại
+ * màn hình, nơi giữ shared value.
  */
 export function FeedBar({
   topInset,

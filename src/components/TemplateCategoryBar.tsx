@@ -22,18 +22,24 @@ export function TemplateCategoryBar({
   value,
   status,
   onChange,
+  onDark,
 }: {
   categories: readonly AdminCategory[];
   value: TemplateTarget | null;
   /** Một dòng nói bản đang chạy / đang nháp / đang dùng mẫu mặc định. */
   status?: string;
   onChange: (target: TemplateTarget) => void;
+  /**
+   * Nền `desk` tối của bàn quản trị. Hai dòng chữ TRẦN (nhãn và câu trạng thái) nằm trực
+   * tiếp trên nền đó; chip thì tự có nền sáng nên không đụng tới.
+   */
+  onDark?: boolean;
 }) {
   const onDefault = value?.kind === 'default';
 
   return (
     <View>
-      <Text style={styles.label}>ĐANG SOẠN CHO</Text>
+      <Text style={[styles.label, onDark && { color: C.deskTxtSoft }]}>ĐANG SOẠN CHO</Text>
 
       <ScrollView
         horizontal
@@ -51,7 +57,7 @@ export function TemplateCategoryBar({
           <Text style={[styles.chipText, onDefault && styles.chipTextOn]}>⭐ Mẫu mặc định</Text>
         </Pressable>
 
-        <View style={styles.divider} />
+        <View style={[styles.divider, onDark && styles.dividerDark]} />
 
         {categories.map((cat) => {
           const on = value?.kind === 'category' && value.categoryId === cat.id;
@@ -76,7 +82,9 @@ export function TemplateCategoryBar({
         })}
       </ScrollView>
 
-      {!!status && <Text style={styles.status}>{status}</Text>}
+      {!!status && (
+        <Text style={[styles.status, onDark && { color: C.deskTxtSoft }]}>{status}</Text>
+      )}
     </View>
   );
 }
@@ -98,6 +106,7 @@ const styles = StyleSheet.create({
     paddingRight: 22,
   },
   divider: { width: 1, alignSelf: 'stretch', marginHorizontal: 2, backgroundColor: C.line },
+  dividerDark: { backgroundColor: C.deskLineStrong },
   chip: {
     borderRadius: R.sm,
     paddingHorizontal: 14,

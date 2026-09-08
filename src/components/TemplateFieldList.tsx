@@ -23,11 +23,18 @@ export function TemplateFieldList({
   onRemove,
   onReorder,
   onAdd,
+  onDark,
 }: {
   fields: DraftField[];
   onPatch: (index: number, next: Partial<DraftField>) => void;
   onRemove: (index: number) => void;
   onReorder: (event: ReorderableListReorderEvent) => void;
+  /**
+   * Màn này sống trên nền `desk` tối của bàn quản trị. Ba dòng chữ TRẦN ở đây (nhãn, nút
+   * thêm, câu hướng dẫn) nằm trực tiếp trên nền đó — thẻ field thì tự có nền sáng riêng nên
+   * không đụng tới. Không có cờ này thì `C.inkSoft`/`C.muted` gần như tàng hình.
+   */
+  onDark?: boolean;
   onAdd: () => void;
 }) {
   const filterable = fields.filter((f) => f.filterable).length;
@@ -52,7 +59,7 @@ export function TemplateFieldList({
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.body}
       ListHeaderComponent={
-        <Text style={styles.label}>
+        <Text style={[styles.label, onDark && { color: C.deskTxtSoft }]}>
           THUỘC TÍNH ĐẶC THÙ · {fields.length} field · {filterable}/{MAX_FILTERABLE} mở lọc
         </Text>
       }
@@ -60,11 +67,19 @@ export function TemplateFieldList({
         <View>
           <Pressable
             onPress={onAdd}
-            style={({ pressed }) => [styles.add, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [
+              styles.add,
+              onDark && { borderColor: C.deskLineStrong },
+              pressed && { opacity: 0.7 },
+            ]}
           >
-            <Text style={styles.addText}>+ Thêm thuộc tính</Text>
+            <Text style={[styles.addText, onDark && { color: C.deskTxt }]}>
+              + Thêm thuộc tính
+            </Text>
           </Pressable>
-          <Text style={styles.hint}>Giữ vào ⣿ rồi kéo để đổi thứ tự hiện trên form đăng tin.</Text>
+          <Text style={[styles.hint, onDark && { color: C.deskTxtDim }]}>
+            Giữ vào ⣿ rồi kéo để đổi thứ tự hiện trên form đăng tin.
+          </Text>
         </View>
       }
     />

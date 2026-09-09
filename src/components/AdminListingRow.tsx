@@ -76,7 +76,12 @@ export function AdminListingRow({
 }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}>
-      <ListingPhoto photo={item.photo} style={styles.thumb} imageStyle={styles.thumbRadius} />
+      <ListingPhoto
+        photo={item.photo}
+        photoUrl={item.photoUrl}
+        style={styles.thumb}
+        imageStyle={styles.thumbRadius}
+      />
 
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text numberOfLines={2} style={styles.title}>

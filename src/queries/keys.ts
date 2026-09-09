@@ -94,6 +94,11 @@ export const qk = {
     ['join-requests', 'queue', orgSlug, status] as const,
   /** Danh bạ thành viên. Theo slug vì đổi tổ chức là đổi hẳn tập người, không phải lọc lại. */
   orgMembers: (orgSlug: string) => ['orgs', 'members', orgSlug] as const,
+  /**
+   * Người phụ trách một org. Khoá theo `id` chứ không `slug`: endpoint nhận id, và slug thì
+   * đổi được (`PATCH /:id/slug`) — bám vào nó là cache mồ côi sau mỗi lần đổi tên.
+   */
+  orgManagers: (orgId: string) => ['orgs', 'managers', orgId] as const,
   /** Mang cả slug đang gõ, cùng lý do với `orgByCode` — mỗi slug là một câu trả lời khác. */
   slugAvailability: (slug: string) => ['orgs', 'slug-check', slug] as const,
 
@@ -115,6 +120,11 @@ export const qk = {
   adminPublicQueue: (status: string) => ['admin', 'public-queue', status] as const,
   adminCoverage: () => ['admin', 'coverage'] as const,
   adminPublicOverview: () => ['admin', 'public-overview'] as const,
+  /**
+   * Bàn của master. Nằm trong cụm `admin` để một lượt duyệt tin quét luôn nó, nhưng KHÔNG mang
+   * `orgSlug` — số liệu gộp mọi tổ chức, không đổi theo tổ chức đang chọn.
+   */
+  systemMetrics: () => ['admin', 'system-metrics'] as const,
   // Ngoài cụm `admin` vì nó là quyền của NGƯỜI, không phải dữ liệu của bàn quản trị: một lượt
   // duyệt tin quét sạch `adminRoot()`, mà quyền thì không đổi theo lượt duyệt nào cả.
   myGrants: () => ['me', 'grants'] as const,

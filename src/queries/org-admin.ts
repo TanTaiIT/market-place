@@ -82,6 +82,48 @@ export function useAllOrgs(filter: OrgListFilter = {}, enabled = true) {
   });
 }
 
+/** Bao nhiêu thành viên kéo về cho ngăn chi tiết. 100 là trần của BE — quá đó bảng cắt im lặng. */
+const ROSTER_TAKE = 100;
+
+/**
+ * Hai lượt gọi của ngăn chi tiết tổ chức trong bảng của master.
+ *
+ * `enabled` theo `orgId`/`slug` chứ không có cờ riêng: ngăn đóng thì call-site truyền chuỗi
+ * rỗng, nên không lượt nào bay đi lúc chưa ai mở ngăn. Hai query tách nhau để phần danh bạ
+ * (chậm hơn, 100 dòng) không giữ phần 'ai phụ trách' lại — đó là thứ người ta mở ngăn để xem.
+ */
+export function useOrgManagers(orgId: string) {
+  return useQuery({
+    queryKey: qk.orgManagers(orgId),
+    queryFn: () => orgAdminApi.managers(orgId),
+    enabled: orgId.length > 0,
+    staleTime: 60_000,
+  });
+}
+
+/**
+ * Danh bạ của MỘT org theo slug, không phụ thuộc org đang thao tác.
+ *
+ * Khác `useOrgRoster` ở đúng chỗ đó: hàm kia đọc `useOrgSlug()`, tức muốn xem nhóm khác thì
+ * phải chuyển org đang thao tác của cả app — chính thao tác mà bàn của master vừa bỏ đi.
+ * `memberPreview` gắn `X-Org-Slug` cho riêng lượt gọi, nên xem nhóm nào không đổi chỗ đứng.
+ *
+ * BE cho master đọc: route gác `requireMembershipOrOrgModerator`, và comment ở đó nói rõ
+ * người quản org mà không phải thành viên cũng phải đọc được — họ xoá được thành viên thì
+ * chặn họ xem danh sách chỉ tạo ra một bàn quản trị thao tác được mà không nhìn được.
+ *
+ * Dùng CHUNG key `orgMembers(slug)` với `useOrgRoster`: cùng endpoint, cùng một org, cùng hình
+ * dạng — hai key riêng chỉ tạo hai bản cache nói cùng một chuyện.
+ */
+export function useOrgMemberList(slug: string) {
+  return useQuery({
+    queryKey: qk.orgMembers(slug),
+    queryFn: () => orgApi.memberPreview(slug, ROSTER_TAKE),
+    enabled: slug.length > 0,
+    staleTime: 60_000,
+  });
+}
+
 /**
  * Tạo tổ chức. Quét `allOrgsRoot()` chứ không `myOrgs()`: master KHÔNG tự thành thành viên, nên
  * tổ chức vừa tạo không bao giờ xuất hiện ở `/organizations/mine` — nó chỉ hiện ở bảng toàn hệ

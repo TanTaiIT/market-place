@@ -46,7 +46,12 @@ export function AdminListingSheet({
           </View>
 
           <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-            <ListingPhoto photo={item.photo} style={styles.photo} imageStyle={styles.photoRadius} />
+            <ListingPhoto
+              photo={item.photo}
+              photoUrl={item.photoUrl}
+              style={styles.photo}
+              imageStyle={styles.photoRadius}
+            />
 
             <View style={styles.tags}>
               <StatusBadge status={item.status} />

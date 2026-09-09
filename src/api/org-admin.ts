@@ -3,6 +3,7 @@ import {
   createOrganization,
   createRoleGrant,
   listOrganizations,
+  organizationManagers,
   organizationGrantAdmin,
   organizationSlugAvailability,
   revokeRoleGrant,
@@ -15,11 +16,17 @@ import {
  * cũ — và file generated thì không sửa tay được (api:sync ghi đè). Mọi endpoint khác vẫn qua barrel.
  */
 import { setOrganizationVisibility } from './generated/sdk.gen';
-import type { CreateRoleGrant, Organization, RoleGrant, SlugAvailability } from './generated';
+import type {
+  CreateRoleGrant,
+  OrgManager,
+  Organization,
+  RoleGrant,
+  SlugAvailability,
+} from './generated';
 import type { ProvinceName } from './location';
 
 /** Cùng lý do với `OrgUnit` bên `org.ts`: màn hình đi qua `api/**`, không chạm `generated`. */
-export type { Organization, RoleGrant };
+export type { Organization, OrgManager, RoleGrant };
 import { isMaster } from './admin';
 import { unwrap } from './client';
 import { withAuthRetry } from './http';
@@ -216,6 +223,20 @@ export const orgAdminApi = {
    * `limit: 100` (trần của BE) và BỎ `meta`: quá 100 tổ chức thì bảng cắt im lặng, nên ô tìm +
    * bộ lọc trạng thái là đường thu hẹp chính. Vượt mốc đó thì phân trang thật trước, sửa hàm sau.
    */
+  /**
+   * Ai đang phụ trách MỘT tổ chức — đọc từ `role_grants`, không phải từ danh bạ.
+   *
+   * `Membership.role === 'admin'` nhìn giống câu trả lời nhưng không phải: nó là THÂN PHẬN
+   * hiển thị trong nhóm, còn quyền thật nằm ở grant. `grantAdmin` bên BE ghi cả hai cùng lúc
+   * nên chúng thường trùng — nhưng thu hồi grant KHÔNG đụng tới danh bạ, nên đúng lúc một
+   * nhóm không còn ai quản thì danh bạ vẫn ghi 'admin'. Mảng rỗng ở đây là câu trả lời thật,
+   * và nó khớp với con số `withoutManager` ở bàn tổng quan hệ thống.
+   */
+  async managers(orgId: string): Promise<OrgManager[]> {
+    const res = await withAuthRetry(() => organizationManagers({ path: { organizationId: orgId } }));
+    return unwrap(res, 'Không đọc được danh sách người phụ trách');
+  },
+
   async listAll(filter: OrgListFilter = {}): Promise<Organization[]> {
     const res = await withAuthRetry(() =>
       listOrganizations({ query: { q: filter.q || undefined, status: filter.status, limit: 100 } }),

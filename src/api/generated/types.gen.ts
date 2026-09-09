@@ -203,6 +203,14 @@ export type ChangeOrganizationSlug = {
     slug: string;
 };
 
+export type OrgManager = {
+    userId: string;
+    name: string | null;
+    email: string | null;
+    avatar: string | null;
+    grantedAt: string;
+};
+
 export type CreateListing = {
     title: string;
     description: string;
@@ -773,6 +781,56 @@ export type Province = {
 export type WardList = {
     province: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
     wards: Array<string>;
+};
+
+export type SystemMetrics = {
+    generatedAt: string;
+    organizations: {
+        total: number;
+        new7d: number;
+        new30d: number;
+        active: number;
+        suspended: number;
+        pendingAdmin: number;
+        withoutManager: number;
+    };
+    users: {
+        total: number;
+        new7d: number;
+        new30d: number;
+        active: number;
+        locked: number;
+    };
+    listings: {
+        total: number;
+        new7d: number;
+        new30d: number;
+        publicAxis: number;
+        orgInternal: number;
+        active: number;
+        pending: number;
+        hidden: number;
+        rejected: number;
+        trend: Array<{
+            day: string;
+            approved: number;
+            pending: number;
+        }>;
+        topCategories: Array<{
+            categoryId: string;
+            name: string;
+            count: number;
+        }>;
+    };
+    moderation: {
+        pendingPublicAxis: number;
+        pendingOrgAxis: number;
+        oldestPendingDays: number;
+        openReports: number;
+        uncoveredCells: number;
+        totalCells: number;
+        coverageBacklog: number;
+    };
 };
 
 export type ClearRejections = {
@@ -2071,6 +2129,45 @@ export type CreateOrganizationResponses = {
 };
 
 export type CreateOrganizationResponse = CreateOrganizationResponses[keyof CreateOrganizationResponses];
+
+export type OrganizationManagersData = {
+    body?: never;
+    path: {
+        organizationId: string;
+    };
+    query?: never;
+    url: '/organizations/{organizationId}/managers';
+};
+
+export type OrganizationManagersErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy tổ chức
+     */
+    404: ErrorResponse;
+};
+
+export type OrganizationManagersError = OrganizationManagersErrors[keyof OrganizationManagersErrors];
+
+export type OrganizationManagersResponses = {
+    /**
+     * Danh sách người phụ trách
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<OrgManager>;
+    };
+};
+
+export type OrganizationManagersResponse = OrganizationManagersResponses[keyof OrganizationManagersResponses];
 
 export type OrganizationGrantAdminData = {
     body?: GrantOrganizationAdmin;
@@ -4693,3 +4790,36 @@ export type WalletAdjustResponses = {
 };
 
 export type WalletAdjustResponse = WalletAdjustResponses[keyof WalletAdjustResponses];
+
+export type MetricsSystemData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/metrics/system';
+};
+
+export type MetricsSystemErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+};
+
+export type MetricsSystemError = MetricsSystemErrors[keyof MetricsSystemErrors];
+
+export type MetricsSystemResponses = {
+    /**
+     * Số liệu toàn hệ thống
+     */
+    200: {
+        success: true;
+        message: string;
+        data: SystemMetrics;
+    };
+};
+
+export type MetricsSystemResponse = MetricsSystemResponses[keyof MetricsSystemResponses];

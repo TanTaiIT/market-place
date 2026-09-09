@@ -1,6 +1,6 @@
 import { userClearRejections, userListForAdmin, userSetStatus, walletAdjust } from './generated';
 import type { AdminUser as AdminUserDto } from './generated';
-import { relativeTime, unwrap } from './client';
+import { initialsOf, relativeTime, unwrap } from './client';
 import { withAuthRetry } from './http';
 
 /**
@@ -31,7 +31,19 @@ export type AdminUser = {
   id: string;
   name: string;
   email: string;
+  /**
+   * Chữ viết tắt để vẽ vòng tròn khi CHƯA có ảnh — KHÔNG phải URL.
+   *
+   * Field `avatar` của DTO bên BE là ảnh thật (`z.string().url()`), nhưng tên nó trùng với
+   * field chữ viết tắt mà `Avatar` component nhận. Tách đôi ngay tại mapper, đúng như
+   * `toMeProfile`/`toPublicProfile` bên `client.ts` đã làm và đã ghi rõ lý do: nhồi cả hai
+   * vào một field thì call-site phải tự đoán mình đang giữ URL hay hai chữ cái. Đúng cái bẫy
+   * đó đã cắn ở bảng người dùng — `text={item.avatar}` vẽ nguyên chuỗi URL vào vòng tròn
+   * 38px và không bao giờ tải ảnh.
+   */
   avatar: string;
+  /** Ảnh thật. `undefined` khi người dùng chưa đặt — BE trả chuỗi rỗng cho ca đó. */
+  avatarUrl?: string;
   status: UserStatus;
   /** Bậc uy tín: từ bậc 2 là tin tự lên bảng, chỉ hậu kiểm. Một số DUY NHẤT cho mọi trục. */
   trustLevel: number;
@@ -61,7 +73,8 @@ const toUser = (dto: AdminUserDto): AdminUser => ({
   id: dto.id,
   name: dto.name,
   email: dto.email,
-  avatar: dto.avatar,
+  avatar: initialsOf(dto.name),
+  avatarUrl: dto.avatar || undefined,
   status: statusOf(dto),
   trustLevel: dto.trustLevel,
   joined: relativeTime(dto.createdAt),

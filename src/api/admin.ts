@@ -43,7 +43,17 @@ export type ModListing = {
   title: string;
   price: string;
   cat: string;
+  /** Gradient dự phòng, dựng từ id — dùng khi tin KHÔNG có ảnh nào. */
   photo: Grad;
+  /**
+   * Ảnh đầu của tin. `undefined` khi tin chưa có ảnh → `ListingPhoto` rơi về `photo`.
+   *
+   * Thiếu field này là lý do bàn duyệt chỉ hiện gradient: `ListingPhoto` chỉ vẽ `<Image>`
+   * khi có `photoUrl`, còn `photo` một mình luôn cho ra ô màu. DTO đã mang `images` từ đầu
+   * (mapper tin công khai đọc nó ở `client.ts`), chỉ mapper của bàn duyệt là chưa lấy —
+   * di sản từ hồi màn này còn chạy fixture, lúc `gradOf(id)` là toàn bộ phần hình.
+   */
+  photoUrl?: string;
   seller: string;
   avatar: string;
   /** Snapshot ảnh đại diện lúc tạo tin. Rỗng = rơi về chữ viết tắt. */
@@ -113,6 +123,7 @@ function toModListing(dto: ListingDto, categoryNames: Map<string, string>): ModL
     price: formatPrice(dto.price),
     cat: categoryNames.get(dto.category) ?? '',
     photo: gradOf(dto._id),
+    photoUrl: dto.images[0] || undefined,
     seller: dto.posterName || 'Người bán',
     avatar: initialsOf(dto.posterName || 'Người bán'),
     avatarUrl: dto.posterAvatar || undefined,

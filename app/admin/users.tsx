@@ -128,7 +128,13 @@ export default function AdminUsers() {
           const locked = item.status === 'locked';
           return (
             <View style={styles.row}>
-              <Avatar text={item.avatar} size={38} color={colorOf(item.name)} textColor={C.desk} />
+              <Avatar
+                text={item.avatar}
+                url={item.avatarUrl}
+                size={38}
+                color={colorOf(item.name)}
+                textColor={C.desk}
+              />
 
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text numberOfLines={1} style={styles.name}>

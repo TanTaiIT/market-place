@@ -24,6 +24,14 @@ export const qk = {
   /** Hạn mức đăng tin — đổi sau mỗi lần đăng hoặc mỗi lần một tin được duyệt. */
   listingQuota: () => ['listings', 'quota'] as const,
   listing: (id: string) => ['listing', id] as const,
+  /**
+   * Bản CHÍNH CHỦ của một tin (mọi trạng thái) — khác `listing(id)` vốn là bản công khai.
+   *
+   * `id` đứng TRƯỚC 'mine' để `listing(id)` thành prefix của nó: mọi lượt invalidate sẵn có
+   * (xoá tin, gia hạn, đánh dấu đã bán) tự phủ luôn bản này, không phải thêm một dòng ở từng
+   * mutation — và không ai quên dòng đó ở mutation viết sau.
+   */
+  myListing: (id: string) => ['listing', id, 'mine'] as const,
   /** Không nằm dưới prefix `listings()`: gợi ý gắn với MỘT tin, đăng tin mới không làm nó sai. */
   listingSuggestions: (id: string) => ['listing', id, 'suggestions'] as const,
   /**

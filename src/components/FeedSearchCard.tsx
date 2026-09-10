@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { PickerSheet } from './PickerSheet';
 import type { PickerSearch } from './PickerSheet';
 import { useProvinceSearch } from './LocationPicker';
+import { GlassSheen, glassPane } from './GlassSurface';
 import type { Category } from '@/api/db';
 import type { ProvinceName } from '@/api/location';
 import { C, F, R, shadowLift } from '@/theme';
@@ -45,6 +46,8 @@ export function FeedSearchCard({
 
   return (
     <View style={styles.card}>
+      {/* Lớp 2 của mặt kính — phải là con ĐẦU TIÊN, nếu không nó phủ lên nội dung. */}
+      <GlassSheen />
       {/* Ô gõ thẳng tên tin — đường tắt cho người đã biết mình tìm gì; Enter trên bàn phím
           cũng là "Tìm tin" luôn, khỏi với tay xuống nút. */}
       <View style={styles.qRow}>
@@ -138,9 +141,15 @@ function Row({
 }
 
 const styles = StyleSheet.create({
-  // Mảng trắng duy nhất trên nền xanh, nên nó là thứ mắt rơi vào đầu tiên.
+  /*
+   * Mảng sáng duy nhất trên nền xanh, nên nó là thứ mắt rơi vào đầu tiên.
+   *
+   * `glassPane` thay cho `paperWarm` đục: trên nền hero đã làm sâu, một tấm trắng 92% có
+   * cạnh vát đọc ra 'kính' còn trắng 100% đọc ra 'tờ giấy dán lên'. Chữ bên trong vẫn là
+   * `C.ink` nên độ đục phải ở mức này, không hạ thêm.
+   */
   card: {
-    backgroundColor: C.paperWarm,
+    ...glassPane,
     borderRadius: R.lg,
     marginHorizontal: 16,
     marginTop: 14,

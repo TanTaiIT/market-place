@@ -4,7 +4,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { Listing } from '@/api/db';
 import { listingShips } from '@/api/placeholders';
 import { ListingPhoto } from './ListingPhoto';
-import { C, F, R, shadow } from '@/theme';
+import { C, F, R, S, T, shadow } from '@/theme';
 
 /**
  * Thẻ tin của giao diện mới — dựng theo `.card` trong prototype "Ghim · Mioto style".
@@ -17,7 +17,7 @@ import { C, F, R, shadow } from '@/theme';
  * khoảng cách từng nằm ở đây và đã được gỡ: chúng trông như bằng chứng về người bán, nên
  * bịa chúng là nói dối đúng chỗ người mua tin nhất.
  *
- * Không có nút nhắn tin như `FeedCard` cũ: bản mẫu chỉ để lại nút lưu trên thẻ, còn nhắn tin
+ * Không có nút nhắn tin như thẻ bảng-bần cũ (`FeedCard`, đã xoá): bản mẫu chỉ để lại nút lưu
  * nằm ở thanh dính dưới màn chi tiết. Một hành động một chỗ, không nhân đôi bề mặt.
  */
 export function ListingCard({
@@ -118,7 +118,7 @@ export function ListingCard({
 
 const styles = StyleSheet.create({
   card: { backgroundColor: C.paperWarm, borderRadius: R.lg, overflow: 'hidden', ...shadow },
-  imgWrap: { margin: 8, marginBottom: 0, borderRadius: R.md, overflow: 'hidden' },
+  imgWrap: { margin: S.sm, marginBottom: 0, borderRadius: R.md, overflow: 'hidden' },
   photo: { height: 196, width: '100%' },
 
   round: {
@@ -130,51 +130,56 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fav: { top: 10, right: 10 },
+  fav: { top: S.md, right: S.md },
   favOn: { backgroundColor: C.glassLift },
   favGlyph: { fontSize: 15 },
 
   pending: {
     position: 'absolute',
-    top: 10,
-    left: 10,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    top: S.md,
+    left: S.md,
+    paddingHorizontal: S.sm,
+    paddingVertical: S.xs,
     borderRadius: R.pill,
     backgroundColor: C.scrim,
   },
-  pendingText: { fontFamily: F.uiBold, fontSize: 9.5, letterSpacing: 0.8, color: C.paperWarm },
+  pendingText: { fontFamily: F.uiBold, ...T.xs, letterSpacing: 0.8, color: C.paperWarm },
 
-
-  dots: { position: 'absolute', alignSelf: 'center', bottom: 10, flexDirection: 'row', gap: 4 },
+  dots: { position: 'absolute', alignSelf: 'center', bottom: S.md, flexDirection: 'row', gap: S.xs },
   dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.55)' },
   dotOn: { width: 14, backgroundColor: '#fff' },
 
-  body: { padding: 12, paddingHorizontal: 14, paddingBottom: 0 },
-  chips: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 11 },
+  /* Đệm ngang bằng `S.lg` cho cả thân thẻ: bản trước 12/14 lệch nhau 2px giữa dọc và ngang, đủ
+     để mắt thấy thẻ hơi 'méo' mà không chỉ ra được chỗ nào. */
+  body: { padding: S.lg, paddingBottom: 0 },
+  chips: { flexDirection: 'row', gap: S.sm, flexWrap: 'wrap', marginBottom: S.md },
   chip: {
     backgroundColor: C.chipIdle,
     borderRadius: R.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: S.md,
+    paddingVertical: S.xs + 2,
     maxWidth: '60%',
   },
   chipGreen: { backgroundColor: C.brandLt },
   chipOrange: { backgroundColor: C.orangeLt },
-  chipText: { fontFamily: F.ui, fontSize: 12.5, color: C.inkSoft },
+  chipText: { fontFamily: F.ui, ...T.sm, color: C.inkSoft },
 
-  title: { fontFamily: F.uiBold, fontSize: 15.5, lineHeight: 20, color: C.ink, letterSpacing: 0.1 },
-  specs: { flexDirection: 'row', gap: 16, marginTop: 11, flexWrap: 'wrap' },
-  spec: { fontFamily: F.ui, fontSize: 12.5, color: C.inkSoft },
-  loc: { fontFamily: F.ui, fontSize: 12.5, color: C.inkSoft, marginTop: 10 },
+  /* `T.md` mang `lineHeight: 22` (1.47×). Bản trước là 15.5/20 — 1.29×, và với chữ có dấu thì
+     dấu của dòng hai chạm chân dòng một; đó là nguồn cảm giác chật rõ nhất trên thẻ. */
+  title: { fontFamily: F.uiBold, ...T.md, color: C.ink },
+  specs: { flexDirection: 'row', gap: S.lg, marginTop: S.md, flexWrap: 'wrap' },
+  spec: { fontFamily: F.ui, ...T.sm, color: C.inkSoft },
+  loc: { fontFamily: F.ui, ...T.sm, color: C.inkSoft, marginTop: S.sm },
 
   foot: {
     borderTopWidth: 1,
     borderTopColor: C.line,
-    marginTop: 13,
-    marginHorizontal: -14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    marginTop: S.lg,
+    marginHorizontal: -S.lg,
+    paddingHorizontal: S.lg,
+    paddingVertical: S.md,
   },
-  price: { fontFamily: F.uiBold, fontSize: 16, color: C.brandTx },
+  /* Giá KHÔNG to hơn tiêu đề — nó đã khác màu (`brandTx`). Cho nó thêm một bậc cỡ nữa là hai
+     thứ tranh nhau làm tâm của thẻ, và mắt không biết đọc cái nào trước. */
+  price: { fontFamily: F.uiBold, ...T.md, color: C.brandTx },
 });

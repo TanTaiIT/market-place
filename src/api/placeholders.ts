@@ -7,6 +7,12 @@
  * 2. `PROMOS` / `BANNERS` — khối quảng bá, chờ hệ chiến dịch. `PROMOS` hứa CON SỐ cụ thể
  *    ("miễn phí tháng 9", "-30%") mà không có gì thực thi phía sau — đó là rủi ro nghiệp vụ,
  *    không phải nợ kỹ thuật.
+ * Mọi `grad` dưới đây theo cùng một luật với `G.brand`: ĐẬM ở chặng đầu, nhạt dần về chặng
+ * sau. Không phải sở thích — các khối này mang chữ TRẮNG, và banner còn mang một nút KÍNH
+ * (`bannerCta` dùng `glassRaise` + `glassLine`). Đo bằng độ sáng cảm nhận: hero cũ ở L=0.40
+ * thì mặt kính đọc ra "màu nhạt hơn" thay vì "vật liệu"; ngưỡng dùng được là quanh L=0.30.
+ * Bản trước hai dải promo ở 0.37 và banner cam ở 0.37 — đều sát vùng hỏng đó.
+ *
  * 3. `GUIDE_STEPS` / `PERKS` — chữ giới thiệu sản phẩm. Không phải dữ liệu, và sẽ không bao
  *    giờ đến từ DB trừ khi marketing cần tự sửa mà không build lại.
  *
@@ -48,14 +54,14 @@ export const PROMOS = [
     title: 'Đăng tin miễn phí cả tháng 9',
     note: 'Không giới hạn số tin',
     big: '0đ',
-    grad: ['#3ECD7F', '#2AA463'] as const,
+    grad: ['#0F6B49', '#35C077'] as const,
   },
   {
     id: 'p2',
     title: 'Tuần lễ sách cũ khoá 12',
     note: 'Nhường lại cho khoá dưới',
     big: '-30%',
-    grad: ['#FF9A5B', '#F2683C'] as const,
+    grad: ['#C2470F', '#FF9A5B'] as const,
   },
 ] as const;
 
@@ -89,7 +95,7 @@ export const BANNERS: readonly Banner[] = [
     cta: 'Đăng tin ngay',
     route: '/post',
     authMessage: 'Đăng nhập để đăng tin',
-    grad: ['#3ECD7F', '#1F8F55'] as const,
+    grad: ['#137A52', '#3ECD7F'] as const,
   },
   {
     id: 'b2',
@@ -99,7 +105,7 @@ export const BANNERS: readonly Banner[] = [
     cta: 'Tìm nhóm của trường',
     route: '/join-org',
     authMessage: 'Đăng nhập để vào nhóm',
-    grad: ['#5BA8FF', '#2F6FDD'] as const,
+    grad: ['#1B4FA8', '#5BA8FF'] as const,
   },
   {
     id: 'b3',
@@ -108,7 +114,7 @@ export const BANNERS: readonly Banner[] = [
     body: 'Lọc theo danh mục, khu vực và khoảng giá — vài chạm là ra đúng món trong tầm tiền.',
     cta: 'Tìm tin ngay',
     route: '/search',
-    grad: ['#FF9A5B', '#F2683C'] as const,
+    grad: ['#C2470F', '#FF9A5B'] as const,
   },
 ];
 

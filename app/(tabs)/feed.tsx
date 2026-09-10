@@ -92,6 +92,7 @@ export default function Feed() {
         <FeaturedStrip
           listings={allListings ?? []}
           onOpen={(id) => router.push(`/listing/${id}`)}
+          onSeeAll={() => openSearch('', null, null)}
         />
         <CategoryStrip
           listings={allListings ?? []}
@@ -104,6 +105,19 @@ export default function Feed() {
           onOpen={(slug) => router.push(`/org/${slug}`)}
         />
         <RecentStrip onOpen={(id) => router.push(`/listing/${id}`)} />
+
+        {/*
+          Ba khối TIẾP THỊ, LUÔN hiện, đặt ở cuối.
+
+          Nội dung của chúng là hardcode trong `api/placeholders` (`BANNERS`, `GUIDE_STEPS`,
+          `PERKS`) — chữ giới thiệu, không phải dữ liệu. Đã có một lượt gác chúng sau cờ
+          `isGuest` để bảng tin của người đã đăng nhập gọn còn 5 mục; BỎ vì đó là quyết định
+          SẢN PHẨM chứ không phải quyết định layout — nó làm nội dung biến mất khỏi màn mà
+          chủ sản phẩm không chờ đợi. Muốn gọn lại thì gác lại, nhưng phải là lựa chọn có ý
+          thức, không phải hệ quả kèm theo của một lượt dọn giao diện.
+
+          Việc xếp chúng xuống CUỐI thì giữ: nội dung thật (tin, danh mục, nhóm) lên trước.
+        */}
         <BannerBoard onPress={openBanner} />
         <GuideStrip />
         <PerkStrip />

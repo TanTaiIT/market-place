@@ -2,7 +2,8 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BANNERS, GUIDE_STEPS, PERKS, PROMOS, type Banner } from '@/api/placeholders';
-import { C, F, R, shadow } from '@/theme';
+import { SectionHead } from './SectionHead';
+import { C, F, R, S, T, shadow } from '@/theme';
 
 /**
  * Hai dải ngang của màn Khám phá trong prototype: "Đang diễn ra" (banner khuyến mãi) và "Vì sao
@@ -17,7 +18,7 @@ import { C, F, R, shadow } from '@/theme';
 export function PromoStrip({ grid }: { grid?: boolean }) {
   return (
     <View style={[styles.block, grid && styles.inset]}>
-      <Text style={styles.heading}>Đang diễn ra</Text>
+      <SectionHead title="Đang diễn ra" />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {PROMOS.map((p) => (
           <LinearGradient
@@ -47,7 +48,7 @@ export function PromoStrip({ grid }: { grid?: boolean }) {
 export function BannerBoard({ onPress }: { onPress: (banner: Banner) => void }) {
   return (
     <View style={styles.block}>
-      <Text style={styles.heading}>Dành cho bạn</Text>
+      <SectionHead title="Dành cho bạn" />
       <View style={{ gap: 12 }}>
         {BANNERS.map((b) => (
           <Pressable key={b.id} onPress={() => onPress(b)} style={({ pressed }) => pressed && { opacity: 0.88 }}>
@@ -79,8 +80,8 @@ export function BannerBoard({ onPress }: { onPress: (banner: Banner) => void }) 
  */
 export function GuideStrip({ grid }: { grid?: boolean }) {
   return (
-    <View style={[styles.block, grid && styles.inset, { marginTop: 18 }]}>
-      <Text style={styles.heading}>Ghim hoạt động thế nào</Text>
+    <View style={[styles.block, grid && styles.inset, { marginTop: S.md }]}>
+      <SectionHead title="Ghim hoạt động thế nào" />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {GUIDE_STEPS.map((step, i) => (
           <View key={step.id} style={styles.guide}>
@@ -101,8 +102,8 @@ export function GuideStrip({ grid }: { grid?: boolean }) {
 
 export function PerkStrip({ grid }: { grid?: boolean }) {
   return (
-    <View style={[styles.block, grid && styles.inset, { marginTop: 18 }]}>
-      <Text style={styles.heading}>Vì sao chọn Ghim</Text>
+    <View style={[styles.block, grid && styles.inset, { marginTop: S.md }]}>
+      <SectionHead title="Vì sao chọn Ghim" />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {PERKS.map((k) => (
           <View key={k.id} style={styles.perk}>
@@ -116,44 +117,51 @@ export function PerkStrip({ grid }: { grid?: boolean }) {
 }
 
 const styles = StyleSheet.create({
-  block: { marginBottom: 18 },
-  /** Chế độ LƯỚI không có lề ngang ở container của danh sách nên dải phải tự bù. */
-  inset: { paddingHorizontal: 16 },
-  heading: { fontFamily: F.uiBold, fontSize: 21, color: C.ink, marginBottom: 12, letterSpacing: -0.3 },
+  /* Ba dòng đầu KHỚP TỪNG SỐ với `FeedHighlights`: hai file cùng vẽ 'một mục của bảng tin', lệch
+     nhau vài pixel là mắt đọc ra hai nhịp khác nhau trên cùng một màn cuộn. */
+  block: { marginBottom: S.xl },
+  inset: { paddingHorizontal: S.lg },
   /* Dải cuộn ngang tràn ra ngoài lề của danh sách, nên tự bù lề bằng `paddingRight`. */
-  row: { gap: 11, paddingRight: 4 },
+  row: { gap: S.md, paddingRight: S.xs },
 
   promo: {
     width: 268,
     height: 132,
     borderRadius: R.md,
-    padding: 18,
+    padding: S.lg,
     flexDirection: 'row',
     alignItems: 'flex-end',
   },
-  promoTitle: { fontFamily: F.uiBold, fontSize: 17, lineHeight: 22, color: '#fff', maxWidth: 150 },
-  promoNote: { fontFamily: F.ui, fontSize: 11.5, color: C.glassTx, marginTop: 5 },
+  promoTitle: { fontFamily: F.uiBold, ...T.md, color: '#fff', maxWidth: 150 },
+  promoNote: { fontFamily: F.ui, ...T.xs, color: C.glassTx, marginTop: S.xs },
+  /* Con số lớn của thẻ khuyến mãi — HÌNH, không phải chữ, nên đứng ngoài thang `T` như
+     `circleIcon`. Đây là dòng duy nhất mỗi màn được phép to thế này. */
   promoBig: { fontFamily: F.uiBold, fontSize: 30, color: '#fff' },
 
-  banner: { borderRadius: R.lg, padding: 20, flexDirection: 'row', alignItems: 'flex-start', ...shadow },
-  bannerTitle: { fontFamily: F.uiBold, fontSize: 18, lineHeight: 24, color: '#fff' },
-  bannerBody: { fontFamily: F.ui, fontSize: 12.5, lineHeight: 19, color: C.glassTx, marginTop: 6 },
+  banner: { borderRadius: R.lg, padding: S.lg, flexDirection: 'row', alignItems: 'flex-start', ...shadow },
+  bannerTitle: { fontFamily: F.uiBold, ...T.lg, color: '#fff' },
+  bannerBody: { fontFamily: F.ui, ...T.sm, color: C.glassTx, marginTop: S.sm },
   /** Nút thật để bấm cả banner cũng vào — nhưng thiếu một hình dạng nút thì banner chỉ là ảnh. */
   bannerCta: {
     alignSelf: 'flex-start',
     backgroundColor: C.glassRaise,
     borderWidth: 1,
     borderColor: C.glassLine,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    marginTop: 12,
+    borderRadius: R.pill,
+    paddingHorizontal: S.lg,
+    paddingVertical: S.sm,
+    marginTop: S.md,
   },
-  bannerCtaText: { fontFamily: F.uiBold, fontSize: 12.5, color: '#fff' },
-  bannerIcon: { fontSize: 34, marginLeft: 12 },
+  bannerCtaText: { fontFamily: F.uiBold, ...T.sm, color: '#fff' },
+  bannerIcon: { fontSize: 34, marginLeft: S.md },
 
-  guide: { width: 236, backgroundColor: C.paperWarm, borderRadius: R.lg, padding: 17, ...shadow },
-  guideHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  guide: { width: 236, backgroundColor: C.paperWarm, borderRadius: R.lg, padding: S.lg, ...shadow },
+  guideHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: S.md,
+  },
   guideNum: {
     width: 30,
     height: 30,
@@ -162,12 +170,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  guideNumText: { fontFamily: F.uiBold, fontSize: 14, color: C.brandTx },
+  guideNumText: { fontFamily: F.uiBold, ...T.sm, color: C.brandTx },
   guideIcon: { fontSize: 24 },
-  guideTitle: { fontFamily: F.uiBold, fontSize: 15, color: C.ink, marginBottom: 6 },
-  guideBody: { fontFamily: F.ui, fontSize: 12.5, lineHeight: 19, color: C.inkSoft },
+  guideTitle: { fontFamily: F.uiBold, ...T.md, color: C.ink, marginBottom: S.xs },
+  guideBody: { fontFamily: F.ui, ...T.sm, color: C.inkSoft },
 
-  perk: { width: 280, backgroundColor: C.brandLt, borderRadius: R.lg, padding: 17, ...shadow },
-  perkTitle: { fontFamily: F.uiBold, fontSize: 15.5, color: C.ink, marginBottom: 7 },
-  perkBody: { fontFamily: F.ui, fontSize: 12.5, lineHeight: 20, color: C.inkSoft },
+  perk: { width: 280, backgroundColor: C.brandLt, borderRadius: R.lg, padding: S.lg, ...shadow },
+  perkTitle: { fontFamily: F.uiBold, ...T.md, color: C.ink, marginBottom: S.sm },
+  perkBody: { fontFamily: F.ui, ...T.sm, color: C.inkSoft },
 });

@@ -34,6 +34,18 @@ export const C = {
   /** `--brand`: nút chính, FAB, trạng thái đang chọn. */
   brand: '#3ECD7F',
   brandDark: '#2FB56D',
+  /**
+   * Chặng ĐẦU của nền hero — xanh rừng, đậm và ngả lam so với `brand`.
+   *
+   * Tồn tại vì hiệu ứng KÍNH cần một nền đủ sâu để đứng lên. `glassRaise` là trắng 30%:
+   * đặt nó trên `brand` (#3ECD7F, đã rất sáng) thì kết quả đọc ra 'xanh nhạt hơn' chứ không
+   * ra 'tấm kính' — chính điều mà chú thích của `glassRaise` mô tả, và bản trước đã cố chữa
+   * bằng cách nâng 0.22 → 0.30. Nâng độ đục là chữa ngọn; gốc là nền quá sáng.
+   *
+   * Chỉ dùng cho `G.brand`. Đây KHÔNG phải màu thương hiệu để đi nút hay chữ — nó tối hơn
+   * mức mà chữ trắng nhỏ cần, nhưng cũng chưa đủ tương phản cho chữ tối.
+   */
+  brandDeep: '#137A52',
   /** Nền nhạt của thương hiệu — viên chip, ô đang chọn. */
   brandLt: '#E9F9F0',
   /** Chữ/biểu tượng thương hiệu trên nền sáng: `brand` quá nhạt để đọc. */
@@ -145,6 +157,40 @@ export const F = {
   monoBold: 'Manrope_700Bold',
 } as const;
 
+/**
+ * Thang KHOẢNG CÁCH. Trước đây theme không có token nào cho việc này, nên mỗi component tự
+ * chọn số: đo ra `gap` rải rác 4, 6, 7, 8, 10, 11, 16 trên đúng năm file của bảng tin. Mắt
+ * đọc ra sự tuỳ tiện đó thành 'rối' kể cả khi không chỉ ra được vì sao.
+ *
+ * Bậc 4 (`lg`) là khoảng cách GIỮA HAI KHỐI, và nó là đòn quyết định của cảm giác thoáng —
+ * đừng hạ nó xuống để nhồi thêm nội dung vào một màn.
+ */
+export const S = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
+
+/**
+ * Thang CỠ CHỮ — năm bậc, không hơn.
+ *
+ * Đo trước khi sửa: `FeedHighlights` dùng 9 cỡ khác nhau (11, 12, 12.5, 13, 14, 19, 21, 22,
+ * 30), `FeedCard` 8 cỡ. Mỗi cỡ lẻ là một tầng phân cấp mà mắt phải xếp hạng, và quá bốn tầng
+ * thì không còn tầng nào nổi lên — đó là lý do một màn 'nhiều cỡ chữ' trông chật hơn hẳn một
+ * màn cùng lượng nội dung mà ít cỡ.
+ *
+ * `lineHeight` đi KÈM chứ không để mỗi chỗ tự đoán: chữ tiếng Việt có dấu cần khoảng 1.45×,
+ * thấp hơn là dấu của dòng dưới chạm chân dòng trên.
+ */
+export const T = {
+  /** Nhãn nhỏ, meta, viên chip. */
+  xs: { fontSize: 11, lineHeight: 16 },
+  /** Chữ phụ: mô tả, dòng thứ hai của thẻ. */
+  sm: { fontSize: 13, lineHeight: 19 },
+  /** Chữ thân — mặc định của app. */
+  md: { fontSize: 15, lineHeight: 22 },
+  /** Tiêu đề thẻ, tiêu đề mục. */
+  lg: { fontSize: 18, lineHeight: 26 },
+  /** Chỉ dùng cho MỘT dòng mỗi màn — lời chào, số liệu lớn. */
+  xl: { fontSize: 24, lineHeight: 32 },
+} as const;
+
 /** Tương đương `box-shadow: 0 1px 3px rgba(0,0,0,.05)` của prototype — rất nhẹ, chỉ tách lớp. */
 export const shadow = Platform.select({
   ios: {
@@ -181,8 +227,14 @@ export type Grad = readonly [string, string];
  * `transparent` (= đen alpha 0) nên dải bị bẩn sắc đen ở quãng giữa.
  */
 export const G = {
-  /** Hero bảng tin — dải thương hiệu duy nhất của app. */
-  brand: [C.brand, C.brandDark],
+  /**
+   * Hero bảng tin — dải thương hiệu duy nhất của app.
+   *
+   * Chiều ĐẢO so với bản trước (`[brand, brandDark]`, sáng → hơi tối). Đậm ở đỉnh rồi nhạt
+   * dần xuống làm hai việc cùng lúc: cho mặt kính một nền đủ sâu ở nửa trên, và để mép dưới
+   * của khối xanh gần với nền màn nên chỗ tiếp giáp tan ra thay vì thành một đường cắt.
+   */
+  brand: [C.brandDeep, C.brand],
   /** Đỉnh màn hồ sơ: mặt thẻ trắng chìm dần về nền màn. */
   hero: [C.paperWarm, C.paper],
   /** Nền màn đăng nhập/đăng ký — ngả thương hiệu ở đỉnh để hai màn này không chỉ là một mảng xám. */

@@ -1645,6 +1645,41 @@ export type ListingCreateResponses = {
 
 export type ListingCreateResponse = ListingCreateResponses[keyof ListingCreateResponses];
 
+export type ListingMineByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/listings/mine/{id}';
+};
+
+export type ListingMineByIdErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Không tìm thấy tin, hoặc tin không phải của bạn
+     */
+    404: ErrorResponse;
+};
+
+export type ListingMineByIdError = ListingMineByIdErrors[keyof ListingMineByIdErrors];
+
+export type ListingMineByIdResponses = {
+    /**
+     * Tin của bạn
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Listing;
+    };
+};
+
+export type ListingMineByIdResponse = ListingMineByIdResponses[keyof ListingMineByIdResponses];
+
 export type ListingMineData = {
     body?: never;
     path?: never;

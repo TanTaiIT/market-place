@@ -193,7 +193,7 @@ function CategoryTile({
    * Đo trên máy thật thấy `entering` chạy tốt trong Modal thì đổi lại được, ngắn hơn 6 dòng.
    */
   useEffect(() => {
-    // Trần `index` ở 5 như `FeedCard`: danh mục thứ 20 mà chờ hơn một giây mới hiện thì lưới
+    // Trần `index` ở 5 như các dải bảng tin: danh mục thứ 20 mà chờ hơn một giây mới hiện thì lưới
     // trông như đang tải chậm, không phải như đang mở ra.
     rise.value = withDelay(Math.min(index, 5) * RISE_STEP_MS, withTiming(1, { duration: 320 }));
   }, [index, rise]);

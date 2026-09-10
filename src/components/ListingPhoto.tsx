@@ -26,7 +26,7 @@ export function ListingPhoto({
   if (photoUrl) {
     return (
       <View style={style}>
-        {/* 800px cho MỌI thumbnail: thẻ rộng nhất (FeedCard) chỉ ~400pt logic, 800 là đủ
+        {/* 800px cho MỌI thumbnail: thẻ rộng nhất (`ListingCard`) chỉ ~400pt logic, 800 là đủ
             cho màn 2x mà vẫn nhẹ hơn ảnh gốc 3-5 lần. Cần ảnh to hơn thì là việc của
             `ListingGallery`/`PhotoViewer`, không phải của thẻ. */}
         <Image

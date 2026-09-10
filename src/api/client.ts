@@ -17,6 +17,7 @@ import {
   favoriteRemove,
   listingCreate,
   listingGetById,
+  listingMineById,
   listingList,
   listingMine,
   listingQuota,
@@ -597,6 +598,22 @@ export const api = {
     const sameProvince = rows.filter((l) => l.province === current.province);
     const elsewhere = rows.filter((l) => l.province !== current.province);
     return [...sameProvince, ...elsewhere].slice(0, take);
+  },
+
+  /**
+   * MỘT tin của chính mình, mọi trạng thái — dùng để dựng form sửa.
+   *
+   * Không dùng `getListing` cho form sửa: `GET /listings/{id}` lọc `status ∈ {active, sold,
+   * expired}` ở BE, nên tin 'Chờ duyệt' (thứ hay cần sửa nhất) trả 404 'Listing not found' —
+   * đúng lỗi mà nút sửa ở 'Tin đã đăng' gặp. Đường này chốt bằng `seller` từ token và không
+   * tăng `viewCount`: mở form sửa không phải một lượt xem.
+   */
+  async getMyListing(id: string): Promise<Listing> {
+    const [res, names] = await Promise.all([
+      withAuthRetry(() => listingMineById({ path: { id } })),
+      categoryNames(),
+    ]);
+    return toListing(unwrap(res, 'Không tìm thấy tin này'), names);
   },
 
   async getListing(id: string): Promise<Listing> {

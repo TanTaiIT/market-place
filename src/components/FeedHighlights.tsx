@@ -15,7 +15,8 @@ import { gradOf, initialsOf } from '@/api/client';
 import { useRecentListings } from '@/stores/recent';
 import type { Category, Listing, Profile } from '@/api/db';
 import type { OrgRow } from '@/api/org';
-import { C, F, R, shadow } from '@/theme';
+import { SectionHead } from './SectionHead';
+import { C, F, R, S, T, shadow } from '@/theme';
 
 /**
  * Các dải DỮ LIỆU của màn Khám phá — khác `FeedStrips` (trang trí thuần, chữ hardcode):
@@ -42,16 +43,24 @@ const score = (l: Listing) => l.favoriteCount * 3 + l.viewCount;
 /* -------------------------------- Tin nổi bật -------------------------------- */
 
 /** Một hàng lướt được, không phải bảng tin thứ hai. */
-const MAX_FEATURED = 8;
+/*
+ * 4 chứ không 8. Dải ngang 8 thẻ thì 6 thẻ nằm ngoài mép phải và không có gì cho biết còn
+ * bao nhiêu nữa — người dùng vuốt mò hoặc bỏ qua cả dải. Bày 4 rồi đưa lối 'Xem tất cả ›'
+ * (xem `SectionHead`) nói đúng thứ cần nói: đây là mẫu, muốn hết thì có một trang riêng.
+ */
+const MAX_FEATURED = 4;
 
 export function FeaturedStrip({
   listings,
   grid,
   onOpen,
+  onSeeAll,
 }: {
   listings: Listing[];
   grid?: boolean;
   onOpen: (id: string) => void;
+  /** Mở trang kết quả không kèm bộ lọc — dải chỉ bày `MAX_FEATURED` tin đầu. */
+  onSeeAll?: () => void;
 }) {
   const { width: winW } = useWindowDimensions();
   // Chỉ tin ĐÃ có người quan tâm: hệ mới toanh mà vẫn bày "nổi bật" thì đó là 8 tin
@@ -73,7 +82,7 @@ export function FeaturedStrip({
 
   return (
     <View style={[styles.block, grid && styles.inset]}>
-      <Text style={styles.heading}>Tin nổi bật 🔥</Text>
+      <SectionHead title="Tin nổi bật 🔥" onSeeAll={onSeeAll} />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -145,7 +154,8 @@ export function CategoryStrip({
 
   return (
     <View style={[styles.block, grid && styles.inset]}>
-      <Text style={styles.heading}>Danh mục sôi động</Text>
+      {/* Không có `onSeeAll`: dải này ĐÃ là toàn bộ danh mục sôi động, không có trang nào sâu hơn. */}
+      <SectionHead title="Danh mục sôi động" />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {top.map(({ cat, count }) => (
           <Pressable
@@ -209,17 +219,19 @@ export function OrgNearbyStrip({
 
   return (
     <View style={[styles.block, grid && styles.inset]}>
-      <Text style={styles.heading}>Nhóm quanh bạn</Text>
       {/*
-        Nói ra khu vực đang dùng, và nói ra khi nó là SUY RA chứ không phải người dùng tự khai.
-        Đoán sai mà người xem nhìn thấy dòng này thì họ biết vào hồ sơ sửa; đoán sai âm thầm
-        thì họ chỉ thấy một dải toàn nhóm lạ và kết luận app hỏng.
+        `note` nói ra khu vực đang dùng, và nói ra khi nó là SUY RA chứ không phải người dùng tự
+        khai. Đoán sai mà người xem nhìn thấy dòng này thì họ biết vào hồ sơ sửa; đoán sai âm
+        thầm thì họ chỉ thấy một dải toàn nhóm lạ và kết luận app hỏng.
       */}
-      <Text style={styles.headingNote}>
-        {area.source === 'listings'
-          ? `${area.province} — theo khu vực các tin bạn đã đăng`
-          : area.province}
-      </Text>
+      <SectionHead
+        title="Nhóm quanh bạn"
+        note={
+          area.source === 'listings'
+            ? `${area.province} — theo khu vực các tin bạn đã đăng`
+            : area.province
+        }
+      />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {nearby.map((org) => {
           // Avatar nếu có, không thì ảnh bìa. Tính MỘT lần: gọi hai lần rồi `!` để dập cảnh
@@ -282,7 +294,7 @@ export function RecentStrip({ grid, onOpen }: { grid?: boolean; onOpen: (id: str
 
   return (
     <View style={[styles.block, grid && styles.inset]}>
-      <Text style={styles.heading}>Xem gần đây</Text>
+      <SectionHead title="Xem gần đây" />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -319,34 +331,34 @@ export function RecentStrip({ grid, onOpen }: { grid?: boolean; onOpen: (id: str
 }
 
 const styles = StyleSheet.create({
-  block: { marginBottom: 18 },
+  /* `S.xl` giữa hai khối, không phải 18: đây là đòn 'thoáng' mạnh nhất của cả màn — khoảng thở
+     giữa các mục là thứ mắt đọc ra trước cả màu và cỡ chữ. Đừng hạ để nhồi thêm mục. */
+  block: { marginBottom: S.xl },
   /** Chế độ LƯỚI không có lề ngang ở container của danh sách nên dải phải tự bù. */
-  inset: { paddingHorizontal: 16 },
-  heading: { fontFamily: F.uiBold, fontSize: 21, color: C.ink, marginBottom: 12, letterSpacing: -0.3 },
-  /** Dòng phụ dưới tiêu đề: kéo lên sát tiêu đề, và gánh nốt khoảng cách trước dải. */
-  headingNote: { fontFamily: F.ui, fontSize: 12, color: C.inkSoft, marginTop: -8, marginBottom: 12 },
-  row: { gap: 11, paddingRight: 4 },
+  inset: { paddingHorizontal: S.lg },
+  row: { gap: S.md, paddingRight: S.xs },
 
-  /* Thẻ slide ăn theo SỐ ĐO của FeedCard (ảnh 200, tiêu đề Kalam 19) — bề ngang do
-     component tính theo màn hình nên không nằm ở đây. */
   featCard: { backgroundColor: C.paperWarm, borderRadius: R.md, ...shadow },
   featPhoto: { height: 200, borderTopLeftRadius: R.md, borderTopRightRadius: R.md },
   featPhotoRadius: { borderTopLeftRadius: R.md, borderTopRightRadius: R.md },
   /** Nhãn giá đè góc ảnh — cùng thủ pháp `priceTag` của NoteCard, người dùng đã quen mắt. */
   featPrice: {
     position: 'absolute',
-    left: 14,
+    left: S.lg,
     bottom: -2,
     backgroundColor: C.brandDark,
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-    borderRadius: 4,
+    paddingHorizontal: S.md,
+    paddingVertical: S.xs + 1,
+    borderRadius: R.sm,
     borderBottomLeftRadius: 0,
   },
-  featPriceText: { color: '#fff', fontFamily: F.monoBold, fontSize: 14 },
-  featBody: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 14 },
-  featTitle: { fontFamily: F.hand, fontSize: 19, lineHeight: 25, color: C.ink },
-  featMeta: { fontFamily: F.ui, fontSize: 12.5, color: C.inkSoft, marginTop: 6 },
+  featPriceText: { color: '#fff', fontFamily: F.monoBold, ...T.sm },
+  featBody: { padding: S.lg },
+  /* Tiêu đề thẻ về `T.md` (15/22) từ 19/25. Cỡ 19 trên một thẻ ngang 280pt ăn hết hai dòng cho
+     một tiêu đề, đẩy phần meta xuống và làm thẻ trông đầy; 15 với `lineHeight` 1.47× vừa gọn
+     vừa đủ chỗ cho dấu tiếng Việt. */
+  featTitle: { fontFamily: F.uiBold, ...T.md, color: C.ink },
+  featMeta: { fontFamily: F.ui, ...T.sm, color: C.inkSoft, marginTop: S.sm },
 
   /* Vòng tròn dùng chung cho danh mục và nhóm — hai dải cùng ngôn ngữ "story" như Mioto. */
   circleItem: { alignItems: 'center', width: 96 },
@@ -356,13 +368,16 @@ const styles = StyleSheet.create({
     borderRadius: 37,
     // Ảnh vuông nhét vòng tròn phải cắt — thiếu dòng này thì góc ảnh lòi ra ngoài viền.
     overflow: 'hidden',
-    marginBottom: 8,
+    marginBottom: S.sm,
     ...shadow,
   },
   circleCenter: { alignItems: 'center', justifyContent: 'center' },
 
+  /* Hai dòng này là HÌNH, không phải chữ — emoji danh mục và chữ cái đầu trong vòng tròn 74px.
+     Chúng cố tình đứng ngoài thang `T`: buộc chúng vào thang chữ là để một vòng tròn trang trí
+     kéo theo cả phân cấp tiêu đề. */
   circleIcon: { fontSize: 30 },
-  circleInitials: { fontFamily: F.uiBold, fontSize: 22, color: '#fff' },
-  circleName: { fontFamily: F.uiBold, fontSize: 13, color: C.ink, maxWidth: 96 },
-  circleCount: { fontFamily: F.ui, fontSize: 11, color: C.muted, marginTop: 2 },
+  circleInitials: { fontFamily: F.uiBold, fontSize: 24, color: '#fff' },
+  circleName: { fontFamily: F.uiBold, ...T.sm, color: C.ink, maxWidth: 96 },
+  circleCount: { fontFamily: F.ui, ...T.xs, color: C.muted },
 });

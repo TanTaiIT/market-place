@@ -21,6 +21,23 @@ import { C, G } from '@/theme';
  * Không nằm trong `ui.tsx` như luật barrel của folder.convention §3: file đó đã 388 dòng, vượt
  * trần 350 của component chia sẻ — thêm vào đó là đẩy nó xa trần hơn nữa.
  */
+/**
+ * Mặt kính SÁNG — cho khối mang chữ TỐI đặt trên nền màu.
+ *
+ * `glassFace` không dùng được ở đó: trắng 30% trên nền xanh vẫn còn rất xanh, mà chữ
+ * `C.ink` trên nền xanh là hỏng tương phản. Bản này lấy `glassLift` (trắng 92%) làm tấm,
+ * nên vẫn đọc được như giấy trắng nhưng để lọt một chút nền qua ở rìa.
+ *
+ * Cảm giác kính ở đây KHÔNG đến từ độ đục — 92% thì gần như đục hẳn — mà đến từ hai lớp
+ * còn lại: cạnh vát `glassLine` và vệt sáng `GlassSheen`. Đó cũng là lý do phải dùng cả cặp.
+ */
+export const glassPane = {
+  backgroundColor: C.glassLift,
+  borderWidth: 1,
+  borderColor: C.glassLine,
+  overflow: 'hidden',
+} as const;
+
 export const glassFace = {
   backgroundColor: C.glassRaise,
   borderWidth: 1,

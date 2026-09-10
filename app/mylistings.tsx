@@ -65,11 +65,21 @@ export default function MyListings() {
         keyExtractor={(l) => String(l.id)}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, gap: 10 }}
         renderItem={({ item, index }) => (
+          /*
+            Bấm vào HÀNG là mở form sửa — không còn nút ✏️ riêng.
+
+            `Animated.View` giữ animation vào/ra, `Pressable` bên trong giữ layout của hàng
+            (`styles.row`) và nhận cú chạm. Ba nút thao tác vẫn ăn cú chạm của riêng chúng:
+            `Pressable` lồng nhau trong RN không cho sự kiện nổi lên như DOM.
+          */
           <Animated.View
             entering={FadeInDown.delay(index * 80).duration(340)}
             exiting={SlideOutRight.duration(280)}
-            style={styles.row}
           >
+            <Pressable
+              onPress={() => router.push(`/listing/edit/${item.id}`)}
+              style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}
+            >
             <ListingPhoto
               photo={item.photo}
               photoUrl={item.photoUrls?.[0]}
@@ -114,12 +124,6 @@ export default function MyListings() {
                 </Pressable>
               ) : null}
               <Pressable
-                style={styles.iconBtn}
-                onPress={() => router.push(`/listing/edit/${item.id}`)}
-              >
-                <Text style={{ fontSize: 12 }}>✏️</Text>
-              </Pressable>
-              <Pressable
                 style={[styles.iconBtn, { backgroundColor: '#FCE4E1' }]}
                 onPress={() =>
                   // Toast nằm trong `onSuccess`: báo "đã xoá" ngay lúc bấm là nói dối khi
@@ -133,6 +137,7 @@ export default function MyListings() {
                 <Text style={{ fontSize: 12 }}>🗑</Text>
               </Pressable>
             </View>
+            </Pressable>
           </Animated.View>
         )}
         ListEmptyComponent={

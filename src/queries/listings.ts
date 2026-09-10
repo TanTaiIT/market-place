@@ -40,6 +40,21 @@ export function useListing(id: string) {
   });
 }
 
+/**
+ * MỘT tin của chính mình — nguồn của form sửa.
+ *
+ * Khoá cache RIÊNG (`myListing`), không dùng chung `listing(id)`: cùng một id nhưng hai
+ * endpoint khác nhau và hai phạm vi khác nhau. Dùng chung khoá là bản đọc rộng (mọi trạng
+ * thái) ghi đè lên bản công khai mà trang chi tiết đang hiện, và ngược lại.
+ */
+export function useMyListing(id: string) {
+  return useQuery({
+    queryKey: qk.myListing(id),
+    queryFn: () => api.getMyListing(id),
+    enabled: id.length > 0,
+  });
+}
+
 /** Số tin gợi ý hiển thị — một hàng ngang cuộn được, không phải một bảng tin thứ hai. */
 const SUGGESTION_COUNT = 8;
 
@@ -161,6 +176,9 @@ export function useUpdateListing() {
     mutationFn: api.updateListing,
     onSuccess: (data) => {
       qc.setQueryData(qk.listing(data.id), data);
+      // Cả bản chính chủ: form sửa đọc từ khoá đó, và với tin `pending` thì bản công khai ở
+      // dòng trên vốn không đọc được (BE lọc theo `PUBLIC_LISTING_STATUSES`).
+      qc.setQueryData(qk.myListing(data.id), data);
       qc.invalidateQueries({ queryKey: qk.listings() });
       qc.invalidateQueries({ queryKey: qk.savedRoot() });
     },

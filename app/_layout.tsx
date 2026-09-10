@@ -7,17 +7,19 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
-import { Kalam_400Regular, Kalam_700Bold } from '@expo-google-fonts/kalam';
+/*
+ * Chỉ nạp những face mà `F` (trong `theme`) thật sự trỏ tới — hiện là bốn weight của Manrope.
+ *
+ * Kalam và JetBrains Mono CỐ TÌNH không có ở đây dù `package.json` còn hai gói đó: sau đợt
+ * đổi sang hệ phẳng, `F` không còn trỏ tới chúng ở đâu nữa (chỉ còn vài chú thích nhắc tên),
+ * nên nạp thêm là tải bốn file font mỗi lần mở app mà không một chữ nào vẽ bằng chúng.
+ */
 import {
   Manrope_500Medium,
   Manrope_600SemiBold,
   Manrope_700Bold,
   Manrope_800ExtraBold,
 } from '@expo-google-fonts/manrope';
-import {
-  JetBrainsMono_400Regular,
-  JetBrainsMono_600SemiBold,
-} from '@expo-google-fonts/jetbrains-mono';
 import { BootSplash } from '@/components/BootSplash';
 import { ErrorScreen } from '@/components/ErrorScreen';
 import { ToastProvider } from '@/components/Toast';
@@ -66,14 +68,10 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
-    Kalam_400Regular,
-    Kalam_700Bold,
     Manrope_500Medium,
     Manrope_600SemiBold,
     Manrope_700Bold,
     Manrope_800ExtraBold,
-    JetBrainsMono_400Regular,
-    JetBrainsMono_600SemiBold,
   });
 
   const isAuthenticated = useIsAuthenticated();

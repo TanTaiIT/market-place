@@ -73,17 +73,25 @@ const styles = StyleSheet.create({
     borderTopColor: C.lineInput,
     paddingTop: 4,
   },
+  /*
+   * HAI CỘT, không phải `space-between`.
+   *
+   * Bản trước đẩy nhãn sang mép trái và giá trị sang mép phải. Trên màn rộng, một dòng như
+   * "Màu ... Đỏ" thành một khoảng trắng dài giữa hai chữ, và mắt phải nhảy ngang để ghép cặp —
+   * đọc năm dòng liền là năm lần nhảy. Cột nhãn cố định thì mọi giá trị thẳng hàng nhau, quét
+   * dọc một lượt là xong.
+   */
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 16,
+    gap: 12,
     paddingVertical: 9,
     borderBottomWidth: 1,
     borderBottomColor: C.lineInput,
   },
-  label: { fontFamily: F.ui, fontSize: 13, color: C.inkSoft, flexShrink: 0 },
-  // `flex: 1` + căn phải: giá trị dài (danh sách tiện ích) xuống dòng trong cột của nó thay vì
-  // đẩy nhãn ra khỏi màn hình.
-  value: { fontFamily: F.uiBold, fontSize: 13, color: C.ink, flex: 1, textAlign: 'right' },
+  // Rộng cố định: nhãn dài hơn thì xuống dòng trong cột của nó, không đẩy cột giá trị lệch đi.
+  label: { fontFamily: F.ui, fontSize: 13, color: C.inkSoft, width: 116, flexShrink: 0 },
+  // `flex: 1` để giá trị dài (danh sách tiện ích) xuống dòng trong cột của nó thay vì tràn ra
+  // ngoài màn hình.
+  value: { fontFamily: F.uiBold, fontSize: 13, color: C.ink, flex: 1 },
 });

@@ -101,6 +101,24 @@ export type AdminUser = {
     createdAt: string;
 };
 
+export type UserReport = {
+    granularity: 'day' | 'month' | 'year';
+    from: string;
+    to: string;
+    timezone: string;
+    truncated: number;
+    points: Array<{
+        bucket: string;
+        users: number;
+        active: number;
+        total: number;
+    }>;
+    totals: {
+        users: number;
+        total: number;
+    };
+};
+
 export type Organization = {
     id: string;
     name: string;
@@ -272,6 +290,28 @@ export type QuotaStatus = {
      * Tin đã hết hạn hoặc sắp hết hạn trong 7 ngày, cũ nhất trước, tối đa 20 tin. Client dùng để chặn lại và hỏi về tin cũ trước khi cho đăng tin mới.
      */
     needsReconcile: Array<StaleListing>;
+};
+
+export type ListingReport = {
+    granularity: 'day' | 'month' | 'year';
+    from: string;
+    to: string;
+    timezone: string;
+    truncated: number;
+    points: Array<{
+        bucket: string;
+        posts: number;
+        sellers: number;
+        active: number;
+        pending: number;
+        rejected: number;
+    }>;
+    totals: {
+        posts: number;
+        active: number;
+        pending: number;
+        rejected: number;
+    };
 };
 
 export type PostingStats = {
@@ -1028,6 +1068,35 @@ export type AuthRefreshResponses = {
 
 export type AuthRefreshResponse = AuthRefreshResponses[keyof AuthRefreshResponses];
 
+export type AuthLogoutData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/auth/logout';
+};
+
+export type AuthLogoutErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+};
+
+export type AuthLogoutError = AuthLogoutErrors[keyof AuthLogoutErrors];
+
+export type AuthLogoutResponses = {
+    /**
+     * Đã đăng xuất
+     */
+    200: {
+        success: true;
+        message: string;
+        data: unknown;
+    };
+};
+
+export type AuthLogoutResponse = AuthLogoutResponses[keyof AuthLogoutResponses];
+
 export type UserDeleteMeData = {
     body?: never;
     path?: never;
@@ -1122,6 +1191,43 @@ export type UserUpdateMeResponses = {
 };
 
 export type UserUpdateMeResponse = UserUpdateMeResponses[keyof UserUpdateMeResponses];
+
+export type UserReportData = {
+    body?: never;
+    path?: never;
+    query?: {
+        granularity?: 'day' | 'month' | 'year';
+        from?: string | null;
+        to?: string | null;
+    };
+    url: '/users/report';
+};
+
+export type UserReportErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+};
+
+export type UserReportError = UserReportErrors[keyof UserReportErrors];
+
+export type UserReportResponses = {
+    /**
+     * Báo cáo người dùng
+     */
+    200: {
+        success: true;
+        message: string;
+        data: UserReport;
+    };
+};
+
+export type UserReportResponse = UserReportResponses[keyof UserReportResponses];
 
 export type UserGetByIdData = {
     body?: never;
@@ -1412,6 +1518,43 @@ export type ListingMarkSoldResponses = {
 };
 
 export type ListingMarkSoldResponse = ListingMarkSoldResponses[keyof ListingMarkSoldResponses];
+
+export type ListingReportData = {
+    body?: never;
+    path?: never;
+    query?: {
+        granularity?: 'day' | 'month' | 'year';
+        from?: string | null;
+        to?: string | null;
+    };
+    url: '/listings/report';
+};
+
+export type ListingReportErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+};
+
+export type ListingReportError = ListingReportErrors[keyof ListingReportErrors];
+
+export type ListingReportResponses = {
+    /**
+     * Báo cáo đăng tin
+     */
+    200: {
+        success: true;
+        message: string;
+        data: ListingReport;
+    };
+};
+
+export type ListingReportResponse = ListingReportResponses[keyof ListingReportResponses];
 
 export type ListingListData = {
     body?: never;

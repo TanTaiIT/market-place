@@ -149,6 +149,15 @@ export const qk = {
   adminProducts: () => ['admin', 'listing-products'] as const,
   /** `days` nằm trong key: đổi cửa sổ thống kê là hỏi BE một câu khác, không phải lọc lại. */
   adminPostingStats: (days: number) => ['admin', 'posting-stats', days] as const,
+  /**
+   * Báo cáo đăng tin. Cả ba tham số nằm trong key: đổi độ mịn hay đổi khoảng là HỎI BE MỘT CÂU
+   * KHÁC, không phải lọc lại dữ liệu cũ — gộp chung một key sẽ hiện số của tháng lên trục ngày.
+   */
+  adminListingReport: (granularity: string, from?: string, to?: string) =>
+    ['admin', 'listing-report', granularity, from ?? '', to ?? ''] as const,
+  /** Báo cáo con thứ hai — khoá RIÊNG, cùng khuôn tham số với báo cáo tin đăng. */
+  adminUserReport: (granularity: string, from?: string, to?: string) =>
+    ['admin', 'user-report', granularity, from ?? '', to ?? ''] as const,
   /** Từ điển field dùng chung — nguồn của bộ chọn field khi soạn template. */
   fieldDefinitions: () => ['admin', 'field-definitions'] as const,
 };

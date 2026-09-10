@@ -7,6 +7,19 @@
  * thì BE phải cấp signature, và khi đó luồng không còn là "FE upload thẳng" nữa.
  *
  * Cloud name không phải bí mật — nó nằm sẵn trong mọi URL ảnh Cloudinary trả về.
+ *
+ * RỦI RO CÒN LẠI, và nó KHÔNG chặn được bằng code ở đây: unsigned nghĩa là bất kỳ ai đọc được
+ * bundle (giải nén .apk là xong) cũng upload được vào tài khoản này. Đây là bài toán lạm dụng
+ * và hoá đơn, không phải rò khoá — chặn nó bằng cấu hình PRESET ở Cloudinary Console:
+ *
+ * - Allowed formats: chỉ ảnh (jpg, png, webp, heic). Mặc định cho phép cả video và raw.
+ * - Max file size + max image dimensions: app đã thu nhỏ về `MAX_DIMENSION` trước khi gửi,
+ *   nên đặt trần ở preset là chặn đúng thứ KHÔNG đi qua app này.
+ * - Folder: ghim tất cả vào một thư mục để tách được rác khi phải dọn.
+ * - Auto-moderation / access control nếu cần, và theo dõi hạn mức để biết khi bị lạm dụng.
+ *
+ * Muốn chặn triệt để thì BE phải cấp chữ ký cho từng lượt upload — khi đó luồng không còn là
+ * "FE upload thẳng" nữa, và đó là một thay đổi kiến trúc chứ không phải một cờ cấu hình.
  */
 import { Image } from 'react-native';
 import { File } from 'expo-file-system';

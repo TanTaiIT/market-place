@@ -1,6 +1,39 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
+
+/**
+ * Kho phiên: Keychain (iOS) / Keystore (Android) qua `expo-secure-store`.
+ *
+ * `AsyncStorage` KHÔNG mã hoá — trên máy đã root/jailbreak nó là một file đọc được, và thứ
+ * nằm trong đó là refresh token dùng được suốt `JWT_REFRESH_EXPIRES_IN`. Đây là lý do trường
+ * này từng mang một `TODO(bảo mật)`.
+ *
+ * DI CƯ MỘT LẦN, không đá ai ra: lần đọc đầu sau khi cập nhật app, kho bảo mật còn rỗng nên
+ * hàm dưới đọc nốt bản cũ trong AsyncStorage, chép sang, rồi xoá bản cũ đi. Thiếu bước này thì
+ * mọi người dùng hiện tại bị đăng xuất ngay lúc cập nhật — một sự cố tự gây, đúng vào bản vá
+ * bảo mật.
+ *
+ * Giới hạn cần biết: SecureStore cảnh báo với giá trị trên ~2KB. Phần lưu ở đây là hai JWT +
+ * vài chuỗi ngắn (`partialize` cắt hết phần còn lại), tổng dưới 1KB — nhưng nhét thêm dữ
+ * liệu vào `partialize` thì phải kiểm lại con số đó.
+ */
+const secureStorage: StateStorage = {
+  getItem: async (name) => {
+    const stored = await SecureStore.getItemAsync(name);
+    if (stored !== null) return stored;
+
+    const legacy = await AsyncStorage.getItem(name);
+    if (legacy === null) return null;
+    await SecureStore.setItemAsync(name, legacy);
+    // Xoá bản thường NGAY: để lại là giữ nguyên đúng lỗ vừa vá, chỉ khác là có thêm một bản sao.
+    await AsyncStorage.removeItem(name);
+    return legacy;
+  },
+  setItem: (name, value) => SecureStore.setItemAsync(name, value),
+  removeItem: (name) => SecureStore.deleteItemAsync(name),
+};
 
 /**
  * Danh tính của phiên đăng nhập — thứ duy nhất cần sống lâu hơn một màn hình.
@@ -10,8 +43,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
  * Khai lại type thay vì import `AuthSession` từ `@/api/db`: store là lá, không được import
  * layer khác (folder.convention §6). Hai bên khớp nhau theo cấu trúc.
  *
- * TODO(bảo mật): token đang nằm trong AsyncStorage — đọc được trên máy đã root/jailbreak.
- * Chuyển sang `expo-secure-store` khi thêm được native module (cần rebuild dev client).
+ * Token nằm trong Keychain/Keystore, KHÔNG phải AsyncStorage — xem `secureStorage` bên dưới.
  */
 type Session = {
   userId: string;
@@ -33,7 +65,7 @@ type AuthState = {
    * `null` = chưa chọn org: vẫn xem được tin công khai, chỉ không thao tác trong org nào.
    */
   activeOrgSlug: string | null;
-  /** false cho tới khi đọc xong AsyncStorage — giữ splash để guard không nháy qua màn login */
+  /** false cho tới khi đọc xong kho bảo mật — giữ splash để guard không nháy qua màn login */
   hydrated: boolean;
   signIn: (session: Session) => void;
   signOut: () => void;
@@ -54,7 +86,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'ghim-auth',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => secureStorage),
       // `hydrated` là cờ runtime; ghi xuống đĩa thì lần mở sau sẽ đọc lại đúng giá trị cũ (false)
       partialize: (s) => ({ session: s.session, activeOrgSlug: s.activeOrgSlug }),
       // Callback này chạy cả khi đọc đĩa lỗi — luôn mở khoá splash, đừng để app treo ở màn boot.

@@ -1,5 +1,6 @@
 import {
   authLogin,
+  authLogout,
   authRefresh,
   authRegister,
   categoryGetTemplate,
@@ -475,6 +476,20 @@ export const api = {
    * Không đi qua `getCurrentUserId()`/session ở module scope: hàm này chạy đúng lúc access token
    * đã hết hạn, nên refresh token phải do caller truyền vào.
    */
+  /**
+   * Báo server cắt phiên — KHÔNG chỉ xoá token khỏi máy.
+   *
+   * Refresh token là bearer sống 30 ngày: xoá khỏi máy mà không báo server thì bản sao nào
+   * đã bị đọc trộm (AsyncStorage không mã hoá) vẫn dùng được tới hết hạn. Gọi đường này là
+   * tăng `tokenVersion`, giết mọi refresh token đã phát — trên mọi thiết bị.
+   *
+   * KHÔNG `withAuthRetry`: đang đăng xuất thì một vòng refresh để "cứu" phiên là đi ngược
+   * ý định, và token vừa bị giết cũng không refresh được.
+   */
+  async signOut(): Promise<void> {
+    await authLogout();
+  },
+
   async refreshSession(refreshToken: string): Promise<AuthSession> {
     const res = await authRefresh({ body: { refreshToken } });
     return toSession(unwrap(res, 'Phiên đăng nhập đã hết, đăng nhập lại nhé'));

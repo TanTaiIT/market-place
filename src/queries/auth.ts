@@ -39,6 +39,15 @@ export function useSignOut() {
   const qc = useQueryClient();
 
   return () => {
+    /*
+     * Báo server TRƯỚC, nhưng không chờ và không chặn.
+     *
+     * Dọn phiên cục bộ phải xảy ra dù mạng có hỏng — bắt người dùng ở lại màn đã đăng nhập vì
+     * một request thất bại là tệ hơn hẳn việc thu hồi token muộn một nhịp. Lỗi nuốt có chủ ý:
+     * người bấm "đăng xuất" không có gì để làm với thông báo lỗi ở đây.
+     */
+    void api.signOut().catch(() => undefined);
+
     useAuthStore.getState().signOut();
     qc.clear();
   };

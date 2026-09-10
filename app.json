@@ -35,7 +35,8 @@
           "backgroundColor": "#11170F"
         }
       ],
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": false

@@ -3,12 +3,26 @@ import {
   bannedPhraseList,
   bannedPhraseRemove,
   listingPostingStats,
+  listingReport,
+  userReport,
   listingProductAdminList,
   listingProductCreate,
   listingProductRemove,
   listingProductUpdate,
 } from './generated';
-import type { ListingProduct, PostingStats } from './generated';
+import type { ListingProduct, ListingReport, PostingStats, UserReport } from './generated';
+
+/** Độ mịn của báo cáo — lấy thẳng từ hợp đồng API, không khai lại một union thứ hai. */
+export type ReportGranularity = ListingReport['granularity'];
+export type ListingReportPoint = ListingReport['points'][number];
+export type UserReportPoint = UserReport['points'][number];
+
+/**
+ * Tham số CHUNG của mọi báo cáo con — BE cố ý cho hai endpoint cùng một hình dạng đầu vào,
+ * nên client cũng chỉ nên có một kiểu. Thêm báo cáo con thứ ba là thêm một hàm, không phải
+ * thêm một bộ tham số.
+ */
+export type ReportQuery = { granularity: ReportGranularity; from?: string; to?: string };
 import { relativeTime, unwrap } from './client';
 import { withAuthRetry } from './http';
 
@@ -175,5 +189,31 @@ export const adminSystemApi = {
   async getPostingStats(days: number): Promise<PostingStats> {
     const res = await withAuthRetry(() => listingPostingStats({ query: { days } }));
     return unwrap(res, 'Không tải được số liệu đăng tin');
+  },
+
+  /**
+   * Báo cáo đăng tin theo thời gian — chuỗi số theo ngày/tháng/năm, master-only.
+   *
+   * Khác `getPostingStats` ở câu hỏi: cái kia là ẢNH CHỤP một cửa sổ để chốt giá gói tin,
+   * cái này là XU HƯỚNG. BE gộp cột theo múi giờ Việt Nam và trả kèm `timezone` — hiện nó
+   * ra, đừng để người đọc tưởng "ngày" là ngày theo máy họ.
+   */
+  async getListingReport(query: ReportQuery): Promise<ListingReport> {
+    const res = await withAuthRetry(() => listingReport({ query }));
+    return unwrap(res, 'Không tải được báo cáo đăng tin');
+  },
+
+  /**
+   * Báo cáo NGƯỜI DÙNG — báo cáo con thứ hai, cùng tham số và cùng cách gộp cột với báo cáo
+   * tin đăng.
+   *
+   * Ba con số mỗi cột trả lời ba câu khác nhau: `users` (tài khoản mới), `active`
+   * (người có đăng tin trong cột), `total` (cộng dồn, đã tính cả người có trước cửa sổ).
+   * Đọc `users` một mình là dễ mừng hụt — 1000 tài khoản mới mà 3 người đăng tin thì con
+   * số đó là ảo.
+   */
+  async getUserReport(query: ReportQuery): Promise<UserReport> {
+    const res = await withAuthRetry(() => userReport({ query }));
+    return unwrap(res, 'Không tải được báo cáo người dùng');
   },
 };

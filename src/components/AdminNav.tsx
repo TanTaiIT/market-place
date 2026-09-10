@@ -130,6 +130,14 @@ const GROUPS: NavGroup[] = [
       { href: '/admin/banned-phrases', icon: '🚫', label: 'Cụm từ cấm', gate: 'master' },
       { href: '/admin/listing-products', icon: '🎟', label: 'Gói tin', gate: 'master' },
       { href: '/admin/posting-stats', icon: '📈', label: 'Số liệu đăng tin', gate: 'master' },
+      /*
+       * 'Thống kê' chứ không 'Báo cáo': nhóm Nội dung đã có mục 'Báo cáo' cho ĐƠN TỐ CÁO của
+       * người dùng, và hai mục cùng tên trong một menu là một cú bấm nhầm chờ sẵn.
+       *
+       * Đứng ngay dưới 'Số liệu đăng tin' vì cùng đọc một nguồn, nhưng trả lời câu khác: cái
+       * trên là ảnh chụp để chốt giá gói, cái này là xu hướng theo ngày/tháng/năm.
+       */
+      { href: '/admin/analytics', icon: '📊', label: 'Thống kê', gate: 'master' },
     ],
   },
 ];

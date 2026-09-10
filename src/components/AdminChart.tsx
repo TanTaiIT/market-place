@@ -154,3 +154,76 @@ const styles = StyleSheet.create({
   barTrack: { height: 7, borderRadius: 20, backgroundColor: C.deskHi, overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: 20 },
 });
+
+/**
+ * Cột dọc cho báo cáo theo thời gian — mỗi cột một ngày/tháng/năm.
+ *
+ * Dựng bằng `View` chứ không SVG: đây là hình chữ nhật xếp cạnh nhau, và `flex` vẽ được mà
+ * không kéo theo một `viewBox` phải tính toạ độ tay. `CategoryBars` ngay trên cũng chọn vậy.
+ *
+ * Nhãn trục x THƯA DẦN theo số cột: 30 nhãn ngày chồng lên nhau thành một vệt mực. Cột thì vẫn
+ * vẽ đủ — mất nhãn còn đọc được hình dạng, mất cột là mất dữ liệu.
+ */
+export function ReportColumns({
+  points,
+  labelOf,
+  unit = 'tin',
+}: {
+  /**
+   * `value` chứ không `posts`: cùng một biểu đồ phục vụ mọi báo cáo con (tin đăng, người
+   * dùng, và cái thứ ba sắp tới). Gọi nó theo tên của một domain là buộc báo cáo sau phải
+   * đổi tên field khi truyền vào — hoặc tệ hơn, sao chép cả component.
+   */
+  points: readonly { bucket: string; value: number }[];
+  labelOf: (bucket: string) => string;
+  unit?: string;
+}) {
+  // Trần là đỉnh thật, không cộng biên: cột cao nhất chạm trần là đúng ý "đây là mốc lớn nhất".
+  const ceiling = Math.max(...points.map((p) => p.value), 1);
+  const every = Math.ceil(points.length / 6);
+
+  return (
+    <View>
+      <View style={columnStyles.plot}>
+        {points.map((p, i) => (
+          <View key={p.bucket} style={columnStyles.slot}>
+            {/* Số chỉ hiện ở cột có dữ liệu và khi còn đủ chỗ — nhiều cột thì nó thành nhiễu. */}
+            {p.value > 0 && points.length <= 14 ? (
+              <Text style={columnStyles.value}>{p.value}</Text>
+            ) : null}
+            <View
+              style={[
+                columnStyles.bar,
+                {
+                  height: `${Math.max((p.value / ceiling) * 100, p.value > 0 ? 4 : 1)}%`,
+                  backgroundColor: p.value > 0 ? C.mossBright : C.deskLine,
+                },
+              ]}
+            />
+            <Text numberOfLines={1} style={columnStyles.tick}>
+              {i % every === 0 ? labelOf(p.bucket) : ''}
+            </Text>
+          </View>
+        ))}
+      </View>
+      <Text style={columnStyles.ceiling}>
+        đỉnh {ceiling} {unit}
+      </Text>
+    </View>
+  );
+}
+
+const columnStyles = StyleSheet.create({
+  plot: { flexDirection: 'row', alignItems: 'flex-end', height: 168, gap: 2 },
+  slot: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: '100%' },
+  value: { fontFamily: F.mono, fontSize: 8.5, color: C.deskTxtSoft, marginBottom: 2 },
+  bar: { width: '78%', borderTopLeftRadius: 2, borderTopRightRadius: 2 },
+  tick: { fontFamily: F.mono, fontSize: 8, color: C.deskTxtDim, marginTop: 5, height: 11 },
+  ceiling: {
+    fontFamily: F.mono,
+    fontSize: 8.5,
+    color: C.deskTxtDim,
+    textAlign: 'right',
+    marginTop: 4,
+  },
+});

@@ -1,6 +1,11 @@
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 import { api, messageFromSocket } from '@/api/client';
 import {
   connectSocket,
@@ -13,6 +18,7 @@ import {
 import type { Message } from '@/api/db';
 import { useAuthStore, useIsAuthenticated } from '@/stores/auth';
 import { qk } from './keys';
+import { appendToNewest, mapPages, usePagedList, type PagedCache } from './paged';
 
 /**
  * Mã nhận dạng tin nhắn do client tự sinh, gửi kèm lên BE và được trả lại nguyên vẹn.
@@ -29,11 +35,37 @@ const newClientMsgId = () =>
 /** Khách không có hộp thư — và `TabBar` gọi hook này ở MỌI màn, kể cả màn công khai. */
 export function useConversations() {
   const isAuthenticated = useIsAuthenticated();
-  return useQuery({
-    queryKey: qk.conversations(),
-    queryFn: api.getConversations,
-    enabled: isAuthenticated,
-  });
+  return usePagedList(qk.conversations(), api.getConversations, { enabled: isAuthenticated });
+}
+
+/**
+ * Tín hiệu "có tin nhắn mới" khi người dùng đang ở BẤT KỲ màn nào.
+ *
+ * Nghe `chat:inbox` — sự kiện BE phát vào phòng riêng của từng người nhận. Khác `chat:message`
+ * của `useConversationRoom`: sự kiện kia đi vào phòng hội thoại nên chỉ tới được người đang mở
+ * đúng màn chat đó, tức không bao giờ báo được cho người đang lướt bảng tin.
+ *
+ * Không tự đếm, không giữ state riêng: nó chỉ `invalidateQueries`. Số chưa đọc đã có đúng MỘT
+ * nguồn là `qk.conversations()` (BE trả cờ `unread` cho từng hội thoại), nên dựng thêm một bộ
+ * đếm ở client là hẹn ngày hai chỗ nói hai số khác nhau — và cái sai sẽ là cái badge, thứ người
+ * dùng nhìn thấy. Đổi lại một lượt gọi REST mỗi tin nhắn đến, đúng thứ `staleTime` sinh ra để
+ * gộp khi tin về dồn dập.
+ *
+ * Gọi MỘT lần ở `app/_layout.tsx`, cạnh `useChatSocket` — đặt trong màn chat thì nó chết ngay
+ * khi người dùng rời màn đó, tức đúng lúc cần nó nhất.
+ *
+ * Nhận `qc` qua THAM SỐ chứ không `useQueryClient()`: thân `RootLayout` nằm NGOÀI
+ * `<QueryClientProvider>` — provider do chính nó render ra trong JSX bên dưới. Gọi hook đó ở
+ * đấy thì app chết ngay lúc mở với "No QueryClient set". Cùng lý do `useSyncAccessToken` và
+ * `useValidateSession` đứng cạnh cũng nhận `queryClient` qua tham số.
+ */
+export function useInboxSignal(qc: QueryClient): void {
+  useEffect(() => {
+    const off = onSocketEvent('chat:inbox', () => {
+      void qc.invalidateQueries({ queryKey: qk.conversations() });
+    });
+    return off;
+  }, [qc]);
 }
 
 export function useConversation(id: string) {
@@ -44,12 +76,14 @@ export function useConversation(id: string) {
   });
 }
 
-/** Lịch sử tin nhắn. Tin mới về qua socket (`useConversationRoom`), không cần polling. */
+/**
+ * Lịch sử tin nhắn. Trang 1 là 10 tin MỚI nhất; kéo lên đầu là tải trang cũ hơn — nối lên
+ * ĐẦU danh sách (`olderPagesFirst`). Tin mới về qua socket (`useConversationRoom`), không polling.
+ */
 export function useMessages(conversationId: string) {
-  return useQuery({
-    queryKey: qk.messages(conversationId),
-    queryFn: () => api.getMessages(conversationId),
+  return usePagedList(qk.messages(conversationId), (page) => api.getMessages(conversationId, page), {
     enabled: conversationId.length > 0,
+    olderPagesFirst: true,
   });
 }
 
@@ -113,19 +147,23 @@ export function useConversationRoom(conversationId: string): void {
       const message = messageFromSocket(payload);
       if (!message) return;
 
-      qc.setQueryData<Message[]>(qk.messages(conversationId), (old = []) => {
-        if (old.some((m) => m.id === message.id)) return old;
+      qc.setQueryData<PagedCache<Message>>(qk.messages(conversationId), (old) => {
+        const seen = old?.pages.flatMap((pg) => pg.items) ?? [];
+        if (seen.some((m) => m.id === message.id)) return old;
 
         // Tin của CHÍNH MÌNH về qua socket chính là bản thật của bong bóng lạc quan đang hiển
         // thị — `clientMsgId` khớp là bằng chứng chắc chắn, không phải suy đoán theo nội dung.
         // Nối thêm thì màn chat hiện hai tin y hệt, rồi lượt refetch của `onSettled` xoá bớt
         // còn một. Thay tại chỗ để giữ nguyên vị trí tin, không đẩy nó xuống cuối.
-        const pending = message.clientMsgId
-          ? old.findIndex((m) => m.clientMsgId === message.clientMsgId)
-          : -1;
-        if (pending >= 0) return [...old.slice(0, pending), message, ...old.slice(pending + 1)];
+        const pending = !!message.clientMsgId && seen.some((m) => m.clientMsgId === message.clientMsgId);
+        if (pending) {
+          return mapPages(old, (items) =>
+            items.map((m) => (m.clientMsgId === message.clientMsgId ? message : m)),
+          );
+        }
 
-        return [...old, message];
+        // Tin mới nhất vào trang ĐẦU (trang mới nhất) — xem `appendToNewest`.
+        return appendToNewest(old, message);
       });
 
       // Dòng tóm tắt + thứ tự ở màn danh sách do BE tính, không dựng lại ở client.
@@ -180,7 +218,7 @@ export function useSendMessage(conversationId: string) {
       api.sendMessage(conversationId, v.text, v.clientMsgId),
     onMutate: async ({ text, clientMsgId }) => {
       await qc.cancelQueries({ queryKey: key });
-      const prev = qc.getQueryData<Message[]>(key);
+      const prev = qc.getQueryData<PagedCache<Message>>(key);
       const now = new Date();
       const optimistic: Message = {
         // `id` tạm chỉ để thoả kiểu; khoá render là `clientMsgId`, và nó không đổi khi bản
@@ -191,7 +229,7 @@ export function useSendMessage(conversationId: string) {
         text,
         time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
       };
-      qc.setQueryData<Message[]>(key, (old) => [...(old ?? []), optimistic]);
+      qc.setQueryData<PagedCache<Message>>(key, (old) => appendToNewest(old, optimistic));
       return { prev };
     },
     onError: (_e, _vars, ctx) => {

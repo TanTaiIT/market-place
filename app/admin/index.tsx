@@ -62,7 +62,7 @@ function OrgOverview() {
   const toast = useToast();
   const { data: overview, error, isLoading } = useAdminOverview();
   const { data: events } = useAdminActivity();
-  const { data: queue } = useAdminListings('pending');
+  const { data: queue, total: queueTotal } = useAdminListings('pending');
   const setStatus = useSetListingStatus();
 
   // Vào phòng quản trị: thao tác của người khác hiện lên ngay ở "Vừa diễn ra".
@@ -95,7 +95,7 @@ function OrgOverview() {
 
             <View>
               <SectionTitle title="Bàn duyệt" note="duyệt xong rồi hãy đi ngủ" />
-              <AdminPanel title="Tin chờ lên bảng" note={`còn ${queue?.length ?? 0} tin`}>
+              <AdminPanel title="Tin chờ lên bảng" note={`còn ${queueTotal} tin`}>
                 <AdminReviewDesk
                   queue={queue ?? []}
                   busy={setStatus.isPending}

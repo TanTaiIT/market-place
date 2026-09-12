@@ -30,7 +30,8 @@ export type { UpdateOrganization as OrgPatch };
 /** Một thẻ nhóm trong danh sách khám phá, và hồ sơ đầy đủ của một nhóm. */
 export type OrgRow = OrganizationLookup;
 export type OrgProfile = OrganizationProfile;
-import { relativeTime, unwrap } from './client';
+import { PAGE_SIZE, relativeTime, unwrap, unwrapPage } from './client';
+import type { Page } from './client';
 import { ORG_HEADER, withAuthRetry } from './http';
 
 /**
@@ -107,16 +108,10 @@ export type JoinRequestRow = JoinRequest & {
 };
 
 export const orgApi = {
-  /**
-   * Danh bạ thành viên của tổ chức đang hoạt động.
-   *
-   * `limit: 100` (trần của BE) chứ không phân trang: mọi call-site đều là dropdown "chọn một
-   * người", mà dropdown thì cần cả tập để tìm — phân trang ở đó là ẩn mất người thứ 101 khỏi ô
-   * tìm kiếm. Trường quá 100 thành viên thì đổi dropdown trước, đổi hàm này sau.
-   */
-  async members(): Promise<Member[]> {
-    const res = await withAuthRetry(() => membershipList({ query: { limit: 100 } }));
-    return unwrap(res, 'Không tải được danh bạ thành viên');
+  /** Một trang danh bạ của tổ chức đang hoạt động — màn Thành viên cuộn tới đâu tải tới đó. */
+  async members(page: number): Promise<Page<Member>> {
+    const res = await withAuthRetry(() => membershipList({ query: { page, limit: PAGE_SIZE } }));
+    return unwrapPage(res, 'Không tải được danh bạ thành viên', (m) => m);
   },
 
   /**
@@ -130,9 +125,11 @@ export const orgApi = {
     unwrap(res, 'Không gỡ được thành viên');
   },
 
-  async joinRequests(status?: JoinRequestStatus): Promise<JoinRequestRow[]> {
-    const res = await withAuthRetry(() => listJoinRequests({ query: status ? { status } : {} }));
-    return unwrap(res, 'Không đọc được hàng đợi đơn').map((r) => ({
+  async joinRequests(status: JoinRequestStatus | undefined, page: number): Promise<Page<JoinRequestRow>> {
+    const res = await withAuthRetry(() =>
+      listJoinRequests({ query: { ...(status ? { status } : {}), page, limit: PAGE_SIZE } }),
+    );
+    return unwrapPage(res, 'Không đọc được hàng đợi đơn', (r) => ({
       ...r,
       sentAt: relativeTime(r.createdAt),
       expiresIn: new Date(r.expiresAt) > new Date() ? untilText(r.expiresAt) : null,
@@ -216,6 +213,17 @@ export const orgApi = {
       membershipList({ query: { limit: take }, headers: { [ORG_HEADER]: slug } }),
     );
     return unwrap(res, 'Không đọc được danh bạ nhóm');
+  },
+
+  /**
+   * Một trang danh bạ của MỘT nhóm theo slug — ngăn chi tiết tổ chức của master. Cùng cách gắn
+   * `X-Org-Slug` riêng cho lượt gọi như `memberPreview`, nhưng phân trang thay vì lấy `take` dòng.
+   */
+  async memberPage(slug: string, page: number): Promise<Page<Member>> {
+    const res = await withAuthRetry(() =>
+      membershipList({ query: { page, limit: PAGE_SIZE }, headers: { [ORG_HEADER]: slug } }),
+    );
+    return unwrapPage(res, 'Không đọc được danh bạ nhóm', (m) => m);
   },
 
   async myOrgs(): Promise<MyOrg[]> {

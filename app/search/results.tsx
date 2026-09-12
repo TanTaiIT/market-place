@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ListingCard } from '@/components/ListingCard';
 import { SearchCrumbBar } from '@/components/SearchCrumbBar';
 import { useRequireAuth } from '@/components/GuestGate';
-import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
+import { EmptyState, Loading, PagedFooter, ScreenHeader } from '@/components/ui';
 import { useSavedIds, useSearch, useToggleSaved } from '@/queries/listings';
 import { useMyOrgs } from '@/queries/org';
 import { hasSearchCriteria, paramsToSearch, searchToParams } from '@/api/db';
@@ -23,7 +23,7 @@ export default function SearchResults() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const filter = paramsToSearch(params as Record<string, string | string[] | undefined>);
-  const { data, error, isFetching } = useSearch(filter);
+  const { data, error, isFetching, total, loadMore, isFetchingNextPage } = useSearch(filter);
 
   /*
    * Thẻ tin của bảng tin cần bốn thứ ngoài `item`: trạng thái đã lưu, hành động lưu, tên tổ chức
@@ -68,7 +68,7 @@ export default function SearchResults() {
 
       <SearchCrumbBar
         filter={filter}
-        count={data ? data.length : null}
+        count={data ? total : null}
         loading={isFetching}
         onChange={applyFilter}
         onEdit={openForm}
@@ -77,6 +77,9 @@ export default function SearchResults() {
       <FlatList
         data={data ?? []}
         keyExtractor={(i) => String(i.id)}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={<PagedFooter loading={isFetchingNextPage} />}
         contentContainerStyle={styles.body}
         renderItem={({ item, index }) => (
           <ListingCard

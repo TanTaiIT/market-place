@@ -1,11 +1,12 @@
-import { useEffect } from 'react';
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { adminApi, isMaster } from '@/api/admin';
+import { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { adminApi, canModeratePublicAxis, isMaster } from '@/api/admin';
 import type { AdminEvent, ModStatus } from '@/api/admin';
 import type { RerouteListing } from '@/api/generated';
 import { joinAdminRoom, leaveAdminRoom, onSocketEvent } from '@/api/socket';
 import { useIsAuthenticated, useOrgSlug } from '@/stores/auth';
 import { qk } from './keys';
+import { usePagedList } from './paged';
 import { useCategories } from './listings';
 
 /**
@@ -73,14 +74,13 @@ export function useMyGrants() {
  */
 export function usePublicQueue(status?: ModStatus) {
   const { data: categories } = useCategories();
+  const names = new Map((categories ?? []).map((c) => [c.id, c.name]));
 
-  return useQuery({
-    queryKey: qk.adminPublicQueue(status ?? 'all'),
-    queryFn: () =>
-      adminApi.getPublicQueue(status, new Map((categories ?? []).map((c) => [c.id, c.name]))),
-    enabled: categories !== undefined,
-    placeholderData: keepPreviousData,
-  });
+  return usePagedList(
+    qk.adminPublicQueue(status ?? 'all'),
+    (page) => adminApi.getPublicQueue(status, names, page),
+    { enabled: categories !== undefined, keepPrevious: true },
+  );
 }
 
 /** Ma trận phủ sóng của master — chỉ các ô chưa có người phụ trách hoặc đang tồn đọng. */
@@ -92,30 +92,43 @@ export function useCoverage() {
  * Tin cho bàn duyệt. Tên danh mục lấy từ `useCategories` (đã cache 30 phút) rồi truyền xuống,
  * để mỗi lần đổi tab không kéo thêm một lượt `/categories`.
  */
-export function useAdminListings(status?: ModStatus) {
+export function useAdminListings(
+  status?: ModStatus,
+  filter: { category?: string; q?: string } = {},
+) {
   const orgSlug = useOrgSlug();
   const master = isMaster(useMyGrants().data);
   const { data: categories } = useCategories();
 
-  return useQuery({
-    queryKey: qk.adminListings(orgSlug ?? '-', status ?? 'all'),
-    queryFn: () =>
-      adminApi.getListings(status, new Map((categories ?? []).map((c) => [c.id, c.name]))),
-    // `|| master`: BE mở các route ĐỌC này cho master chưa chọn org (`requireOrgReadOrMaster`),
-    // nên chặn ở client là tự khoá lại đúng thứ vừa mở.
-    enabled: (Boolean(orgSlug) || master) && categories !== undefined,
-    placeholderData: keepPreviousData,
-  });
+  // Từ khoá hoãn 300ms như `useAdminUsers`: mỗi prefix là một key mới, gõ thẳng là một request
+  // cho từng chữ cái.
+  const term = (filter.q ?? '').trim();
+  const [settled, setSettled] = useState(term);
+  useEffect(() => {
+    const t = setTimeout(() => setSettled(term), 300);
+    return () => clearTimeout(t);
+  }, [term]);
+
+  const names = new Map((categories ?? []).map((c) => [c.id, c.name]));
+  return usePagedList(
+    qk.adminListings(orgSlug ?? '-', status ?? 'all', filter.category ?? 'all', settled),
+    (page) => adminApi.getListings(status, names, page, { category: filter.category, q: settled }),
+    {
+      // `|| master`: BE mở các route ĐỌC này cho master chưa chọn org (`requireOrgReadOrMaster`),
+      // nên chặn ở client là tự khoá lại đúng thứ vừa mở.
+      enabled: (Boolean(orgSlug) || master) && categories !== undefined,
+      keepPrevious: true,
+    },
+  );
 }
 
 export function useAdminReports() {
   const orgSlug = useOrgSlug();
-  const master = isMaster(useMyGrants().data);
-  return useQuery({
-    queryKey: qk.adminReports(orgSlug ?? '-'),
-    queryFn: adminApi.getReports,
-    // Cùng lý do với `useAdminListings`: BE đã mở route đọc này cho master chưa chọn org.
-    enabled: Boolean(orgSlug) || master,
+  const grants = useMyGrants().data;
+  return usePagedList(qk.adminReports(orgSlug ?? '-'), adminApi.getReports, {
+    // Ba lối vào, không cần org: master đọc xuyên tổ chức; người phụ trách ô trục công khai thấy
+    // báo cáo trong ô mình (BE dựng ô từ grant). Quản trị org thì cần slug như cũ.
+    enabled: Boolean(orgSlug) || isMaster(grants) || canModeratePublicAxis(grants),
   });
 }
 

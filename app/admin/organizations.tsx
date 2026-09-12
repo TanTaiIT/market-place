@@ -5,7 +5,7 @@ import { AdminSmallBtn, adminFormStyles } from '@/components/AdminPicker';
 import { AdminOrgSheet } from '@/components/AdminOrgSheet';
 import { OrgCreateForm } from '@/components/OrgCreateForm';
 import { SlugField } from '@/components/SlugField';
-import { EmptyState, Loading, PinButton } from '@/components/ui';
+import { EmptyState, Loading, PagedFooter, PinButton, nearEnd } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import {
   useAllOrgs,
@@ -35,7 +35,7 @@ export default function AdminOrganizations() {
   const [term, setTerm] = useState('');
   const [status, setStatus] = useState('all');
 
-  const { data, error, isPending } = useAllOrgs({
+  const { data, error, isPending, loadMore, isFetchingNextPage } = useAllOrgs({
     q: term,
     status: status === 'all' ? undefined : (status as OrgStatus),
   });
@@ -123,7 +123,13 @@ export default function AdminOrganizations() {
 
       <AdminFilter options={STATUS_FILTER} value={status} onChange={setStatus} />
 
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.body}
+        keyboardShouldPersistTaps="handled"
+        // Danh sách vẽ bằng `map` trong ScrollView (có ô tìm phía trên), nên tự dò đáy để tải trang sau.
+        onScroll={(e) => nearEnd(e) && loadMore()}
+        scrollEventThrottle={160}
+      >
         {isPending ? (
           <Loading onDark />
         ) : error ? (
@@ -251,6 +257,7 @@ export default function AdminOrganizations() {
             </AdminPanel>
           )}
         </View>
+        <PagedFooter loading={isFetchingNextPage} onDark />
       </ScrollView>
 
       {/* Ngoài `ScrollView`: Modal tự phủ toàn màn, nằm trong danh sách cuộn chỉ làm rối cây. */}

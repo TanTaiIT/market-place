@@ -2,9 +2,11 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useCategories } from '@/queries/listings';
 import { useCategoryTemplate } from '@/queries/templates';
+import { useMyOrgs } from '@/queries/org';
 import {
   activeFilterCount,
   EMPTY_SEARCH,
+  locationApplies,
   priceRangeLabel,
   type ListingAttrFilter,
   type SearchFilter,
@@ -49,18 +51,36 @@ export function SearchCrumbBar({
    */
   const { data: template } = useCategoryTemplate(filter.categoryId ?? '');
   const category = categories?.find((c) => c.id === filter.categoryId);
+  // Tên nhóm tra từ danh sách nhóm của chính người xem — chỉ nhóm họ đã vào mới lọc được, nên
+  // luôn tra ra. Không ra (cache chưa về) thì "Nhóm", không bịa và không hiện slug kỹ thuật.
+  const { data: myOrgs } = useMyOrgs();
+  const org = myOrgs?.find((o) => o.slug === filter.orgSlug);
 
   const q = filter.q.trim();
   const price = priceRangeLabel(filter.minPrice, filter.maxPrice);
 
   const crumbs: Crumb[] = [];
   if (q) crumbs.push({ key: 'q', icon: '🔍', text: `“${q}”`, without: { ...filter, q: '' } });
-  if (filter.province) {
+  // Có nhóm thì tỉnh/xã không lọc lên tin (`locationApplies`) → không bày chip cho thứ không tác
+  // dụng. Bỏ chip nhóm là tỉnh quay lại làm việc, và chip của nó hiện lại.
+  if (filter.province && locationApplies(filter)) {
     crumbs.push({
       key: 'province',
       icon: '📍',
       text: filter.province,
-      without: { ...filter, province: null },
+      // Bỏ tỉnh là bỏ xã theo — xã được bày theo tỉnh, không còn ngữ cảnh để thuộc về.
+      without: { ...filter, province: null, ward: null },
+    });
+  }
+  if (filter.ward && locationApplies(filter)) {
+    crumbs.push({ key: 'ward', icon: '🏘️', text: filter.ward, without: { ...filter, ward: null } });
+  }
+  if (filter.orgSlug) {
+    crumbs.push({
+      key: 'org',
+      icon: '👥',
+      text: org?.name ?? 'Nhóm',
+      without: { ...filter, orgSlug: null },
     });
   }
   if (filter.categoryId) {

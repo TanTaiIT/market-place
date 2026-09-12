@@ -25,7 +25,8 @@ import { useCreateReport } from '@/queries/report';
 import { C, F, shadow } from '@/theme';
 
 export default function ListingDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // `mod=1`: mở từ hàng đợi báo cáo của bàn quản trị — đọc qua cửa bàn duyệt (xem `useListing`).
+  const { id, mod } = useLocalSearchParams<{ id: string; mod?: string }>();
   // ObjectId của BE là chuỗi 24 hex — `Number()` ở đây sẽ ra NaN.
   const listingId = id ?? '';
   const router = useRouter();
@@ -34,7 +35,7 @@ export default function ListingDetail() {
   const toast = useToast();
   const insets = useSafeAreaInsets();
 
-  const { data: listing, error, isLoading } = useListing(listingId);
+  const { data: listing, error, isLoading } = useListing(listingId, mod === '1');
   const { data: savedIds } = useSavedIds();
   const toggleSaved = useToggleSaved();
   const openChat = useOpenConversation();

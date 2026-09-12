@@ -99,11 +99,17 @@ export function UserReportPanels({
   totals,
   granularity,
   meta,
+  orgScoped = false,
 }: {
   points: readonly UserReportPoint[];
   totals: { users: number; total: number };
   granularity: ReportGranularity;
   meta: React.ReactNode;
+  /**
+   * Bản CỦA NHÓM (quản trị nhóm, hoặc master đang đứng trong một org): BE đếm THÀNH VIÊN vào
+   * nhóm chứ không phải tài khoản mới của sàn — nhãn phải nói đúng thứ đang đếm.
+   */
+  orgScoped?: boolean;
 }) {
   const perBucket = points.length > 0 ? totals.users / points.length : 0;
   // Người có đăng tin ở cột CUỐI — chỉ số "đang sống" gần nhất, không cộng dồn được vì cùng
@@ -112,7 +118,7 @@ export function UserReportPanels({
 
   return (
     <>
-      <AdminPanel title="Người dùng mới theo thời gian">
+      <AdminPanel title={orgScoped ? 'Thành viên mới theo thời gian' : 'Người dùng mới theo thời gian'}>
         {/* `unit` phải truyền: mặc định là "tin", để nguyên thì nhãn đỉnh ghi "đỉnh 12 tin"
             trên một biểu đồ đang đếm người. */}
         <ReportColumns
@@ -125,8 +131,16 @@ export function UserReportPanels({
 
       <AdminPanel title="Tổng trong kỳ">
         <View style={styles.kpis}>
-          <Kpi label="Người dùng mới" value={group(totals.users)} tone={C.mossBright} />
-          <Kpi label="Tổng tài khoản" value={group(totals.total)} tone={C.deskTxt} />
+          <Kpi
+            label={orgScoped ? 'Thành viên mới' : 'Người dùng mới'}
+            value={group(totals.users)}
+            tone={C.mossBright}
+          />
+          <Kpi
+            label={orgScoped ? 'Tổng thành viên' : 'Tổng tài khoản'}
+            value={group(totals.total)}
+            tone={C.deskTxt}
+          />
           <Kpi label={`Có đăng tin (${UNIT[granularity]} cuối)`} value={group(activeNow)} tone={C.sky} />
         </View>
         <Text style={styles.note}>

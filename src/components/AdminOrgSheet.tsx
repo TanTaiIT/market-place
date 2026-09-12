@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar, Loading } from './ui';
+import { Avatar, Loading, PagedFooter, nearEnd } from './ui';
 import { initialsOf } from '@/api/client';
 import { useOrgManagers, useOrgMemberList } from '@/queries/org-admin';
 import type { Organization } from '@/api/org-admin';
@@ -71,7 +71,13 @@ export function AdminOrgSheet({ org, onClose }: { org: Organization | null; onCl
             </Pressable>
           </View>
 
-          <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            contentContainerStyle={styles.body}
+            showsVerticalScrollIndicator={false}
+            // Danh bạ ở cuối ngăn tải theo trang — dò đáy để lấy trang sau.
+            onScroll={(e) => nearEnd(e) && members.loadMore()}
+            scrollEventThrottle={160}
+          >
             <View style={styles.identity}>
               <Avatar
                 text={initialsOf(org.name)}
@@ -135,9 +141,8 @@ export function AdminOrgSheet({ org, onClose }: { org: Organization | null; onCl
 
             <Section
               title="Thành viên"
-              note={
-                members.data ? `${members.data.length} người${members.data.length >= 100 ? '+' : ''}` : ''
-              }
+              // `total` của BE — số đã tải chỉ là một trang.
+              note={members.data ? `${members.total} người` : ''}
             />
             {members.isLoading ? (
               <Loading onDark />
@@ -171,6 +176,7 @@ export function AdminOrgSheet({ org, onClose }: { org: Organization | null; onCl
                 </View>
               ))
             )}
+            <PagedFooter loading={members.isFetchingNextPage} onDark />
           </ScrollView>
         </View>
       )}

@@ -4,7 +4,7 @@ import { AdminFilter, AdminScreen } from '@/components/AdminScreen';
 import { AdminListingRow, RowAction } from '@/components/AdminListingRow';
 import { AdminListingSheet } from '@/components/AdminListingSheet';
 import { RerouteSheet } from '@/components/RerouteSheet';
-import { EmptyState, Loading } from '@/components/ui';
+import { EmptyState, Loading, PagedFooter } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import {
   useBumpListing,
@@ -44,7 +44,7 @@ export default function PublicQueue() {
    */
   const [sheet, setSheet] = useState<ModListing | null>(null);
 
-  const { data, error, isLoading } = usePublicQueue(tab);
+  const { data, error, isLoading, loadMore, isFetchingNextPage } = usePublicQueue(tab);
   const { data: grants } = useMyGrants();
   const setStatus = useSetListingStatus();
   const reroute = useRerouteListing();
@@ -80,6 +80,9 @@ export default function PublicQueue() {
       <FlatList
         data={rows}
         keyExtractor={(l) => l.id}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={<PagedFooter loading={isFetchingNextPage} onDark />}
         contentContainerStyle={{ padding: 16, gap: 10 }}
         renderItem={({ item }) => (
           /*

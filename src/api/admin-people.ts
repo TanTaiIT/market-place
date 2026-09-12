@@ -1,6 +1,7 @@
 import { userClearRejections, userListForAdmin, userSetStatus, walletAdjust } from './generated';
 import type { AdminUser as AdminUserDto } from './generated';
-import { initialsOf, relativeTime, unwrap } from './client';
+import { PAGE_SIZE, initialsOf, relativeTime, unwrap, unwrapPage } from './client';
+import type { Page } from './client';
 import { withAuthRetry } from './http';
 
 /**
@@ -84,17 +85,19 @@ const toUser = (dto: AdminUserDto): AdminUser => ({
 // ── API ─────────────────────────────────────────────────────────────
 
 export const adminPeopleApi = {
-  /**
-   * `limit: 100` (trần của BE) và BỎ `meta`, y hệt `orgAdminApi.listAll`: quá 100 tài khoản thì
-   * bảng cắt im lặng, nên ô tìm là đường thu hẹp chính. Vượt mốc đó thì phân trang thật trước.
-   */
-  async getUsers(filter: UserFilter = {}): Promise<AdminUser[]> {
+  /** Một trang của bảng người dùng — cuộn tới đâu tải tới đó, ô tìm để thu hẹp. */
+  async getUsers(filter: UserFilter, page: number): Promise<Page<AdminUser>> {
     const res = await withAuthRetry(() =>
       userListForAdmin({
-        query: { q: filter.q?.trim() || undefined, status: filter.status, limit: 100 },
+        query: {
+          q: filter.q?.trim() || undefined,
+          status: filter.status,
+          page,
+          limit: PAGE_SIZE,
+        },
       }),
     );
-    return unwrap(res, 'Không tải được danh sách người dùng').map(toUser);
+    return unwrapPage(res, 'Không tải được danh sách người dùng', toUser);
   },
 
   /**

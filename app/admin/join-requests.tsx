@@ -3,7 +3,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AdminFilter, AdminScreen } from '@/components/AdminScreen';
 import { RowAction } from '@/components/AdminListingRow';
 import { RejectReasonSheet } from '@/components/RejectReasonSheet';
-import { EmptyState, Loading } from '@/components/ui';
+import { EmptyState, Loading, PagedFooter } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import {
   useApproveJoinRequest,
@@ -32,7 +32,7 @@ export default function JoinRequests() {
   const [picked, setPicked] = useState<string[]>([]);
   const [rejecting, setRejecting] = useState<JoinRequestRow | null>(null);
 
-  const { data, error, isLoading } = useJoinRequestQueue(tab);
+  const { data, error, isLoading, loadMore, isFetchingNextPage } = useJoinRequestQueue(tab);
   const approve = useApproveJoinRequest();
   const reject = useRejectJoinRequest();
   const bulk = useBulkApproveJoinRequests();
@@ -78,6 +78,9 @@ export default function JoinRequests() {
       <FlatList
         data={rows}
         keyExtractor={(r) => r.id}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={<PagedFooter loading={isFetchingNextPage} onDark />}
         contentContainerStyle={{ padding: 16, gap: 10 }}
         renderItem={({ item }) => (
           <Pressable

@@ -1,10 +1,18 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import type { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRequireAuth } from './GuestGate';
 import { useConversations } from '@/queries/chat';
+import { useNotifications } from '@/queries/notifications';
+import { onSocketEvent } from '@/api/socket';
 import { C, F, R, shadowLift } from '@/theme';
 
 /**
@@ -36,6 +44,9 @@ export function TabBar({ state, navigation }: TabBarProps) {
   const requireAuth = useRequireAuth();
   const { data: conversations } = useConversations();
   const hasUnread = !!conversations?.some((c) => c.unread);
+  const { data: notifs } = useNotifications();
+  const hasNotif = !!notifs?.some((n) => n.unread);
+  const bell = useBellShake();
 
   const routes = state.routes.filter((r) => META[r.name]);
   const left = routes.slice(0, 2);
@@ -58,8 +69,17 @@ export function TabBar({ state, navigation }: TabBarProps) {
         style={[styles.item, focused && styles.itemOn]}
       >
         <View>
-          <Text style={styles.icon}>{meta.icon}</Text>
+          {/*
+            Chỉ chuông mới lắc. Bọc MỌI icon trong `Animated.Text` thì ba icon kia cũng dựng
+            thêm một node animated không bao giờ chạy — rẻ, nhưng nói sai rằng chúng có hiệu ứng.
+          */}
+          {route.name === 'notif' ? (
+            <Animated.Text style={[styles.icon, bell]}>{meta.icon}</Animated.Text>
+          ) : (
+            <Text style={styles.icon}>{meta.icon}</Text>
+          )}
           {route.name === 'chatlist' && hasUnread && <View style={styles.dot} />}
+          {route.name === 'notif' && hasNotif && <View style={styles.dot} />}
         </View>
         <Text style={[styles.label, focused && styles.labelOn]}>{meta.label}</Text>
       </Pressable>
@@ -84,6 +104,37 @@ export function TabBar({ state, navigation }: TabBarProps) {
       </View>
     </View>
   );
+}
+
+/**
+ * Lắc chuông khi có thông báo mới.
+ *
+ * Nghe `notif:new` NGAY TẠI ĐÂY thay vì nhận qua prop hay global state: hiệu ứng thuộc về cái
+ * chuông, nên nó nên sống và chết cùng cái chuông. `useNotifSignal` ở `_layout` lo việc quét
+ * lại query — hai việc khác nhau, hai vòng đời khác nhau, và thanh tab thì không phải lúc nào
+ * cũng hiển thị.
+ *
+ * Lắc bằng `rotate` chứ không `translateX`: chuông thật quay quanh điểm treo. Bốn nhịp giảm
+ * dần rồi về 0 — kết thúc đúng ở 0 là bắt buộc, nếu không mỗi lượt lắc để lại một độ nghiêng
+ * cộng dồn và sau vài thông báo cái chuông nằm ngang.
+ */
+function useBellShake() {
+  const deg = useSharedValue(0);
+
+  useEffect(() => {
+    const off = onSocketEvent('notif:new', () => {
+      deg.value = withSequence(
+        withTiming(-14, { duration: 60 }),
+        withTiming(12, { duration: 70 }),
+        withTiming(-8, { duration: 70 }),
+        withTiming(5, { duration: 70 }),
+        withTiming(0, { duration: 80 }),
+      );
+    });
+    return off;
+  }, [deg]);
+
+  return useAnimatedStyle(() => ({ transform: [{ rotate: `${deg.value}deg` }] }));
 }
 
 const styles = StyleSheet.create({

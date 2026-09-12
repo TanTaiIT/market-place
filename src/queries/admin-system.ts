@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminSystemApi, type ReportQuery } from '@/api/admin-system';
+import { useOrgSlug } from '@/stores/auth';
 import { qk } from './keys';
 
 /**
@@ -91,8 +92,10 @@ export function useRemoveProduct() {
  * quét cả bảng.
  */
 export function useListingReport(query: ReportQuery, enabled = true) {
+  // BE scope theo `X-Org-Slug` mà `http.ts` gắn sẵn: có org là bản của nhóm, không có là toàn sàn.
+  const orgSlug = useOrgSlug();
   return useQuery({
-    queryKey: qk.adminListingReport(query.granularity, query.from, query.to),
+    queryKey: qk.adminListingReport(orgSlug ?? '-', query.granularity, query.from, query.to),
     queryFn: () => adminSystemApi.getListingReport(query),
     staleTime: 5 * 60_000,
     enabled,
@@ -107,8 +110,9 @@ export function useListingReport(query: ReportQuery, enabled = true) {
  * chạy song song, một trong hai không ai nhìn.
  */
 export function useUserReport(query: ReportQuery, enabled = true) {
+  const orgSlug = useOrgSlug();
   return useQuery({
-    queryKey: qk.adminUserReport(query.granularity, query.from, query.to),
+    queryKey: qk.adminUserReport(orgSlug ?? '-', query.granularity, query.from, query.to),
     queryFn: () => adminSystemApi.getUserReport(query),
     staleTime: 5 * 60_000,
     enabled,

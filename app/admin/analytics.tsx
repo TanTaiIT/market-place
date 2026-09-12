@@ -4,11 +4,16 @@ import { AdminFilter, AdminPanel, AdminScreen } from '@/components/AdminScreen';
 import { ListingReportPanels, UserReportPanels } from '@/components/ReportPanels';
 import { EmptyState, Loading } from '@/components/ui';
 import { useListingReport, useUserReport } from '@/queries/admin-system';
+import { useMyGrants } from '@/queries/admin';
+import { isMaster } from '@/api/admin';
 import type { ReportGranularity } from '@/api/admin-system';
+import { useOrgSlug } from '@/stores/auth';
 import { C, F } from '@/theme';
 
 /**
- * Thống kê — KHUNG chứa nhiều báo cáo con, master-only.
+ * Thống kê — KHUNG chứa nhiều báo cáo con. Master không chọn org thấy cả sàn; quản trị nhóm
+ * (hoặc master đang đứng trong một org) thấy bản CỦA NHÓM — BE scope theo `X-Org-Slug`, màn này
+ * chỉ đổi nhãn cho đúng thứ đang đếm (thành viên vào nhóm, không phải tài khoản mới của sàn).
  *
  * Một màn thay vì mỗi báo cáo một mục menu: hai câu hỏi "tin đăng thế nào" và "người dùng thế
  * nào" luôn được hỏi cùng lúc và luôn cùng một khoảng thời gian. Tách ra thì người xem phải
@@ -36,6 +41,8 @@ const GRAINS = [
 export default function AdminAnalytics() {
   const [tab, setTab] = useState('listings');
   const [granularity, setGranularity] = useState<ReportGranularity>('day');
+  const master = isMaster(useMyGrants().data);
+  const orgScoped = Boolean(useOrgSlug());
 
   /*
    * Gọi CẢ HAI hook — quy tắc hook cấm gọi có điều kiện — và tắt cái không dùng bằng `enabled`.
@@ -55,7 +62,14 @@ export default function AdminAnalytics() {
   ) : null;
 
   return (
-    <AdminScreen title="Thống kê" note="xu hướng theo thời gian">
+    <AdminScreen
+      title="Thống kê"
+      note={orgScoped ? 'xu hướng của nhóm theo thời gian' : 'xu hướng theo thời gian'}
+      // Quản trị nhóm phải đứng trong một org (BE 403 nếu không); master thì tuỳ — không chọn là
+      // toàn sàn, chọn một org là xem bản của nhóm đó.
+      org={master ? 'optional' : true}
+      masterReadsAll
+    >
       <AdminFilter options={TABS} value={tab} onChange={setTab} />
       <AdminFilter
         options={GRAINS}
@@ -81,13 +95,22 @@ export default function AdminAnalytics() {
           )
         ) : users.data ? (
           users.data.totals.total === 0 ? (
-            <EmptyState icon="👥" onDark text="Chưa có tài khoản nào trong khoảng này" />
+            <EmptyState
+              icon="👥"
+              onDark
+              text={
+                orgScoped
+                  ? 'Chưa có thành viên nào vào nhóm trong khoảng này'
+                  : 'Chưa có tài khoản nào trong khoảng này'
+              }
+            />
           ) : (
             <UserReportPanels
               points={users.data.points}
               totals={users.data.totals}
               granularity={granularity}
               meta={meta}
+              orgScoped={orgScoped}
             />
           )
         ) : (

@@ -6,7 +6,8 @@ import {
   updateCategory,
 } from './generated';
 import type { Category as CategoryDto } from './generated';
-import { relativeTime, unwrap } from './client';
+import { PAGE_SIZE, relativeTime, unwrap, unwrapPage } from './client';
+import type { Page } from './client';
 import { withAuthRetry } from './http';
 
 /**
@@ -138,11 +139,11 @@ export const adminContentApi = {
    * nào, nên thông báo họ vừa gửi cho một nhóm không nằm trong hộp thư của họ — panel này sẽ
    * báo gửi xong rồi hiện một danh sách không có nó.
    */
-  async getNotices(): Promise<SentNotice[]> {
+  async getNotices(page: number): Promise<Page<SentNotice>> {
     const res = await withAuthRetry(() =>
-      notificationList({ query: { limit: 20, scope: 'managed' } }),
+      notificationList({ query: { page, limit: PAGE_SIZE, scope: 'managed' } }),
     );
-    return unwrap(res, 'Không tải được thông báo đã gửi').map((n) => ({
+    return unwrapPage(res, 'Không tải được thông báo đã gửi', (n) => ({
       id: n.id,
       title: n.title,
       unitId: n.unitId,

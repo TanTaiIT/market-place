@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { useJoinRequestQueue, useMyOrgs } from '@/queries/org';
 import { useOrgSlug } from '@/stores/auth';
 import { useProfile } from '@/queries/listings';
 import { Avatar } from './ui';
+import { AdminOrgPicker } from './AdminOrgPicker';
 import { C, F, shadow } from '@/theme';
 
 /**
@@ -27,7 +28,7 @@ type NavItem = {
   label: string;
   badge?: 'queue' | 'reports' | 'joins';
   /** Quyền BE đòi ở màn đó. Hiện mục mà người dùng chỉ có thể ăn 403 là hứa suông. */
-  gate?: 'master' | 'publicAxis' | 'anyAxis';
+  gate?: 'master' | 'publicAxis';
 };
 
 /**
@@ -41,7 +42,7 @@ type NavItem = {
  *
  * `org: true` = màn đọc `X-Org-Slug`, tức nội dung đổi theo tổ chức đang chọn.
  *
- * Nhóm 'Quyền' là ngoại lệ có chủ ý — nó cắt ngang cả hai trục, xem gate `anyAxis`.
+ * Nhóm 'Quyền' chỉ master thấy: hệ thống không còn cấp phó, quản trị nhóm không cấp quyền cho ai.
  */
 type NavGroup = {
   label: string;
@@ -71,7 +72,12 @@ const GROUPS: NavGroup[] = [
      */
     label: 'Tổng quan',
     gate: 'master',
-    items: [{ href: '/admin', icon: '▦', label: 'Toàn hệ thống' }],
+    items: [
+      { href: '/admin', icon: '▦', label: 'Toàn hệ thống' },
+      // Báo cáo về tin trục công khai rơi về master khi ô chưa có người phụ trách — cùng luật với
+      // hàng đợi duyệt. Nhóm 'Tổ chức' bên dưới cũng có mục này, nhưng master không thấy nhóm đó.
+      { href: '/admin/reports', icon: '⚑', label: 'Báo cáo', badge: 'reports' },
+    ],
   },
   {
     label: 'Tổ chức',
@@ -85,7 +91,9 @@ const GROUPS: NavGroup[] = [
       { href: '/admin/notice', icon: '◈', label: 'Gửi thông báo' },
       { href: '/admin/join-requests', icon: '✋', label: 'Đơn xin gia nhập', badge: 'joins' },
       { href: '/admin/members', icon: '👥', label: 'Thành viên' },
-      { href: '/admin/org-display', icon: '▦', label: 'Cách bày bảng tin' },
+      // Cùng màn Thống kê của master; BE scope theo `X-Org-Slug` nên quản trị nhóm chỉ thấy tin
+      // và thành viên của nhóm mình — không có gì của sàn lọt ra.
+      { href: '/admin/analytics', icon: '📊', label: 'Thống kê' },
     ],
   },
   {
@@ -105,15 +113,16 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: '/admin/public-overview', icon: '▦', label: 'Tổng quan trục' },
       { href: '/admin/public-queue', icon: '🌐', label: 'Hàng đợi công khai' },
+      // Báo cáo đóng dấu trục của TIN: người phụ trách ô thấy báo cáo về tin trong ô mình, ở cùng
+      // màn `/admin/reports` — BE tự dựng ô từ grant, không cần chọn tổ chức.
+      { href: '/admin/reports', icon: '⚑', label: 'Báo cáo', badge: 'reports' },
     ],
   },
   {
-    // Phân quyền cắt ngang cả hai trục: `canGrant` cho manager cấp staff TRONG scope của chính
-    // mình, kể cả scope (danh mục × tỉnh), còn `/role-grants/mine` thì ai có grant cũng đọc được.
-    // Treo nó trong nhóm org như trước là khoá manager danh mục ra khỏi màn duy nhất họ chia
-    // tải được — họ không thuộc tổ chức nào nên cả nhóm đó bị cắt.
+    // Chỉ master: hệ thống không còn cấp phó, quản trị nhóm không cấp được quyền cho ai nữa.
+    // Ở đây master đặt người phụ trách các ô trục công khai; quản trị NHÓM đặt ở màn Tổ chức.
     label: 'Quyền',
-    items: [{ href: '/admin/role-grants', icon: '🔑', label: 'Phân quyền', gate: 'anyAxis' }],
+    items: [{ href: '/admin/role-grants', icon: '🔑', label: 'Phân quyền', gate: 'master' }],
   },
   {
     // Không mục nào ở đây đọc `X-Org-Slug`: đổi tổ chức đang chọn không đổi một dòng nào.
@@ -150,19 +159,19 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const pathname = usePathname();
-  const { data: queue } = useAdminListings('pending');
-  const { data: reports } = useAdminReports();
+  // `total` của BE, không phải `data.length`: danh sách giờ tải 10 dòng một trang, đếm phần đã
+  // tải là badge dừng ở 10 trong khi hàng đợi có 40.
+  const { total: queueTotal } = useAdminListings('pending');
+  const { total: reportsTotal } = useAdminReports();
   const { data: profile } = useProfile();
   const { data: grants } = useMyGrants();
-  const { data: joins } = useJoinRequestQueue('pending');
+  const { total: joinsTotal } = useJoinRequestQueue('pending');
   const { data: myOrgs } = useMyOrgs();
   const activeSlug = useOrgSlug();
+  /** Ngăn chọn tổ chức mở từ dòng mồi của nhóm TỔ CHỨC — chỉ có ý nghĩa khi đã thuộc ≥2 nhóm. */
+  const [pickOrg, setPickOrg] = useState(false);
 
-  const counts = {
-    queue: queue?.length ?? 0,
-    reports: reports?.length ?? 0,
-    joins: joins?.length ?? 0,
-  };
+  const counts = { queue: queueTotal, reports: reportsTotal, joins: joinsTotal };
 
   const orgModerator = canModerateOrg(grants);
   const publicAxis = canModeratePublicAxis(grants);
@@ -171,8 +180,6 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
     master: isMaster(grants),
     publicAxis,
     orgModerator,
-    // Cửa của mục Phân quyền — xem nhóm 'Quyền' ở GROUPS: nó không thuộc riêng trục nào.
-    anyAxis: orgModerator || publicAxis,
   };
 
   /*
@@ -235,20 +242,41 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
 
               {/*
                 Chưa xác định được tổ chức thì cả tám mục dưới đây chỉ trả 403. Thay vì để người
-                dùng bấm từng cái để phát hiện ra điều đó, nói thẳng một dòng và đưa họ đi xin
-                vào một nhóm.
+                dùng bấm từng cái để phát hiện ra điều đó, nói thẳng một dòng — và dòng đó phải
+                nói ĐÚNG ca đang gặp, vì có hai ca khác hẳn nhau:
 
-                Chỉ còn MỘT lối: nhánh `master → /admin/organizations` đã bỏ vì nhóm này không
-                hiện với master nữa, nên điều kiện đó không bao giờ đúng.
+                - Thuộc ≥2 nhóm mà chưa chọn (quản trị hai trường, hoặc quản trị một trường và
+                  là thành viên trường khác): BE không tự suy ra được, họ cần CHỌN. Mở thẳng bộ
+                  chọn ngay trong ngăn kéo — chọn xong là tám mục hiện ra tại chỗ.
+                - Không thuộc nhóm nào: họ cần XIN VÀO một nhóm.
+
+                Bản trước gộp hai ca vào một dòng 'Chọn tổ chức để mở →' dẫn tới `/join-org` —
+                tức bảo một người đang quản trị hai trường đi xin mã tham gia. Đo trên tài khoản
+                thật: thành viên 3 nhóm, quản lý 2, và bàn quản trị của họ chỉ còn đúng hai mục.
               */}
               {group.org && !orgName ? (
-                <Pressable
-                  onPress={() => go('/join-org')}
-                  style={({ pressed }) => [styles.item, pressed && { opacity: 0.7 }]}
-                >
-                  <Text style={styles.itemIcon}>◇</Text>
-                  <Text style={[styles.itemLabel, { color: C.pin }]}>Chọn tổ chức để mở →</Text>
-                </Pressable>
+                /* `myOrgs` chưa về thì `mine` rỗng và nhánh dưới sẽ nói 'Tham gia một nhóm' với
+                   một người có ba nhóm — chờ một nhịp, đừng nói sai rồi sửa lại. */
+                myOrgs === undefined ? null : mine.length > 0 ? (
+                  <View style={styles.item}>
+                    <Text style={styles.itemIcon}>◇</Text>
+                    {/* Chip của bộ chọn LÀ dòng mồi: bấm vào mở ngăn chọn; chọn xong thì `orgName`
+                        có giá trị và nhánh này biến mất, nhường chỗ cho tám mục. */}
+                    <AdminOrgPicker
+                      open={pickOrg}
+                      onOpen={() => setPickOrg(true)}
+                      onClose={() => setPickOrg(false)}
+                    />
+                  </View>
+                ) : (
+                  <Pressable
+                    onPress={() => go('/join-org')}
+                    style={({ pressed }) => [styles.item, pressed && { opacity: 0.7 }]}
+                  >
+                    <Text style={styles.itemIcon}>◇</Text>
+                    <Text style={[styles.itemLabel, { color: C.pin }]}>Tham gia một nhóm →</Text>
+                  </Pressable>
+                )
               ) : (
                 group.items.map((item) => {
                   const on = item.href === pathname;

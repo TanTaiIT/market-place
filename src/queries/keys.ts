@@ -25,6 +25,11 @@ export const qk = {
   listingQuota: () => ['listings', 'quota'] as const,
   listing: (id: string) => ['listing', id] as const,
   /**
+   * Bản BÀN DUYỆT của một tin (mọi trạng thái, mọi trục). Khoá riêng: trộn với `listing(id)` là
+   * một tin đã ẩn "sống lại" trên màn người mua ngay sau khi quản trị vừa mở nó từ báo cáo.
+   */
+  modListing: (id: string) => ['listing', id, 'moderation'] as const,
+  /**
    * Bản CHÍNH CHỦ của một tin (mọi trạng thái) — khác `listing(id)` vốn là bản công khai.
    *
    * `id` đứng TRƯỚC 'mine' để `listing(id)` thành prefix của nó: mọi lượt invalidate sẵn có
@@ -44,6 +49,8 @@ export const qk = {
       'search',
       f.q,
       f.province ?? '',
+      f.ward ?? '',
+      f.orgSlug ?? '',
       f.categoryId ?? '',
       f.minPrice ?? '',
       f.maxPrice ?? '',
@@ -123,8 +130,9 @@ export const qk = {
    */
   adminOverview: (orgSlug: string) => ['admin', 'overview', orgSlug] as const,
   adminActivity: (orgSlug: string) => ['admin', 'activity', orgSlug] as const,
-  adminListings: (orgSlug: string, status: string) =>
-    ['admin', 'listings', orgSlug, status] as const,
+  /** `category`/`q` là bộ lọc SERVER của màn Tin đăng — một tổ hợp lọc là một danh sách trang riêng. */
+  adminListings: (orgSlug: string, status: string, category = 'all', q = '') =>
+    ['admin', 'listings', orgSlug, status, category, q] as const,
   adminPublicQueue: (status: string) => ['admin', 'public-queue', status] as const,
   adminCoverage: () => ['admin', 'coverage'] as const,
   adminPublicOverview: () => ['admin', 'public-overview'] as const,
@@ -161,11 +169,13 @@ export const qk = {
    * Báo cáo đăng tin. Cả ba tham số nằm trong key: đổi độ mịn hay đổi khoảng là HỎI BE MỘT CÂU
    * KHÁC, không phải lọc lại dữ liệu cũ — gộp chung một key sẽ hiện số của tháng lên trục ngày.
    */
-  adminListingReport: (granularity: string, from?: string, to?: string) =>
-    ['admin', 'listing-report', granularity, from ?? '', to ?? ''] as const,
+  // `orgSlug` đứng đầu: cùng độ mịn nhưng của HAI nhóm khác nhau (hoặc của cả sàn với master
+  // chưa chọn org) là hai báo cáo khác — đổi tổ chức xong mà vẫn hiện số cũ là số sai.
+  adminListingReport: (orgSlug: string, granularity: string, from?: string, to?: string) =>
+    ['admin', 'listing-report', orgSlug, granularity, from ?? '', to ?? ''] as const,
   /** Báo cáo con thứ hai — khoá RIÊNG, cùng khuôn tham số với báo cáo tin đăng. */
-  adminUserReport: (granularity: string, from?: string, to?: string) =>
-    ['admin', 'user-report', granularity, from ?? '', to ?? ''] as const,
+  adminUserReport: (orgSlug: string, granularity: string, from?: string, to?: string) =>
+    ['admin', 'user-report', orgSlug, granularity, from ?? '', to ?? ''] as const,
   /** Từ điển field dùng chung — nguồn của bộ chọn field khi soạn template. */
   fieldDefinitions: () => ['admin', 'field-definitions'] as const,
 };

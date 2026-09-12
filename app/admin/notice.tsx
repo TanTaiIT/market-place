@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { AdminPanel, AdminScreen } from '@/components/AdminScreen';
-import { Field, PinButton } from '@/components/ui';
+import { Field, PagedFooter, PinButton, nearEnd } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useSendNotice, useSentNotices } from '@/queries/admin-content';
 import { C, F, shadow } from '@/theme';
@@ -28,7 +28,7 @@ import { C, F, shadow } from '@/theme';
 export default function AdminNotice() {
   const toast = useToast();
   const send = useSendNotice();
-  const { data: sent } = useSentNotices();
+  const { data: sent, loadMore, isFetchingNextPage } = useSentNotices();
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -52,7 +52,13 @@ export default function AdminNotice() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.body}
+          keyboardShouldPersistTaps="handled"
+          // Panel "đã gửi" nằm dưới form trong cùng một ScrollView — tự dò đáy để tải trang sau.
+          onScroll={(e) => nearEnd(e) && loadMore()}
+          scrollEventThrottle={160}
+        >
           <AdminPanel title="Soạn thông báo">
             <View>
               <Field onDark label="Tiêu đề" value={title} onChangeText={setTitle} />
@@ -131,6 +137,7 @@ export default function AdminNotice() {
                 </View>
               ))}
             </AdminPanel>
+            <PagedFooter loading={isFetchingNextPage} onDark />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

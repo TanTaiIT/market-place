@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import { qk } from './keys';
+import { usePagedList } from './paged';
 
 /**
  * Hồ sơ công khai của người bán + tin họ đang bán.
@@ -23,9 +24,7 @@ export function useSellerProfile(id: string) {
 }
 
 export function useSellerListings(id: string) {
-  return useQuery({
-    queryKey: qk.sellerListings(id),
-    queryFn: () => api.getSellerListings(id),
+  return usePagedList(qk.sellerListings(id), (page) => api.getSellerListings(id, page), {
     enabled: id.length > 0,
   });
 }

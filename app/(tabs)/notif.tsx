@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { EmptyState, Loading, TabHeader } from '@/components/ui';
+import { EmptyState, Loading, PagedFooter, TabHeader } from '@/components/ui';
 import { GuestGate } from '@/components/GuestGate';
 import { useIsAuthenticated } from '@/stores/auth';
 import { useToast } from '@/components/Toast';
@@ -41,8 +41,6 @@ type Row =
       count: number;
       unread: boolean;
       time: string;
-      /** Dòng MỚI NHẤT của cụm — bấm vào nó là đánh dấu cả cụm đã đọc (xem `markRead` ở BE). */
-      newestId: string;
     };
 
 /** Khoá ngày theo giờ máy — chỉ để gom, không hiển thị nên không cần lo múi giờ hiển thị. */
@@ -88,8 +86,8 @@ function clusterNotifs(items: Notif[]): Row[] {
     if (done.has(key)) continue;
     done.add(key);
 
-    // `n` là phần tử ĐẦU của cụm trong danh sách đã sắp mới-nhất-trước, nên nó vừa quyết định
-    // vị trí của cụm vừa là dòng mới nhất — cái cần cho `markRead`.
+    // `n` là phần tử ĐẦU của cụm trong danh sách đã sắp mới-nhất-trước, nên nó quyết định vị
+    // trí của cụm và cho cụm mốc thời gian mới nhất.
     const members = items.filter((m) => m.actorName && clusterKey(m) === key);
     rows.push({
       kind: 'many',
@@ -99,7 +97,6 @@ function clusterNotifs(items: Notif[]): Row[] {
       count: members.length,
       unread: members.some((m) => m.unread),
       time: n.time,
-      newestId: n.id,
     });
   }
 
@@ -108,12 +105,89 @@ function clusterNotifs(items: Notif[]): Row[] {
 
 const clusterKey = (n: Notif) => `${n.orgId ?? '-'}|${dayOf(n.at)}`;
 
+/**
+ * Những dòng cần MỘT lượt PATCH để cả tập `unread` thành đã đọc.
+ *
+ * Dòng đích danh: mỗi dòng một PATCH — chúng chỉ vài cái mỗi tháng. Dòng tự động: MỘT PATCH cho
+ * mỗi nhóm, vào dòng mới nhất của nhóm đó (danh sách đã mới-nhất-trước) — BE đẩy mốc "đã xem"
+ * của cả nhóm lên tới thời điểm ấy (xem `markRead` ở BE), nên các dòng cũ hơn theo luôn.
+ */
+function markTargets(unread: Notif[]): string[] {
+  const orgs = new Set<string>();
+  return unread
+    .filter((n) => {
+      if (!n.actorName) return true;
+      const org = n.orgId ?? '-';
+      if (orgs.has(org)) return false;
+      orgs.add(org);
+      return true;
+    })
+    .map((n) => n.id);
+}
+
+/**
+ * Vào tab là ĐÃ XEM HẾT — không phải chạm từng dòng.
+ *
+ * Đây là hộp thư "lướt qua": người dùng mở tab, đọc lướt tiêu đề, xong. Bắt họ chạm từng dòng
+ * để tắt chấm là mô hình email, không phải mô hình thông báo — kết quả thật là chấm đỏ trên
+ * thanh tab không bao giờ tắt, và người dùng thôi để ý tới nó.
+ *
+ * Hai việc, cố ý tách nhau:
+ *
+ * 1. GHI với BE ngay khi tab có focus, và lại mỗi khi có dòng chưa đọc MỚI tới trong lúc đang
+ *    mở. Huy hiệu trên thanh tab tắt ngay nhờ bản lạc quan của `useMarkNotificationRead`.
+ * 2. CHẤM trên dòng giữ tới khi RỜI tab. Tắt hết ngay lúc mở là xoá luôn câu trả lời cho "cái
+ *    nào mới?" — thứ duy nhất người ta vào đây để biết. `fresh` là ảnh chụp những dòng chưa đọc
+ *    lúc mở (cộng dòng mới tới trong lúc mở); rời tab thì xoá, lần sau vào là sạch.
+ *
+ * `fresh` cũng là cái chặn vòng lặp: mutation hỏng → rollback → dòng lại "chưa đọc" → effect
+ * chạy lại, nhưng dòng đã nằm trong `fresh` thì không thử lại. Mỗi dòng một lần cho mỗi lần
+ * focus, và lỗi báo MỘT toast — không phải một toast cho mỗi PATCH song song.
+ */
+function useSeenOnFocus(data: Notif[] | undefined): Set<string> {
+  const { mutate } = useMarkNotificationRead();
+  const toast = useToast();
+  const [focused, setFocused] = useState(false);
+  const [fresh, setFresh] = useState<Set<string>>(() => new Set());
+  // Ref, không state: chỉ để chặn toast thứ hai, không có gì cần vẽ lại.
+  const warned = useRef(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      setFocused(true);
+      return () => {
+        setFocused(false);
+        setFresh(new Set());
+        warned.current = false;
+      };
+    }, []),
+  );
+
+  useEffect(() => {
+    if (!focused || !data) return;
+    const unread = data.filter((n) => n.unread && !fresh.has(n.id));
+    if (unread.length === 0) return;
+
+    setFresh((prev) => new Set([...prev, ...unread.map((n) => n.id)]));
+    for (const id of markTargets(unread)) {
+      mutate(id, {
+        onError: (e: Error) => {
+          if (warned.current) return;
+          warned.current = true;
+          toast(`⚠️ ${e.message}`);
+        },
+      });
+    }
+  }, [focused, data, fresh, mutate, toast]);
+
+  return fresh;
+}
+
 export default function Notifications() {
   const router = useRouter();
-  const { data, error, isLoading, refetch } = useNotifications();
+  const { data, error, isLoading, refetch, loadMore, isFetchingNextPage } = useNotifications();
   const { data: myOrgs } = useMyOrgs();
-  const markRead = useMarkNotificationRead();
-  const toast = useToast();
+  const fresh = useSeenOnFocus(data);
 
   const isAuthenticated = useIsAuthenticated();
 
@@ -127,14 +201,12 @@ export default function Notifications() {
     );
   }
 
-  const rows = clusterNotifs(data ?? []);
+  // Chấm trên dòng = "mới kể từ lần xem trước" theo ảnh chụp `fresh`, không theo `unread` sống:
+  // server đã được ghi "đã đọc" ngay lúc mở tab, mà chấm thì phải sống tới khi rời tab.
+  const rows = clusterNotifs(
+    (data ?? []).map((n) => ({ ...n, unread: n.unread || fresh.has(n.id) })),
+  );
   const orgById = new Map((myOrgs ?? []).map((o) => [o.id, o]));
-
-  /** Đánh dấu đã đọc rồi mới đi — thứ tự đó để chấm chưa-đọc tắt ngay cả khi điều hướng chậm. */
-  const open = (id: string, unread: boolean, go?: () => void) => {
-    if (unread) markRead.mutate(id, { onError: (e: Error) => toast(`⚠️ ${e.message}`) });
-    go?.();
-  };
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -142,6 +214,9 @@ export default function Notifications() {
       <FlatList
         data={rows}
         keyExtractor={(r) => r.key}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={<PagedFooter loading={isFetchingNextPage} />}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, gap: 10 }}
         renderItem={({ item, index }) => (
           <Animated.View entering={FadeInDown.delay(Math.min(index, 6) * 70).duration(340)}>
@@ -156,7 +231,7 @@ export default function Notifications() {
                 unread={item.unread}
                 onPress={() => {
                   const slug = orgById.get(item.orgId ?? '')?.slug;
-                  open(item.newestId, item.unread, slug ? () => router.push(`/org/${slug}`) : undefined);
+                  if (slug) router.push(`/org/${slug}`);
                 }}
               />
             ) : (
@@ -180,7 +255,7 @@ export default function Notifications() {
                 unread={item.notif.unread}
                 onPress={() => {
                   const id = item.notif.listingId;
-                  open(item.notif.id, item.notif.unread, id ? () => router.push(`/listing/${id}`) : undefined);
+                  if (id) router.push(`/listing/${id}`);
                 }}
               />
             )}
@@ -237,9 +312,8 @@ function Row({
 }) {
   return (
     <Pressable
-      // Chạm để đánh dấu đã đọc. Không tự đánh dấu khi dòng lọt vào khung nhìn: cuộn lướt qua
-      // không phải là đã đọc, và chấm chưa đọc là thứ duy nhất giúp người dùng tìm lại thông
-      // báo họ định xem sau.
+      // Chạm là ĐI (mở tin / mở nhóm), không còn là "đánh dấu đã đọc" — vào tab đã là đã xem
+      // hết (xem `useSeenOnFocus`). Chấm bên phải = "mới kể từ lần xem trước", giữ tới khi rời tab.
       onPress={onPress}
       style={({ pressed }) => [styles.item, pressed && { opacity: 0.85 }]}
     >

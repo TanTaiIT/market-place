@@ -2,7 +2,7 @@ import React from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AdminScreen } from '@/components/AdminScreen';
 import { AdminSmallBtn } from '@/components/AdminPicker';
-import { Avatar, EmptyState, Loading } from '@/components/ui';
+import { Avatar, EmptyState, Loading, PagedFooter, nearEnd } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { initialsOf } from '@/api/client';
 import { useOrgRoster, useRemoveMember } from '@/queries/org';
@@ -54,7 +54,12 @@ export default function AdminMembers() {
 
   return (
     <AdminScreen title="Thành viên" note="ai đang ở trong nhóm" org>
-      <ScrollView contentContainerStyle={styles.body}>
+      <ScrollView
+        contentContainerStyle={styles.body}
+        // Danh bạ vẽ bằng `map` trong ScrollView — tự dò đáy để tải trang sau (BE 10 người/trang).
+        onScroll={(e) => nearEnd(e) && roster.loadMore()}
+        scrollEventThrottle={160}
+      >
         {roster.isLoading ? (
           <Loading onDark />
         ) : roster.members.length === 0 ? (
@@ -83,6 +88,8 @@ export default function AdminMembers() {
             ))}
           </View>
         )}
+
+        <PagedFooter loading={roster.isFetchingNextPage} onDark />
 
         <Text style={styles.note}>
           Đây là danh bạ, không phải phân quyền. Ai duyệt được tin hay sửa được nhóm nằm ở màn

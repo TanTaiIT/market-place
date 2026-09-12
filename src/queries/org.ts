@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { orgApi } from '@/api/org';
 import type { JoinRequestStatus } from '@/api/org';
 import { useEffect } from 'react';
@@ -6,6 +6,7 @@ import { useIsAuthenticated, useOrgSlug, useSetActiveOrg } from '@/stores/auth';
 import { canModerateOrg } from '@/api/admin';
 import { useMyGrants } from './admin';
 import { qk } from './keys';
+import { usePagedList } from './paged';
 
 /** Độ dài tối thiểu của mã tham gia theo schema BE — gõ ngắn hơn thì chắc chắn 400. */
 const MIN_CODE_CHARS = 4;
@@ -116,15 +117,17 @@ export function useJoinRequestQueue(status?: JoinRequestStatus) {
   const orgSlug = useOrgSlug();
   const { data: grants } = useMyGrants();
 
-  return useQuery({
-    queryKey: qk.joinRequestQueue(orgSlug ?? '-', status ?? 'all'),
-    queryFn: () => orgApi.joinRequests(status),
-    // Chặn bằng grant chứ không chỉ bằng org: `AdminNav` gọi hook này để lấy con số badge cho
-    // MỌI người mở ngăn kéo, mà manager danh mục (grant `category_province`) tuy là thành viên
-    // org vẫn ăn 403 ở endpoint này — một request hỏng mỗi lần mở ngăn kéo.
-    enabled: Boolean(orgSlug) && canModerateOrg(grants),
-    placeholderData: keepPreviousData,
-  });
+  return usePagedList(
+    qk.joinRequestQueue(orgSlug ?? '-', status ?? 'all'),
+    (page) => orgApi.joinRequests(status, page),
+    {
+      // Chặn bằng grant chứ không chỉ bằng org: `AdminNav` gọi hook này để lấy con số badge cho
+      // MỌI người mở ngăn kéo, mà manager danh mục (grant `category_province`) tuy là thành viên
+      // org vẫn ăn 403 ở endpoint này — một request hỏng mỗi lần mở ngăn kéo.
+      enabled: Boolean(orgSlug) && canModerateOrg(grants),
+      keepPrevious: true,
+    },
+  );
 }
 
 /**
@@ -160,11 +163,11 @@ export function useOrgRoster() {
   const orgSlug = useOrgSlug();
   const { data: grants } = useMyGrants();
 
-  const query = useQuery({
-    queryKey: qk.orgMembers(orgSlug ?? '-'),
-    queryFn: orgApi.members,
+  const query = usePagedList(qk.orgMembers(orgSlug ?? '-'), orgApi.members, {
     enabled: Boolean(orgSlug) && canModerateOrg(grants),
     staleTime: 5 * 60_000,
+    // Danh bạ không có `id` — khoá là `userId`.
+    keyOf: (m) => m.userId,
   });
 
   return { ...query, members: query.data ?? [] };

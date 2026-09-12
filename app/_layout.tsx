@@ -24,7 +24,8 @@ import { BootSplash } from '@/components/BootSplash';
 import { ErrorScreen } from '@/components/ErrorScreen';
 import { ToastProvider } from '@/components/Toast';
 import { useSyncAccessToken, useValidateSession } from '@/queries/auth';
-import { useChatSocket } from '@/queries/chat';
+import { useChatSocket, useInboxSignal } from '@/queries/chat';
+import { useNotifSignal } from '@/queries/notifications';
 import { useAuthHydrated, useIsAuthenticated, useOrgSlug } from '@/stores/auth';
 import { C } from '@/theme';
 
@@ -85,6 +86,17 @@ export default function RootLayout() {
   useValidateSession(queryClient);
   // Mở kết nối realtime theo phiên. Effect nên nó chạy sau khi token đã được đẩy xuống ở trên.
   useChatSocket();
+  /*
+   * Tín hiệu 'có tin nhắn mới' khi người dùng đang ở màn khác.
+   *
+   * Phải ở ĐÂY chứ không trong màn chat: đặt trong màn chat thì nó chết ngay khi người dùng
+   * rời màn đó — tức đúng lúc cần nó nhất. Nó chỉ quét lại `conversations()`, mà chấm chưa đọc
+   * trên tab Tin nhắn vốn đã đọc từ đúng query đó, nên badge tự sáng không cần thêm state nào.
+   */
+  useInboxSignal(queryClient);
+  // Đối xứng cho hộp thư thông báo. Hiệu ứng lắc chuông KHÔNG ở đây mà ở `TabBar` — nó thuộc
+  // về cái chuông, còn hook này phải sống cả khi thanh tab không hiển thị.
+  useNotifSignal(queryClient);
 
   const [splashDone, setSplashDone] = useState(false);
   const finishSplash = useCallback(() => setSplashDone(true), []);

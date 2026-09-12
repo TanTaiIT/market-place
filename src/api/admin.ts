@@ -15,7 +15,8 @@ import {
 } from './generated';
 import type { Listing as ListingDto, RerouteListing, RoleGrant } from './generated';
 import { reportKindLabel } from './report';
-import { formatPrice, gradOf, initialsOf, relativeTime, unwrap } from './client';
+import { PAGE_SIZE, formatPrice, gradOf, initialsOf, relativeTime, unwrap, unwrapPage } from './client';
+import type { Page } from './client';
 import { withAuthRetry } from './http';
 import type { Grad } from '@/theme';
 
@@ -69,6 +70,9 @@ export type ModListing = {
 export type Report = {
   id: string;
   urgent: boolean;
+  /** Để bấm vào xem ĐỐI TƯỢNG bị tố — tin thì mở qua cửa bàn duyệt, người thì mở hồ sơ công khai. */
+  targetType: 'listing' | 'user';
+  targetId: string;
   target: string;
   kind: string;
   by: string;
@@ -192,7 +196,7 @@ export const adminApi = {
     };
   },
   async getEvents(): Promise<AdminEvent[]> {
-    const res = await withAuthRetry(() => moderationActivity({ query: { limit: 20 } }));
+    const res = await withAuthRetry(() => moderationActivity({ query: { limit: PAGE_SIZE } }));
     return unwrap(res, 'Không tải được dòng hoạt động').map((log) => ({
       id: log.id,
       tone: EVENT_TONE[log.action] ?? 'info',
@@ -208,11 +212,21 @@ export const adminApi = {
   async getListings(
     status: ModStatus | undefined,
     categoryNames: Map<string, string>,
-  ): Promise<ModListing[]> {
+    page: number,
+    filter: { category?: string; q?: string } = {},
+  ): Promise<Page<ModListing>> {
     const res = await withAuthRetry(() =>
-      moderationListings({ query: { status, limit: 100 } }),
+      moderationListings({
+        query: {
+          status,
+          category: filter.category,
+          q: filter.q?.trim() || undefined,
+          page,
+          limit: PAGE_SIZE,
+        },
+      }),
     );
-    return unwrap(res, 'Không tải được tin đăng').map((l) => toModListing(l, categoryNames));
+    return unwrapPage(res, 'Không tải được tin đăng', (l) => toModListing(l, categoryNames));
   },
 
   /**
@@ -223,9 +237,12 @@ export const adminApi = {
   async getPublicQueue(
     status: ModStatus | undefined,
     categoryNames: Map<string, string>,
-  ): Promise<ModListing[]> {
-    const res = await withAuthRetry(() => moderationPublicQueue({ query: { status, limit: 100 } }));
-    return unwrap(res, 'Không tải được hàng đợi công khai').map((l) =>
+    page: number,
+  ): Promise<Page<ModListing>> {
+    const res = await withAuthRetry(() =>
+      moderationPublicQueue({ query: { status, page, limit: PAGE_SIZE } }),
+    );
+    return unwrapPage(res, 'Không tải được hàng đợi công khai', (l) =>
       toModListing(l, categoryNames),
     );
   },
@@ -250,12 +267,16 @@ export const adminApi = {
     return unwrap(res, 'Không chuyển được tin sang ô khác');
   },
 
-  async getReports(): Promise<Report[]> {
-    const res = await withAuthRetry(() => reportList({ query: { status: 'open', limit: 50 } }));
-    return unwrap(res, 'Không tải được báo cáo').map((r) => ({
+  async getReports(page: number): Promise<Page<Report>> {
+    const res = await withAuthRetry(() =>
+      reportList({ query: { status: 'open', page, limit: PAGE_SIZE } }),
+    );
+    return unwrapPage(res, 'Không tải được báo cáo', (r) => ({
       id: r.id,
       // "Nghi lừa đảo" là loại nặng nhất — viền đỏ, xếp trước.
       urgent: r.kind === 'scam',
+      targetType: r.targetType,
+      targetId: r.targetId,
       target: r.targetTitle,
       // Nhãn lấy từ `report.ts` — cùng bản với ngăn người dùng chọn lúc gửi (xem file đó).
       kind: reportKindLabel(r.kind),

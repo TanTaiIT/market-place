@@ -3,7 +3,7 @@ import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AdminListingRow, RowAction } from '@/components/AdminListingRow';
 import { AdminListingSheet } from '@/components/AdminListingSheet';
 import { AdminFilter, AdminScreen } from '@/components/AdminScreen';
-import { EmptyState, Loading } from '@/components/ui';
+import { EmptyState, Loading, PagedFooter } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import {
   useAdminListings,
@@ -32,7 +32,10 @@ export default function AdminListings() {
   const [sheet, setSheet] = useState<ModListing | null>(null);
 
   const { data: categories } = useCategories();
-  const { data, error, isLoading } = useAdminListings();
+  const { data, error, isLoading, loadMore, isFetchingNextPage, total } = useAdminListings(
+    undefined,
+    { category: cat === 'all' ? undefined : cat, q: term },
+  );
   const setStatus = useSetListingStatus();
   const remove = useRemoveModListing();
   const bump = useBumpListing();
@@ -46,22 +49,15 @@ export default function AdminListings() {
   const { id: activeOrgId } = useActiveOrg();
   const canBump = canAdminOrg(grants, activeOrgId);
 
-  const all = data ?? [];
-  const q = term.trim().toLowerCase();
-  const rows = all.filter(
-    (l) =>
-      (cat === 'all' || l.cat === cat) &&
-      // Tìm cả tên người đăng: quản trị thường lần theo một người bán đáng ngờ chứ không nhớ
-      // chính xác tiêu đề của tin.
-      (!q || l.title.toLowerCase().includes(q) || l.seller.toLowerCase().includes(q)),
-  );
+  /*
+   * Lọc ở SERVER (danh mục + từ khoá, BE khớp cả tên người đăng). Danh sách đã phân trang: lọc ở
+   * client trên 10 dòng vừa về là danh sách ngắn hơn màn hình → `onEndReached` bắn liên tiếp, kéo
+   * hết mọi trang về chỉ để tìm vài dòng. Đếm theo danh mục cũng bỏ — đếm phần đã tải là số sai.
+   */
+  const rows = data ?? [];
   const catOptions = [
-    { value: 'all', label: 'Mọi danh mục', count: all.length },
-    ...(categories ?? []).map((c) => ({
-      value: c.name,
-      label: c.name,
-      count: all.filter((l) => l.cat === c.name).length,
-    })),
+    { value: 'all', label: 'Mọi danh mục' },
+    ...(categories ?? []).map((c) => ({ value: c.id, label: c.name })),
   ];
 
   const act = (done: string) => ({
@@ -90,7 +86,7 @@ export default function AdminListings() {
           style={styles.searchInput}
           returnKeyType="search"
         />
-        {!!q && <Text style={styles.searchCount}>{rows.length}</Text>}
+        {!!term.trim() && <Text style={styles.searchCount}>{total}</Text>}
       </View>
 
       <AdminFilter options={catOptions} value={cat} onChange={setCat} />
@@ -98,6 +94,9 @@ export default function AdminListings() {
       <FlatList
         data={rows}
         keyExtractor={(l) => l.id}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={<PagedFooter loading={isFetchingNextPage} onDark />}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => (
@@ -128,7 +127,7 @@ export default function AdminListings() {
             <EmptyState
               icon="📌"
               onDark
-              text={q ? `Không tìm thấy "${term.trim()}"` : 'Chưa có tin nào khớp bộ lọc'}
+              text={term.trim() ? `Không tìm thấy "${term.trim()}"` : 'Chưa có tin nào khớp bộ lọc'}
             />
           )
         }

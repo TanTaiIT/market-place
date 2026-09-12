@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NoteCard } from '@/components/NoteCard';
 import { ReportButton } from '@/components/ReportButton';
-import { Avatar, EmptyState, Loading, ScreenHeader } from '@/components/ui';
+import { Avatar, EmptyState, Loading, PagedFooter, ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useSellerListings, useSellerProfile } from '@/queries/users';
 import { useCreateReport } from '@/queries/report';
@@ -52,6 +52,9 @@ export default function SellerProfile() {
       <FlatList
         data={listings.data ?? []}
         keyExtractor={(item) => item.id}
+        onEndReached={listings.loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={<PagedFooter loading={listings.isFetchingNextPage} />}
         numColumns={2}
         columnWrapperStyle={{ gap: 14 }}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}

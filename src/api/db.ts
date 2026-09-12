@@ -64,9 +64,16 @@ export type Listing = {
    * BỐN trạng thái, không phải hai: tin hết hạn và tin đã bán là hai câu trả lời KHÁC nhau mà
    * chủ tin phải phân biệt được ("gia hạn đi" vs "xong rồi"). 4 trạng thái BE còn lại
    * (`draft`/`rejected`/`hidden`/`pending_unverified`) vẫn gộp về `pending` — với người bán
-   * chúng đều là "chưa lên bảng".
+   * chúng đều là "chưa lên bảng" và không có nút nào để bấm. Phân biệt chờ / bị từ chối / bị ẩn,
+   * kèm LÝ DO, nằm ở `review` — `status` chỉ trả lời "có hành động gì".
    */
   status: 'live' | 'pending' | 'expired' | 'sold';
+  /**
+   * Vì sao tin chưa lên bảng. Chỉ có ở tin CỦA MÌNH đọc qua `/listings/mine*`, và chỉ khi có gì
+   * cần nói (chờ duyệt / bị từ chối / bị ẩn) — tin đang hiện, đã bán, hết hạn thì vắng. BE đã
+   * dịch mã máy thành câu, app hiện nguyên văn: câu chữ khớp với lời người duyệt ở bàn quản trị.
+   */
+  review?: ListingReview;
   /**
    * Mốc hết hạn hiển thị, ISO. Vắng ở tin đăng trước ngày có hạn — màn nào đọc nó phải chịu
    * được `undefined` chứ không hiện "Invalid Date".
@@ -85,6 +92,15 @@ export type Listing = {
    * tên trong danh sách của mình. Tra không ra thì giấu dòng đó đi, không bịa.
    */
   organizationId: string | null;
+};
+
+/** Lời BE soạn cho chính chủ về tin chưa lên bảng. `hint` = việc họ làm được ngay, nếu có. */
+export type ListingReview = {
+  state: 'pending' | 'rejected' | 'hidden';
+  /** Nhãn huy hiệu — "Chờ duyệt" / "Bị từ chối" / "Đã ẩn". */
+  title: string;
+  message: string;
+  hint?: string;
 };
 
 /**
@@ -305,6 +321,20 @@ export type ListingAttributes = Record<string, string | number | boolean | strin
 export type SearchFilter = {
   q: string;
   province: ProvinceName | null;
+  /**
+   * Tầng dưới của `province`, tuỳ chọn. Không bao giờ có nghĩa khi `province` là `null`: BE trả
+   * 400 cho xã trần (tên xã lặp giữa các tỉnh), nên đổi hay bỏ tỉnh phải kéo xã về `null` cùng lúc.
+   */
+  ward: string | null;
+  /**
+   * Thu hẹp về tin NỘI BỘ của một nhóm mình đã tham gia. Giữ slug chứ không id: `X-Org-Slug`
+   * nhận slug, và URL kết quả đọc được bằng mắt.
+   *
+   * Cùng luật với `ward`: chỉ có nghĩa khi có `province`. Danh sách nhóm để chọn được bày theo
+   * tỉnh đang lọc (nhóm có địa bàn), nên bỏ hay đổi tỉnh là nhóm về `null` cùng lúc — không có
+   * bộ lọc nào đang bật mà ngăn lọc lại không bày ra được.
+   */
+  orgSlug: string | null;
   categoryId: string | null;
   minPrice: number | null;
   maxPrice: number | null;
@@ -327,6 +357,8 @@ export type ListingAttrFilter = Record<
 export const EMPTY_SEARCH: SearchFilter = {
   q: '',
   province: null,
+  ward: null,
+  orgSlug: null,
   categoryId: null,
   minPrice: null,
   maxPrice: null,
@@ -341,15 +373,33 @@ export const EMPTY_SEARCH: SearchFilter = {
 export const hasSearchCriteria = (f: SearchFilter): boolean =>
   f.q.trim().length > 0 ||
   f.province !== null ||
+  f.ward !== null ||
+  f.orgSlug !== null ||
   f.categoryId !== null ||
   f.minPrice !== null ||
   f.maxPrice !== null ||
   Object.keys(f.attrs).length > 0;
 
+/**
+ * Đã chọn nhóm thì tỉnh/xã KHÔNG lọc lên tin — chúng chỉ còn là ngữ cảnh để bày danh sách nhóm.
+ *
+ * Tin trong nhóm nằm ở tỉnh của NGƯỜI ĐĂNG, không phải tỉnh của nhóm: nhóm "kings" đặt ở Lâm
+ * Đồng nhưng tin của nó đăng từ Hồ Chí Minh. Gửi cả `province` của nhóm lẫn `X-Org-Slug` là
+ * lấy giao của hai tập gần như rời nhau — đúng ca "chọn nhóm rồi tìm mà không ra tin nào".
+ *
+ * Ba nơi cùng hỏi hàm này — request, số bộ lọc đang bật, hàng chip ở trang kết quả — để thứ
+ * hiện ra luôn đúng là thứ đã lọc, không có chip "📍 Lâm Đồng" đứng cạnh một kết quả toàn HCM.
+ */
+export const locationApplies = (f: SearchFilter): boolean => f.orgSlug === null;
+
 /** Số bộ lọc đang bật, KHÔNG tính từ khoá — nó có ô riêng, không nằm trong ngăn lọc. */
-export const activeFilterCount = (f: SearchFilter): number =>
-  [f.province, f.categoryId, f.minPrice, f.maxPrice].filter((v) => v !== null).length +
-  Object.keys(f.attrs).length;
+export const activeFilterCount = (f: SearchFilter): number => {
+  const location = locationApplies(f) ? [f.province, f.ward] : [];
+  return (
+    [...location, f.orgSlug, f.categoryId, f.minPrice, f.maxPrice].filter((v) => v !== null).length +
+    Object.keys(f.attrs).length
+  );
+};
 
 const trimTenth = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
 
@@ -393,6 +443,8 @@ export function searchToParams(f: SearchFilter): Record<string, string> {
   const p: Record<string, string> = {};
   if (f.q.trim()) p.q = f.q.trim();
   if (f.province) p.province = f.province;
+  if (f.province && f.ward) p.ward = f.ward;
+  if (f.province && f.orgSlug) p.org = f.orgSlug;
   if (f.categoryId) p.categoryId = f.categoryId;
   if (f.minPrice !== null) p.minPrice = String(f.minPrice);
   if (f.maxPrice !== null) p.maxPrice = String(f.maxPrice);
@@ -427,9 +479,14 @@ export function paramsToSearch(p: Record<string, string | string[] | undefined>)
     }
   }
 
+  const province = (oneParam(p.province) as ProvinceName | undefined) ?? null;
   return {
     q: oneParam(p.q) ?? '',
-    province: (oneParam(p.province) as ProvinceName | undefined) ?? null,
+    province,
+    // Xã trần (URL dán tay, thiếu tỉnh) bị bỏ: BE trả 400 cho nó, mà trang kết quả trắng vì một
+    // param lẻ thì không ai đoán được vì sao — phần còn lại của bộ lọc vẫn dùng được.
+    ward: province ? (oneParam(p.ward) ?? null) : null,
+    orgSlug: province ? (oneParam(p.org) ?? null) : null,
     categoryId: oneParam(p.categoryId) ?? null,
     minPrice: num(p.minPrice),
     maxPrice: num(p.maxPrice),

@@ -41,7 +41,9 @@ export function AvatarPicker({
       // mất hai đầu mà người dùng không kiểm soát được cắt chỗ nào.
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.7,
+      // 1, không phải 0.7: bản cắt là một lần encode bắt buộc, nhưng `prepare` (cloudinary.ts)
+      // còn encode lần cuối — để lần này gần không mất gì thì ảnh chỉ xuống chất lượng đúng một lần.
+      quality: 1,
     });
     if (res.canceled) return;
 

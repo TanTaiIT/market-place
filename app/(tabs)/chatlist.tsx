@@ -3,7 +3,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Avatar, EmptyState, Loading, TabHeader } from '@/components/ui';
+import { Avatar, EmptyState, Loading, PagedFooter, TabHeader } from '@/components/ui';
 import { GuestGate } from '@/components/GuestGate';
 import { ListingPhoto } from '@/components/ListingPhoto';
 import { useIsAuthenticated } from '@/stores/auth';
@@ -13,7 +13,7 @@ import { C, F, shadow } from '@/theme';
 
 export default function ChatList() {
   const router = useRouter();
-  const { data, error, isLoading, refetch } = useConversations();
+  const { data, error, isLoading, refetch, loadMore, isFetchingNextPage } = useConversations();
 
   const isAuthenticated = useIsAuthenticated();
 
@@ -33,6 +33,9 @@ export default function ChatList() {
       <FlatList
         data={data ?? []}
         keyExtractor={(c) => c.id}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={<PagedFooter loading={isFetchingNextPage} />}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, gap: 10 }}
         renderItem={({ item, index }) => (
           <Animated.View entering={FadeInDown.delay(index * 70).duration(340)}>

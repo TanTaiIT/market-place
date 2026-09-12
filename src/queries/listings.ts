@@ -8,6 +8,7 @@ import { api } from '@/api/client';
 import type { Listing, Profile, SearchFilter } from '@/api/db';
 import { useIsAuthenticated } from '@/stores/auth';
 import { qk } from './keys';
+import { mapPages, usePagedList, type PagedCache } from './paged';
 
 /**
  * Từ điển danh mục. `staleTime` dài vì nó gần như không đổi — mỗi lần mở bảng tin lại gọi
@@ -31,10 +32,14 @@ export function useListings(categoryId = '') {
   });
 }
 
-export function useListing(id: string) {
+/**
+ * `viaModeration`: mở tin qua cửa bàn duyệt — từ hàng đợi báo cáo, để xem tin bị tố kể cả khi nó đã
+ * ẩn / chờ duyệt hoặc thuộc org mình không đứng trong. Người thường không có cờ này (BE trả 403).
+ */
+export function useListing(id: string, viaModeration = false) {
   return useQuery({
-    queryKey: qk.listing(id),
-    queryFn: () => api.getListing(id),
+    queryKey: viaModeration ? qk.modListing(id) : qk.listing(id),
+    queryFn: () => (viaModeration ? api.getListingForModeration(id) : api.getListing(id)),
     // Route param có thể rỗng lúc màn hình mới mount, và ObjectId của BE là 24 hex.
     enabled: id.length > 0,
   });
@@ -90,15 +95,13 @@ export function useListingSuggestions(current: Listing | undefined) {
  * tới — người dùng thấy màn kết quả trống vĩnh viễn mà không có lỗi nào.
  */
 export function useSearch(filter: SearchFilter) {
-  return useQuery({
-    queryKey: qk.search(filter),
-    queryFn: () => api.searchListings(filter),
-    placeholderData: keepPreviousData,
+  return usePagedList(qk.search(filter), (page) => api.searchListings(filter, page), {
+    keepPrevious: true,
   });
 }
 
 export function useMyListings() {
-  return useQuery({ queryKey: qk.myListings(), queryFn: api.getMyListings });
+  return usePagedList(qk.myListings(), api.getMyListings);
 }
 
 /**
@@ -116,11 +119,7 @@ export function useSavedIds() {
 
 export function useSavedListings() {
   const isAuthenticated = useIsAuthenticated();
-  return useQuery({
-    queryKey: qk.savedListings(),
-    queryFn: api.getSavedListings,
-    enabled: isAuthenticated,
-  });
+  return usePagedList(qk.savedListings(), api.getSavedListings, { enabled: isAuthenticated });
 }
 
 export function useProfile() {
@@ -225,8 +224,10 @@ export function useDeleteListing() {
     mutationFn: (id: string) => api.deleteListing(id),
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: qk.myListings() });
-      const prev = qc.getQueryData<Listing[]>(qk.myListings());
-      qc.setQueryData<Listing[]>(qk.myListings(), (old) => (old ?? []).filter((l) => l.id !== id));
+      const prev = qc.getQueryData<PagedCache<Listing>>(qk.myListings());
+      qc.setQueryData<PagedCache<Listing>>(qk.myListings(), (old) =>
+        mapPages(old, (items) => items.filter((l) => l.id !== id)),
+      );
       return { prev };
     },
     onError: (_e, _id, ctx) => {

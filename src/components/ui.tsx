@@ -7,6 +7,8 @@ import {
   Text,
   TextInput,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   type TextInputProps,
   type ViewStyle,
 } from 'react-native';
@@ -236,6 +238,24 @@ export function Loading({ onDark }: { onDark?: boolean }) {
       <ActivityIndicator color={onDark ? C.paperWarm : C.pin} />
     </View>
   );
+}
+
+/**
+ * Chân danh sách cuộn-tới-đâu-tải-tới-đó: chỉ hiện vòng xoay khi ĐANG tải trang sau. Không hiện
+ * "đã hết" — hết thì danh sách dừng, một dòng chữ nói điều đó là nhiễu ở mọi màn.
+ */
+export function PagedFooter({ loading, onDark }: { loading: boolean; onDark?: boolean }) {
+  return loading ? <Loading onDark={onDark} /> : null;
+}
+
+/**
+ * `onScroll` của `ScrollView` — còn cách đáy dưới `px` thì coi là chạm đáy. Cho hai màn quản trị
+ * vẽ danh sách bằng `map` trong `ScrollView` (có form phía trên), nơi `FlatList.onEndReached`
+ * không có sẵn.
+ */
+export function nearEnd(e: NativeSyntheticEvent<NativeScrollEvent>, px = 240): boolean {
+  const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+  return contentOffset.y + layoutMeasurement.height >= contentSize.height - px;
 }
 
 /* ------------------------------- inputs ------------------------------- */

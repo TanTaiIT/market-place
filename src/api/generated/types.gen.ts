@@ -29,6 +29,10 @@ export type RefreshInput = {
     refreshToken: string;
 };
 
+export type GoogleAuthInput = {
+    idToken: string;
+};
+
 export type AuthResponse = {
     user: {
         id: string;
@@ -397,6 +401,20 @@ export type Listing = {
     updatedAt: string;
 };
 
+/**
+ * Vắng khi tin đang hiện / đã bán / hết hạn — không có gì cần giải thích.
+ */
+export type ListingReview = {
+    state: 'pending' | 'rejected' | 'hidden';
+    title: string;
+    message: string;
+    hint?: string;
+};
+
+export type OwnerListing = Listing & {
+    review?: ListingReview;
+};
+
 export type FavoriteStatus = {
     listingId: string;
     favorited: boolean;
@@ -503,8 +521,8 @@ export type AcceptInviteResult = {
 export type CreateRoleGrant = {
     userId?: string;
     userEmail?: string;
-    role: 'master' | 'manager' | 'staff';
-    scopeType: 'system' | 'org' | 'org_unit' | 'category_province' | 'category_ward';
+    role: 'master' | 'manager';
+    scopeType: 'system' | 'org' | 'category_province' | 'category_ward';
     orgId?: string;
     unitId?: string;
     categoryId?: string;
@@ -1039,6 +1057,43 @@ export type AuthLoginResponses = {
 
 export type AuthLoginResponse = AuthLoginResponses[keyof AuthLoginResponses];
 
+export type AuthGoogleData = {
+    body?: GoogleAuthInput;
+    path?: never;
+    query?: never;
+    url: '/auth/google';
+};
+
+export type AuthGoogleErrors = {
+    /**
+     * Token Google không hợp lệ, email chưa xác thực, hoặc tài khoản bị khoá
+     */
+    401: ErrorResponse;
+    /**
+     * Quá nhiều request
+     */
+    429: ErrorResponse;
+    /**
+     * Đăng nhập Google chưa được bật trên máy chủ này
+     */
+    503: ErrorResponse;
+};
+
+export type AuthGoogleError = AuthGoogleErrors[keyof AuthGoogleErrors];
+
+export type AuthGoogleResponses = {
+    /**
+     * Đăng nhập thành công
+     */
+    200: {
+        success: true;
+        message: string;
+        data: AuthResponse;
+    };
+};
+
+export type AuthGoogleResponse = AuthGoogleResponses[keyof AuthGoogleResponses];
+
 export type AuthRefreshData = {
     body?: RefreshInput;
     path?: never;
@@ -1566,6 +1621,7 @@ export type ListingListData = {
         category?: string;
         seller?: string;
         province?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
+        ward?: string;
         condition?: 'new' | 'like_new' | 'used';
         visibility?: 'org_internal' | 'public';
         minPrice?: number | null;
@@ -1674,7 +1730,7 @@ export type ListingMineByIdResponses = {
     200: {
         success: true;
         message: string;
-        data: Listing;
+        data: OwnerListing;
     };
 };
 
@@ -1690,6 +1746,7 @@ export type ListingMineData = {
         category?: string;
         seller?: string;
         province?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
+        ward?: string;
         condition?: 'new' | 'like_new' | 'used';
         visibility?: 'org_internal' | 'public';
         minPrice?: number | null;
@@ -1715,7 +1772,7 @@ export type ListingMineResponses = {
     200: {
         success: true;
         message: string;
-        data: Array<Listing>;
+        data: Array<OwnerListing>;
         meta: {
             page: number;
             limit: number;
@@ -2591,6 +2648,8 @@ export type ListJoinRequestsData = {
     path?: never;
     query?: {
         status?: 'pending' | 'approved' | 'rejected' | 'expired' | 'cancelled';
+        page?: number;
+        limit?: number;
     };
     url: '/join-requests';
 };
@@ -2612,6 +2671,14 @@ export type ListJoinRequestsResponses = {
         success: true;
         message: string;
         data: Array<JoinRequest>;
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNextPage: boolean;
+            hasPrevPage: boolean;
+        };
     };
 };
 
@@ -2898,7 +2965,10 @@ export type MembershipRemoveResponse = MembershipRemoveResponses[keyof Membershi
 export type InviteListData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        page?: number;
+        limit?: number;
+    };
     url: '/invites';
 };
 
@@ -2923,6 +2993,14 @@ export type InviteListResponses = {
         success: true;
         message: string;
         data: Array<Invite>;
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNextPage: boolean;
+            hasPrevPage: boolean;
+        };
     };
 };
 
@@ -3124,7 +3202,11 @@ export type CreateRoleGrantData = {
 
 export type CreateRoleGrantErrors = {
     /**
-     * Không đủ thẩm quyền để cấp quyền này
+     * Vai trò staff đã bỏ, hoặc phạm vi không hợp lệ
+     */
+    400: ErrorResponse;
+    /**
+     * Cần quyền master, hoặc đang cấp master / tự cấp cho mình
      */
     403: ErrorResponse;
     /**
@@ -4168,6 +4250,8 @@ export type ModerationListingsData = {
     path?: never;
     query?: {
         status?: 'pending' | 'pending_unverified' | 'active' | 'rejected' | 'hidden';
+        category?: string;
+        q?: string;
         page?: number;
         limit?: number;
     };
@@ -4247,6 +4331,45 @@ export type ModerationRemoveListingResponses = {
 
 export type ModerationRemoveListingResponse = ModerationRemoveListingResponses[keyof ModerationRemoveListingResponses];
 
+export type ModerationGetListingData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/moderation/listings/{id}';
+};
+
+export type ModerationGetListingErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Không có quyền duyệt, hoặc tin thuộc trục bạn không phụ trách
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy tin
+     */
+    404: ErrorResponse;
+};
+
+export type ModerationGetListingError = ModerationGetListingErrors[keyof ModerationGetListingErrors];
+
+export type ModerationGetListingResponses = {
+    /**
+     * Tin
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Listing;
+    };
+};
+
+export type ModerationGetListingResponse = ModerationGetListingResponses[keyof ModerationGetListingResponses];
+
 export type ModerationSetListingStatusData = {
     body?: SetListingStatus;
     path: {
@@ -4295,6 +4418,8 @@ export type ModerationPublicQueueData = {
     path?: never;
     query?: {
         status?: 'pending' | 'pending_unverified' | 'active' | 'rejected' | 'hidden';
+        category?: string;
+        q?: string;
         page?: number;
         limit?: number;
     };
@@ -4433,7 +4558,7 @@ export type ReportListErrors = {
      */
     401: ErrorResponse;
     /**
-     * Cần quyền owner hoặc moderator
+     * Không có quyền duyệt ở trục của đối tượng bị báo cáo
      */
     403: ErrorResponse;
 };
@@ -4521,7 +4646,7 @@ export type ReportResolveErrors = {
      */
     401: ErrorResponse;
     /**
-     * Cần quyền owner hoặc moderator
+     * Không có quyền duyệt ở trục của đối tượng bị báo cáo
      */
     403: ErrorResponse;
     /**

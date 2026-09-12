@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { orgAdminApi } from '@/api/org-admin';
 import { orgApi } from '@/api/org';
 import type { OrgListFilter } from '@/api/org-admin';
 import { qk } from './keys';
+import { usePagedList } from './paged';
 
 /**
  * Quản trị tổ chức + phân quyền. Domain riêng (query.convention §8): `org.ts` lo đường người
@@ -73,24 +74,20 @@ export function useAllOrgs(filter: OrgListFilter = {}, enabled = true) {
 
   const status = filter.status;
 
-  return useQuery({
-    queryKey: qk.allOrgs(settled, status ?? 'all'),
-    queryFn: () => orgAdminApi.listAll({ q: settled, status }),
-    enabled,
-    placeholderData: keepPreviousData,
-    staleTime: 60_000,
-  });
+  return usePagedList(
+    qk.allOrgs(settled, status ?? 'all'),
+    (page) => orgAdminApi.listAll({ q: settled, status }, page),
+    { enabled, keepPrevious: true, staleTime: 60_000 },
+  );
 }
-
-/** Bao nhiêu thành viên kéo về cho ngăn chi tiết. 100 là trần của BE — quá đó bảng cắt im lặng. */
-const ROSTER_TAKE = 100;
 
 /**
  * Hai lượt gọi của ngăn chi tiết tổ chức trong bảng của master.
  *
  * `enabled` theo `orgId`/`slug` chứ không có cờ riêng: ngăn đóng thì call-site truyền chuỗi
  * rỗng, nên không lượt nào bay đi lúc chưa ai mở ngăn. Hai query tách nhau để phần danh bạ
- * (chậm hơn, 100 dòng) không giữ phần 'ai phụ trách' lại — đó là thứ người ta mở ngăn để xem.
+ * (phân trang, cuộn tới đâu tải tới đó) không giữ phần 'ai phụ trách' lại — đó là thứ người ta
+ * mở ngăn để xem.
  */
 export function useOrgManagers(orgId: string) {
   return useQuery({
@@ -106,7 +103,7 @@ export function useOrgManagers(orgId: string) {
  *
  * Khác `useOrgRoster` ở đúng chỗ đó: hàm kia đọc `useOrgSlug()`, tức muốn xem nhóm khác thì
  * phải chuyển org đang thao tác của cả app — chính thao tác mà bàn của master vừa bỏ đi.
- * `memberPreview` gắn `X-Org-Slug` cho riêng lượt gọi, nên xem nhóm nào không đổi chỗ đứng.
+ * `memberPage` gắn `X-Org-Slug` cho riêng lượt gọi, nên xem nhóm nào không đổi chỗ đứng.
  *
  * BE cho master đọc: route gác `requireMembershipOrOrgModerator`, và comment ở đó nói rõ
  * người quản org mà không phải thành viên cũng phải đọc được — họ xoá được thành viên thì
@@ -116,11 +113,10 @@ export function useOrgManagers(orgId: string) {
  * dạng — hai key riêng chỉ tạo hai bản cache nói cùng một chuyện.
  */
 export function useOrgMemberList(slug: string) {
-  return useQuery({
-    queryKey: qk.orgMembers(slug),
-    queryFn: () => orgApi.memberPreview(slug, ROSTER_TAKE),
+  return usePagedList(qk.orgMembers(slug), (page) => orgApi.memberPage(slug, page), {
     enabled: slug.length > 0,
     staleTime: 60_000,
+    keyOf: (m) => m.userId,
   });
 }
 
@@ -193,28 +189,6 @@ function useGrantMutation<TVars, TData>(fn: (v: TVars) => Promise<TData>) {
   return useMutation({
     mutationFn: fn,
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.myGrants() }),
-  });
-}
-
-/**
- * Đổi cách bày bảng tin của một nhóm.
- *
- * Refetch contract: quét CẢ HAI nguồn mang `feedLayout`.
- *
- * `myOrgs()` — bảng tin đọc nó để chọn số cột; không quét thì đổi xong bảng tin vẫn bày
- *   kiểu cũ tới hết `staleTime` 5 phút.
- * `orgProfile(slug)` — nguồn của người KHÔNG phải thành viên (master). Thiếu nó thì màn
- *   cấu hình vẫn tô đậm lựa chọn cũ sau khi lưu thành công, trông như bấm không ăn.
- */
-export function useUpdateOrgDisplay() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: { slug: string; feedLayout: 'feed' | 'grid' }) =>
-      orgApi.update(v.slug, { feedLayout: v.feedLayout }),
-    onSuccess: (_data, v) => {
-      void qc.invalidateQueries({ queryKey: qk.myOrgs() });
-      void qc.invalidateQueries({ queryKey: qk.orgProfile(v.slug) });
-    },
   });
 }
 

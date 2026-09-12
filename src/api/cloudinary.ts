@@ -33,14 +33,14 @@ const UPLOAD_PRESET = 'ghim_unsigned';
 const UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
 
 /**
- * Trần cạnh dài của ảnh upload. `quality` của expo-image-picker chỉ nén JPEG chứ KHÔNG giảm
- * độ phân giải — ảnh 4000×3000 của điện thoại vẫn đi nguyên 4000px lên mạng. Màn hình lớn nhất
- * app phục vụ chỉ ~1200px logic, nên 2000px là đủ dư cho cả zoom, còn dung lượng thì giảm ~3-4 lần.
+ * Trần cạnh dài của ảnh upload. Màn rộng nhất app phục vụ ~430pt × 3 = 1290px, và `displayUrl`
+ * đã resize lúc hiển thị, nên ảnh LƯU chỉ cần đủ cho màn chi tiết + zoom nhẹ. 2000 → 1600 bớt
+ * ~35% bytes so với bản trước — trên 4G là ~0,3–0,5s mỗi ảnh, trên 3G nhiều hơn.
  */
-const MAX_DIMENSION = 2000;
+const MAX_DIMENSION = 1600;
 
-/** Mức nén khi phải re-encode lúc thu nhỏ — cùng tinh thần `quality: 0.7` của các picker. */
-const RESIZE_JPEG_QUALITY = 0.8;
+/** Mức nén JPEG DUY NHẤT của cả app — picker không nén nữa (xem `prepare`). */
+const JPEG_QUALITY = 0.75;
 
 /** Đọc kích thước từ header file, không decode cả ảnh. Lỗi trả `null` — caller tự quyết. */
 function sizeOf(uri: string): Promise<{ width: number; height: number } | null> {
@@ -54,35 +54,63 @@ function sizeOf(uri: string): Promise<{ width: number; height: number } | null> 
 }
 
 /**
- * Thu nhỏ ảnh về ≤ `MAX_DIMENSION` TRƯỚC khi upload — tiết kiệm băng thông lúc gửi, không chỉ
- * lúc lưu (việc đó incoming transformation trên preset làm được, nhưng ảnh vẫn phải bò hết
- * 3-12MB qua 3G rồi mới bị Cloudinary cắt).
+ * Chuẩn hoá ảnh TRƯỚC khi upload: thu về ≤ `MAX_DIMENSION` và mã hoá JPEG — một lần, ở đây và
+ * chỉ ở đây. Tiết kiệm băng thông lúc GỬI, không chỉ lúc lưu (incoming transformation trên
+ * preset làm được việc sau, nhưng ảnh vẫn phải bò hết 3-12MB qua 3G rồi mới bị Cloudinary cắt).
  *
- * Nằm ở đây chứ không trong từng picker: đây là điểm nghẽn duy nhất mọi ảnh phải đi qua
- * (PhotoPicker, AvatarPicker, màn sửa org), sửa một chỗ phủ cả ba luồng.
+ * Trước đây picker nén (`quality: 0.7`) rồi hàm này nén lại: hai lần decode + encode một ảnh
+ * 12MP cho một kết quả mà lần đầu bị vứt đi — ~0,5–1s mỗi ảnh trên máy tầm trung, và lần đầu
+ * chạy NGAY trong picker nên chọn 6 ảnh là picker treo 6 lần. Giờ picker trả nguyên bản
+ * (`quality: 1`), và đây là điểm nghẽn duy nhất mọi ảnh đi qua (PhotoPicker, AvatarPicker, màn
+ * sửa org) — sửa một chỗ phủ cả ba luồng.
  *
- * Ảnh đã nhỏ hơn trần trả về NGUYÊN uri — không re-encode để khỏi mất chất lượng vô ích.
- * Mọi đường lỗi (không đọc được size, resize hỏng) đều rơi về bản gốc: upload chậm hơn là
- * phiền, chặn người dùng đăng tin mới là hỏng việc.
+ * LUÔN mã hoá lại, kể cả ảnh đã nhỏ hơn trần: nguồn giờ là bản chưa nén (PNG chụp màn hình,
+ * JPEG q100, HEIC), bỏ qua nó là upload nguyên 5MB. JPEG cố định kể cả cho PNG/HEIC: ảnh chụp
+ * thật không cần alpha, và MIME suy được thẳng từ đuôi file.
+ *
+ * Mọi đường lỗi (không đọc được size, render hỏng) rơi về bản gốc: upload chậm hơn là phiền,
+ * chặn người dùng đăng tin mới là hỏng việc.
  */
-async function downscale(uri: string): Promise<string> {
-  const size = await sizeOf(uri);
-  if (!size || Math.max(size.width, size.height) <= MAX_DIMENSION) return uri;
-
+async function prepare(uri: string): Promise<string> {
   try {
+    const size = await sizeOf(uri);
     const context = ImageManipulator.manipulate(uri);
-    // Chỉ đặt MỘT cạnh — cạnh kia manipulator tự tính để giữ tỉ lệ.
-    context.resize(
-      size.width >= size.height ? { width: MAX_DIMENSION } : { height: MAX_DIMENSION },
-    );
+    if (size && Math.max(size.width, size.height) > MAX_DIMENSION) {
+      // Chỉ đặt MỘT cạnh — cạnh kia manipulator tự tính để giữ tỉ lệ.
+      context.resize(
+        size.width >= size.height ? { width: MAX_DIMENSION } : { height: MAX_DIMENSION },
+      );
+    }
     const image = await context.renderAsync();
-    // JPEG cố định (kể cả nguồn PNG/HEIC): ảnh chụp thật không cần alpha, và HEIC đổi sang
-    // JPEG còn tiện — MIME suy được thẳng từ đuôi file.
-    const saved = await image.saveAsync({ compress: RESIZE_JPEG_QUALITY, format: SaveFormat.JPEG });
+    const saved = await image.saveAsync({ compress: JPEG_QUALITY, format: SaveFormat.JPEG });
     return saved.uri;
   } catch {
     return uri;
   }
+}
+
+/** KB của một file local; `null` nếu không đọc được — chỉ để log, không quyết định gì. */
+function kbOf(uri: string): number | null {
+  try {
+    const size = new File(uri).size;
+    return size === null ? null : Math.round(size / 1024);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Chỉ trong dev: một dòng cho mỗi ảnh — thời gian chuẩn hoá trên máy, bytes trước/sau, và thời
+ * gian Cloudinary (kết nối + gửi + xử lý phía server, gộp). Không có ba con số này thì mọi lần
+ * chỉnh preset hay mức nén đều là đoán: "4 giây" có thể là 3 giây CPU máy yếu, hoặc 3 giây một
+ * add-on kiểm duyệt đồng bộ đang giữ response ở phía Cloudinary — hai bệnh, hai thuốc.
+ */
+function logTiming(original: string, prepared: string, t0: number, t1: number, t2: number) {
+  if (!__DEV__) return;
+  // oxlint-disable-next-line no-console
+  console.log(
+    `[upload] prepare ${t1 - t0}ms (${kbOf(original) ?? '?'}KB → ${kbOf(prepared) ?? '?'}KB) · cloudinary ${t2 - t1}ms`,
+  );
 }
 
 /**
@@ -137,7 +165,9 @@ type CloudinaryUploadResponse = {
  * @returns `secure_url` — chuỗi HTTPS để lưu xuống BE.
  */
 export async function uploadImage(uri: string): Promise<string> {
-  const source = await downscale(uri);
+  const t0 = Date.now();
+  const source = await prepare(uri);
+  const t1 = Date.now();
   const name = source.split('/').pop() || 'upload.jpg';
 
   const form = new FormData();
@@ -150,6 +180,7 @@ export async function uploadImage(uri: string): Promise<string> {
 
   const res = await fetch(UPLOAD_URL, { method: 'POST', body: form });
   const json = (await res.json()) as CloudinaryUploadResponse;
+  logTiming(uri, source, t0, t1, Date.now());
 
   if (!res.ok || !json.secure_url) {
     // Kèm nguyên văn message của Cloudinary sau phần copy tiếng Việt: nó là thứ duy nhất phân biệt

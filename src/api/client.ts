@@ -27,6 +27,7 @@ import {
   listingUpdate,
   locationProvinces,
   locationWards,
+  moderationGetListing,
   notificationList,
   notificationMarkRead,
   userGetById,
@@ -39,10 +40,11 @@ import type {
   Listing as ListingDto,
   MeProfile,
   Message as MessageDto,
+  OwnerListing as OwnerListingDto,
   PublicProfile as PublicProfileDto,
 } from './generated';
 import type { Province, ProvinceName } from './location';
-import { CHAT_COLORS, NEW_PHOTOS } from './db';
+import { CHAT_COLORS, NEW_PHOTOS, locationApplies } from './db';
 import type {
   AuthSession,
   Category,
@@ -91,6 +93,30 @@ export function unwrap<TPayload>(res: SdkResult<TPayload>, fallback: string): TP
   }
   if (!res.data) throw new Error(fallback);
   return res.data.data;
+}
+
+/** Mỗi trang xin ĐÚNG trần của BE (`PAGINATION.MAX_LIMIT`) — xin hơn là 400, không phải bị kẹp. */
+export const PAGE_SIZE = 10;
+
+/** Một trang của danh sách cuộn-tới-đâu-tải-tới-đó — hình dạng duy nhất mọi API list trả về. */
+export type Page<T> = { items: T[]; hasNext: boolean; total: number };
+
+type PagedEnvelope<TItem> = ApiEnvelope<TItem[]> & {
+  meta?: { hasNextPage: boolean; total: number };
+};
+
+/**
+ * Như `unwrap`, nhưng GIỮ `meta`: `hasNext` là thứ duy nhất cho hook biết còn trang sau hay
+ * không, `total` là con số cho badge — cả hai không suy được từ độ dài của trang vừa nhận.
+ */
+export function unwrapPage<TItem, TOut>(
+  res: { data?: PagedEnvelope<TItem>; error?: unknown },
+  fallback: string,
+  map: (item: TItem) => TOut,
+): Page<TOut> {
+  const items = unwrap(res as SdkResult<TItem[]>, fallback).map(map);
+  const meta = res.data?.meta;
+  return { items, hasNext: meta?.hasNextPage ?? false, total: meta?.total ?? items.length };
 }
 
 // ── MAPPER: DTO → domain ────────────────────────────────────────────
@@ -182,7 +208,12 @@ function toStatus(status: ListingDto['status']): Listing['status'] {
   return 'pending';
 }
 
-function toListing(dto: ListingDto, names: Map<string, string>): Listing {
+/**
+ * Nhận `OwnerListing` (= `Listing` + `review?`) để MỘT mapper phục vụ cả hai: DTO công khai là
+ * `Listing` thuần nên gán vào được và `review` đơn giản là vắng. Tách `toOwnerListing` riêng là
+ * hai bản copy của 30 dòng chỉ khác nhau một field.
+ */
+function toListing(dto: OwnerListingDto, names: Map<string, string>): Listing {
   const isMine = dto.seller === getCurrentUserId();
   const sellerName = isMine ? 'Bạn' : dto.posterName || 'Người bán';
 
@@ -214,6 +245,7 @@ function toListing(dto: ListingDto, names: Map<string, string>): Listing {
     attributes: dto.attributes as ListingAttributes | undefined,
     templateVersion: dto.templateRef?.version,
     status: toStatus(dto.status),
+    review: dto.review,
     expiresAt: dto.expiresAt ?? undefined,
     mine: isMine,
     viewCount: dto.viewCount,
@@ -538,7 +570,7 @@ export const api = {
     // Không gửi `status`: `listingQuerySchema` của BE không khai field đó (chỉ caller nội bộ mới
     // được ép status), và `buildFilter` đã mặc định ACTIVE. Gửi thêm chỉ bị zod strip im lặng.
     const [res, names] = await Promise.all([
-      withAuthRetry(() => listingList({ query: { limit: 50, category: categoryId } })),
+      withAuthRetry(() => listingList({ query: { limit: PAGE_SIZE, category: categoryId } })),
       categoryNames(),
     ]);
     return unwrap(res, 'Không tải được bảng tin').map((l) => toListing(l, names));
@@ -585,7 +617,8 @@ export const api = {
    */
   async getSuggestions(current: Pick<Listing, 'id' | 'categoryId' | 'province'>, take: number) {
     const [res, names] = await Promise.all([
-      withAuthRetry(() => listingList({ query: { limit: take * 3, category: current.categoryId } })),
+      withAuthRetry(() => // Trần trang của BE là 10 — dải gợi ý vẽ 3–4 tin nên 10 vẫn đủ để lọc và xếp.
+        listingList({ query: { limit: Math.min(take * 3, PAGE_SIZE), category: current.categoryId } })),
       categoryNames(),
     ]);
 
@@ -616,6 +649,19 @@ export const api = {
     return toListing(unwrap(res, 'Không tìm thấy tin này'), names);
   },
 
+  /**
+   * Một tin qua cửa BÀN DUYỆT — cho người xử báo cáo mở tin bị tố. Khác `getListing` ở hai ca
+   * mà đường công khai trả 404: tin đã bị ẩn / đang chờ duyệt, và tin nội bộ của org mà master
+   * không đứng trong. BE chốt thẩm quyền theo trục của tin, người thường ăn 403.
+   */
+  async getListingForModeration(id: string): Promise<Listing> {
+    const [res, names] = await Promise.all([
+      withAuthRetry(() => moderationGetListing({ path: { id } })),
+      categoryNames(),
+    ]);
+    return toListing(unwrap(res, 'Không mở được tin này'), names);
+  },
+
   async getListing(id: string): Promise<Listing> {
     const [res, names] = await Promise.all([
       withAuthRetry(() => listingGetById({ path: { id } })),
@@ -628,7 +674,7 @@ export const api = {
    * `province` phải là đúng chuỗi trong danh sách của `/locations/provinces` — BE so khớp chính
    * xác, gửi "TP. Hồ Chí Minh" thay vì "Hồ Chí Minh" giờ là 400 chứ không còn im lặng trả rỗng.
    */
-  async searchListings(filter: SearchFilter): Promise<Listing[]> {
+  async searchListings(filter: SearchFilter, page: number): Promise<Page<Listing>> {
     /*
      * KHÔNG chặn lượt tìm rỗng.
      *
@@ -639,15 +685,26 @@ export const api = {
      * chí trước khi được thấy bất cứ thứ gì.
      */
     const term = filter.q.trim();
+    /*
+     * Lọc theo nhóm = đúng cách `getOrgListings` đang làm: `X-Org-Slug` cho lượt gọi này thôi
+     * (không chuyển cả app sang nhóm đó) + `visibility: 'org_internal'` để không hứng luôn trục
+     * công khai. Không cần tham số BE mới — danh mục, giá, `q`, `attrs` vẫn `AND` lên trên
+     * trong `buildFilter`. Riêng tỉnh/xã thì KHÔNG đi cùng nhóm — xem `locationApplies`.
+     */
+    const org = filter.orgSlug;
+    const province = locationApplies(filter) ? filter.province : null;
     const [res, names] = await Promise.all([
       withAuthRetry(() =>
         listingList({
           // Bỏ hẳn field khi rỗng chứ không gửi `undefined`/`null`: `listingQuerySchema` của BE
           // coi `minPrice: null` là có mặt và ép kiểu, còn vắng mặt mới là "không lọc".
           query: {
-            limit: 50,
+            page,
+            limit: PAGE_SIZE,
             ...(term ? { q: term } : {}),
-            ...(filter.province ? { province: filter.province } : {}),
+            ...(province ? { province } : {}),
+            ...(province && filter.ward ? { ward: filter.ward } : {}),
+            ...(org ? { visibility: 'org_internal' as const } : {}),
             ...(filter.categoryId ? { category: filter.categoryId } : {}),
             ...(filter.minPrice !== null ? { minPrice: filter.minPrice } : {}),
             ...(filter.maxPrice !== null ? { maxPrice: filter.maxPrice } : {}),
@@ -657,23 +714,24 @@ export const api = {
               ? { attrs: JSON.stringify(filter.attrs) }
               : {}),
           },
+          ...(org ? { headers: { [ORG_HEADER]: org } } : {}),
         }),
       ),
       categoryNames(),
     ]);
-    return unwrap(res, 'Không tìm được tin nào').map((l) => toListing(l, names));
+    return unwrapPage(res, 'Không tìm được tin nào', (l) => toListing(l, names));
   },
 
   /**
    * Dùng `/listings/mine` chứ KHÔNG phải `/listings?seller=<id>`: cái sau lọc cứng về `active`
    * nên tin vừa ghim (luôn ở `pending`) sẽ không xuất hiện, và người đăng tưởng là đăng hụt.
    */
-  async getMyListings(): Promise<Listing[]> {
+  async getMyListings(page: number): Promise<Page<Listing>> {
     const [res, names] = await Promise.all([
-      withAuthRetry(() => listingMine({ query: { limit: 50 } })),
+      withAuthRetry(() => listingMine({ query: { page, limit: PAGE_SIZE } })),
       categoryNames(),
     ]);
-    return unwrap(res, 'Không tải được tin của bạn').map((l) => toListing(l, names));
+    return unwrapPage(res, 'Không tải được tin của bạn', (l) => toListing(l, names));
   },
 
   /**
@@ -790,12 +848,12 @@ export const api = {
    * Tin đã lưu, mới lưu trước. BE trả nguyên tin nên không còn phải lấy từng cái như bản
    * local; tin đã bị gỡ BE tự loại khỏi `data`.
    */
-  async getSavedListings(): Promise<Listing[]> {
+  async getSavedListings(page: number): Promise<Page<Listing>> {
     const [res, names] = await Promise.all([
-      withAuthRetry(() => favoriteList({ query: { limit: 50 } })),
+      withAuthRetry(() => favoriteList({ query: { page, limit: PAGE_SIZE } })),
       categoryNames(),
     ]);
-    return unwrap(res, 'Không tải được tin đã lưu').map((l) => toListing(l, names));
+    return unwrapPage(res, 'Không tải được tin đã lưu', (l) => toListing(l, names));
   },
 
   /**
@@ -810,9 +868,9 @@ export const api = {
   },
 
   /* ---------------- chat ---------------- */
-  async getConversations(): Promise<Conversation[]> {
-    const res = await withAuthRetry(() => chatList({ query: { limit: 50 } }));
-    return unwrap(res, 'Không tải được tin nhắn').map(toConversation);
+  async getConversations(page: number): Promise<Page<Conversation>> {
+    const res = await withAuthRetry(() => chatList({ query: { page, limit: PAGE_SIZE } }));
+    return unwrapPage(res, 'Không tải được tin nhắn', toConversation);
   },
 
   async getConversation(id: string): Promise<Conversation> {
@@ -821,16 +879,18 @@ export const api = {
   },
 
   /**
-   * BE trả tin mới nhất trước (phân trang lấy từ cuối lên), còn màn chat render từ cũ tới mới.
-   * Đọc ngược chỉ số thay vì `.reverse()`/`.sort()`: cả hai đều mutate mảng gốc và đều bị
-   * oxlint chặn, mà ở đây chỉ cần đảo chiều đọc chứ không cần sắp xếp lại gì.
+   * BE trả tin mới nhất trước (trang 1 = 10 tin mới nhất, trang 2 = 10 tin cũ hơn…), còn màn
+   * chat render từ cũ tới mới. Đảo chiều TRONG trang ở đây; thứ tự GIỮA các trang do
+   * `useMessages` lo (`olderPagesFirst`). Đọc ngược chỉ số thay vì `.reverse()`: nó mutate mảng
+   * gốc và bị oxlint chặn, mà ở đây chỉ cần đảo chiều đọc.
    */
-  async getMessages(conversationId: string): Promise<Message[]> {
+  async getMessages(conversationId: string, page: number): Promise<Page<Message>> {
     const res = await withAuthRetry(() =>
-      chatMessages({ path: { id: conversationId }, query: { limit: 100 } }),
+      chatMessages({ path: { id: conversationId }, query: { page, limit: PAGE_SIZE } }),
     );
-    const rows = unwrap(res, 'Không tải được tin nhắn');
-    return rows.map((_, i) => toMessage(rows[rows.length - 1 - i]));
+    const newestFirst = unwrapPage(res, 'Không tải được tin nhắn', toMessage);
+    const n = newestFirst.items.length;
+    return { ...newestFirst, items: newestFirst.items.map((_, i) => newestFirst.items[n - 1 - i]) };
   },
 
   /** Mở hội thoại cho một tin, hoặc lấy lại hội thoại đã có — BE chốt bằng unique index. */
@@ -865,9 +925,9 @@ export const api = {
    * BE đã lọc sẵn theo người gọi: thông báo cả tổ chức + thông báo của đúng nhóm con họ thuộc.
    * Tài khoản chưa thuộc tổ chức nào nhận mảng rỗng chứ không phải lỗi, nên không cần guard.
    */
-  async getNotifications(): Promise<Notif[]> {
-    const res = await withAuthRetry(() => notificationList({ query: { limit: 50 } }));
-    return unwrap(res, 'Không tải được thông báo').map((n) => ({
+  async getNotifications(page: number): Promise<Page<Notif>> {
+    const res = await withAuthRetry(() => notificationList({ query: { page, limit: PAGE_SIZE } }));
+    return unwrapPage(res, 'Không tải được thông báo', (n) => ({
       id: n.id,
       scope: n.unitId ? ('unit' as const) : ('org' as const),
       title: n.title,
@@ -907,12 +967,12 @@ export const api = {
    * bộ lọc cứng về `active` của nó đúng ở đây — khách xem hồ sơ không được thấy tin chờ duyệt
    * hay tin bị từ chối của người khác.
    */
-  async getSellerListings(id: string): Promise<Listing[]> {
+  async getSellerListings(id: string, page: number): Promise<Page<Listing>> {
     const [res, names] = await Promise.all([
-      withAuthRetry(() => listingList({ query: { limit: 50, seller: id } })),
+      withAuthRetry(() => listingList({ query: { page, limit: PAGE_SIZE, seller: id } })),
       categoryNames(),
     ]);
-    return unwrap(res, 'Không tải được tin của người bán này').map((l) => toListing(l, names));
+    return unwrapPage(res, 'Không tải được tin của người bán này', (l) => toListing(l, names));
   },
 
   /**

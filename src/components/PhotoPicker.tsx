@@ -48,8 +48,16 @@ export function PhotoPicker({
       // `allowsEditing` bị bỏ qua khi chọn nhiều ảnh — cắt ảnh hàng loạt không được hỗ trợ
       allowsMultipleSelection: true,
       selectionLimit: remaining,
-      // Nén ngay trên máy: ảnh gốc điện thoại 3-12MB, upload bằng 3G sẽ treo rất lâu
-      quality: 0.7,
+      /*
+       * KHÔNG nén ở picker. `quality < 1` là OS decode + encode lại nguyên 12MP ngay trong
+       * picker (chọn 6 ảnh = treo 6 lần), rồi `prepare` ở `cloudinary.ts` lại decode + encode
+       * lần nữa và vứt kết quả lần đầu. Nén một lần, ở một chỗ — chỗ đó là `prepare`.
+       */
+      quality: 1,
+      // iOS: trả đúng file đang có (HEIC) thay vì transcode sang JPEG — thêm một lần encode
+      // 12MP nữa, mà `prepare` đọc HEIC được. Android bỏ qua tuỳ chọn này.
+      preferredAssetRepresentationMode:
+        ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Current,
     });
     if (res.canceled) return;
 

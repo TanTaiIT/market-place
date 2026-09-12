@@ -192,7 +192,9 @@ export const adminSystemApi = {
   },
 
   /**
-   * Báo cáo đăng tin theo thời gian — chuỗi số theo ngày/tháng/năm, master-only.
+   * Báo cáo đăng tin theo thời gian — chuỗi số theo ngày/tháng/năm. Master không kèm org: cả
+   * sàn; kèm `X-Org-Slug` (quản trị nhóm): tin mang dấu nhóm — nội bộ lẫn công khai do thành
+   * viên đăng trong ngữ cảnh nhóm.
    *
    * Khác `getPostingStats` ở câu hỏi: cái kia là ẢNH CHỤP một cửa sổ để chốt giá gói tin,
    * cái này là XU HƯỚNG. BE gộp cột theo múi giờ Việt Nam và trả kèm `timezone` — hiện nó

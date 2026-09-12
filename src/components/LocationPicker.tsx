@@ -92,12 +92,18 @@ export function WardField({
   value,
   onChange,
   allowAll = false,
+  disabledReason,
 }: {
   label?: string;
   province: ProvinceName | null;
   value: string | null;
   onChange: (ward: string | null) => void;
   allowAll?: boolean;
+  /**
+   * Khoá ô kèm câu giải thích thay placeholder — cho màn nào mà xã TẠM không có nghĩa (ngăn lọc
+   * đang lọc theo nhóm). Người gọi tự xoá `value` khi khoá; ô này chỉ hiện, không quyết.
+   */
+  disabledReason?: string;
 }) {
   const [open, setOpen] = useState(false);
   const { data: wards, isPending } = useWards(province);
@@ -122,13 +128,14 @@ export function WardField({
       <Trigger
         text={value}
         placeholder={
-          !province
+          disabledReason ??
+          (!province
             ? 'Chọn tỉnh / thành trước'
             : wards?.length
               ? `Chọn trong ${wards.length} phường / xã`
-              : 'Đang tải phường / xã...'
+              : 'Đang tải phường / xã...')
         }
-        disabled={!province}
+        disabled={!province || !!disabledReason}
         onPress={() => setOpen(true)}
       />
 

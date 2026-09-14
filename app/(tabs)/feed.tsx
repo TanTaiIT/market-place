@@ -12,6 +12,7 @@ import {
   OrgNearbyStrip,
   RecentStrip,
 } from '@/components/FeedHighlights';
+import { SiteFooter } from '@/components/SiteFooter';
 import { useRequireAuth } from '@/components/GuestGate';
 import { useCollapsingHeader } from '@/components/useCollapsingHeader';
 import { useCategories, useListings, useProfile } from '@/queries/listings';
@@ -74,7 +75,9 @@ export default function Feed() {
         contentContainerStyle={{
           // Chừa đúng chiều cao thanh nổi: nó nằm NGOÀI cuộn nên không tự đẩy nội dung xuống.
           paddingTop: bar.height,
-          paddingBottom: 32,
+          // Không đệm đáy: `SiteFooter` là khối cuối và nó tự mang phần đệm đó bên trong lề
+          // âm của mình — để 32 ở đây là chừa một dải xám dưới chân trang trắng.
+          paddingBottom: 0,
           paddingHorizontal: 16,
         }}
         refreshControl={
@@ -121,6 +124,8 @@ export default function Feed() {
         <BannerBoard onPress={openBanner} />
         <GuideStrip />
         <PerkStrip />
+
+        <SiteFooter />
       </Animated.ScrollView>
 
       {/*

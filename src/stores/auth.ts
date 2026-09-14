@@ -70,6 +70,20 @@ type AuthState = {
   signIn: (session: Session) => void;
   signOut: () => void;
   setActiveOrg: (slug: string | null) => void;
+  /**
+   * Vừa đăng ký xong và chưa được mời xác thực email — cờ MỘT LẦN, đọc rồi xoá.
+   *
+   * Nó tồn tại vì HARD#18: đổi trạng thái auth thì không được tự `router.replace`, phải để
+   * `Stack.Protected` đổi stack. Nên `register` không đẩy thẳng sang màn nhập mã được — nó
+   * bật cờ này, và `(tabs)/_layout` đọc cờ SAU khi stack đã đổi xong. Điều hướng vì thế đến
+   * từ trạng thái app, không phải từ sự kiện đăng nhập, nên không đua với navigator.
+   *
+   * KHÔNG ghi xuống đĩa (xem `partialize`): tắt app rồi mở lại thì lời mời đó đã cũ, và lối
+   * vào vẫn còn nguyên ở dải cảnh báo trong màn Cá nhân.
+   */
+  pendingEmailVerify: boolean;
+  markPendingEmailVerify: () => void;
+  clearPendingEmailVerify: () => void;
 };
 
 export const useAuthStore = create<AuthState>()(
@@ -78,11 +92,14 @@ export const useAuthStore = create<AuthState>()(
       session: null,
       activeOrgSlug: null,
       hydrated: false,
+      pendingEmailVerify: false,
       signIn: (session) => set({ session }),
       // Đăng xuất dọn luôn org đang chọn: người kế tiếp đăng nhập trên cùng máy không được
       // thừa hưởng tổ chức của người trước.
-      signOut: () => set({ session: null, activeOrgSlug: null }),
+      signOut: () => set({ session: null, activeOrgSlug: null, pendingEmailVerify: false }),
       setActiveOrg: (activeOrgSlug) => set({ activeOrgSlug }),
+      markPendingEmailVerify: () => set({ pendingEmailVerify: true }),
+      clearPendingEmailVerify: () => set({ pendingEmailVerify: false }),
     }),
     {
       name: 'ghim-auth',
@@ -109,6 +126,8 @@ export const useAuthStore = create<AuthState>()(
 export const useIsAuthenticated = () => useAuthStore((s) => s.session !== null);
 export const useAuthHydrated = () => useAuthStore((s) => s.hydrated);
 export const useSignIn = () => useAuthStore((s) => s.signIn);
+export const usePendingEmailVerify = () => useAuthStore((s) => s.pendingEmailVerify);
+export const useMarkPendingEmailVerify = () => useAuthStore((s) => s.markPendingEmailVerify);
 /** Tổ chức đang thao tác. `null` = chưa chọn org, chỉ xem được nội dung công khai. */
 export const useOrgSlug = () => useAuthStore((s) => s.activeOrgSlug ?? undefined);
 export const useSetActiveOrg = () => useAuthStore((s) => s.setActiveOrg);

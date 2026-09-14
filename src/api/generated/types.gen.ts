@@ -891,6 +891,15 @@ export type SystemMetrics = {
     };
 };
 
+export type SendVerificationCode = {
+    expiresInSeconds: number;
+    resendAfterSeconds: number;
+};
+
+export type VerifyEmail = {
+    code: string;
+};
+
 export type ClearRejections = {
     reason: string;
 };
@@ -981,6 +990,29 @@ export type AdjustWallet = {
     amount: number;
     note: string;
     idempotencyKey: string;
+};
+
+export type SocialFeedback = {
+    id: string;
+    orgName: string;
+    decisionNo: string;
+    content: string;
+    createdAt: string;
+};
+
+export type CreateSocialFeedback = {
+    orgName: string;
+    decisionNo: string;
+    content: string;
+};
+
+export type SocialFeedbackAdmin = SocialFeedback & {
+    status: 'pending' | 'published' | 'rejected';
+    reviewedAt: string | null;
+};
+
+export type ReviewSocialFeedback = {
+    status: 'published' | 'rejected';
 };
 
 export type AuthRegisterData = {
@@ -1151,6 +1183,80 @@ export type AuthLogoutResponses = {
 };
 
 export type AuthLogoutResponse = AuthLogoutResponses[keyof AuthLogoutResponses];
+
+export type AuthSendEmailCodeData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/auth/email/send-code';
+};
+
+export type AuthSendEmailCodeErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Email này đã được xác thực
+     */
+    409: ErrorResponse;
+    /**
+     * Gửi lại quá sớm, hoặc quá nhiều request
+     */
+    429: ErrorResponse;
+    /**
+     * Xác thực email chưa được bật, hoặc không gửi được thư
+     */
+    503: ErrorResponse;
+};
+
+export type AuthSendEmailCodeError = AuthSendEmailCodeErrors[keyof AuthSendEmailCodeErrors];
+
+export type AuthSendEmailCodeResponses = {
+    /**
+     * Đã gửi mã
+     */
+    200: {
+        success: true;
+        message: string;
+        data: SendVerificationCode;
+    };
+};
+
+export type AuthSendEmailCodeResponse = AuthSendEmailCodeResponses[keyof AuthSendEmailCodeResponses];
+
+export type AuthVerifyEmailData = {
+    body?: VerifyEmail;
+    path?: never;
+    query?: never;
+    url: '/auth/email/verify';
+};
+
+export type AuthVerifyEmailErrors = {
+    /**
+     * Mã không đúng hoặc đã hết hạn
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+};
+
+export type AuthVerifyEmailError = AuthVerifyEmailErrors[keyof AuthVerifyEmailErrors];
+
+export type AuthVerifyEmailResponses = {
+    /**
+     * Đã xác thực
+     */
+    200: {
+        success: true;
+        message: string;
+        data: unknown;
+    };
+};
+
+export type AuthVerifyEmailResponse = AuthVerifyEmailResponses[keyof AuthVerifyEmailResponses];
 
 export type UserDeleteMeData = {
     body?: never;
@@ -5126,3 +5232,151 @@ export type MetricsSystemResponses = {
 };
 
 export type MetricsSystemResponse = MetricsSystemResponses[keyof MetricsSystemResponses];
+
+export type SocialFeedbackListData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        limit?: number;
+    };
+    url: '/social-feedback';
+};
+
+export type SocialFeedbackListResponses = {
+    /**
+     * Danh sách đã công bố
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<SocialFeedback>;
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNextPage: boolean;
+            hasPrevPage: boolean;
+        };
+    };
+};
+
+export type SocialFeedbackListResponse = SocialFeedbackListResponses[keyof SocialFeedbackListResponses];
+
+export type SocialFeedbackSubmitData = {
+    body?: CreateSocialFeedback;
+    path?: never;
+    query?: never;
+    url: '/social-feedback';
+};
+
+export type SocialFeedbackSubmitErrors = {
+    /**
+     * Dữ liệu không hợp lệ
+     */
+    400: ErrorResponse;
+    /**
+     * Gửi quá nhiều lần, thử lại sau
+     */
+    429: ErrorResponse;
+};
+
+export type SocialFeedbackSubmitError = SocialFeedbackSubmitErrors[keyof SocialFeedbackSubmitErrors];
+
+export type SocialFeedbackSubmitResponses = {
+    /**
+     * Đã tiếp nhận
+     */
+    201: {
+        success: true;
+        message: string;
+        data: SocialFeedback;
+    };
+};
+
+export type SocialFeedbackSubmitResponse = SocialFeedbackSubmitResponses[keyof SocialFeedbackSubmitResponses];
+
+export type SocialFeedbackReviewQueueData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        limit?: number;
+        status?: 'pending' | 'published' | 'rejected';
+    };
+    url: '/social-feedback/review';
+};
+
+export type SocialFeedbackReviewQueueErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+};
+
+export type SocialFeedbackReviewQueueError = SocialFeedbackReviewQueueErrors[keyof SocialFeedbackReviewQueueErrors];
+
+export type SocialFeedbackReviewQueueResponses = {
+    /**
+     * Hàng đợi
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<SocialFeedbackAdmin>;
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNextPage: boolean;
+            hasPrevPage: boolean;
+        };
+    };
+};
+
+export type SocialFeedbackReviewQueueResponse = SocialFeedbackReviewQueueResponses[keyof SocialFeedbackReviewQueueResponses];
+
+export type SocialFeedbackReviewData = {
+    body?: ReviewSocialFeedback;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/social-feedback/{id}';
+};
+
+export type SocialFeedbackReviewErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy ý kiến
+     */
+    404: ErrorResponse;
+};
+
+export type SocialFeedbackReviewError = SocialFeedbackReviewErrors[keyof SocialFeedbackReviewErrors];
+
+export type SocialFeedbackReviewResponses = {
+    /**
+     * Đã xử lý
+     */
+    200: {
+        success: true;
+        message: string;
+        data: SocialFeedbackAdmin;
+    };
+};
+
+export type SocialFeedbackReviewResponse = SocialFeedbackReviewResponses[keyof SocialFeedbackReviewResponses];

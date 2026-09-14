@@ -138,6 +138,9 @@ const GROUPS: NavGroup[] = [
       // từ điển CHẶN, áp trước cả phép tính uy tín.
       { href: '/admin/banned-phrases', icon: '🚫', label: 'Cụm từ cấm', gate: 'master' },
       { href: '/admin/listing-products', icon: '🎟', label: 'Gói tin', gate: 'master' },
+      // Cụm TẠM THỜI (gỡ theo `@/api/legal`). Master vì đây là nghĩa vụ của PHÁP NHÂN vận hành
+      // sàn, không của tổ chức nào — nên không phải `publicAxis`.
+      { href: '/admin/social-feedback', icon: '⚖', label: 'Ý kiến tổ chức XH', gate: 'master' },
       { href: '/admin/posting-stats', icon: '📈', label: 'Số liệu đăng tin', gate: 'master' },
       /*
        * 'Thống kê' chứ không 'Báo cáo': nhóm Nội dung đã có mục 'Báo cáo' cho ĐƠN TỐ CÁO của

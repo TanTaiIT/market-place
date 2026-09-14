@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Field, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useRegister } from '@/queries/auth';
-import { useSignIn } from '@/stores/auth';
+import { useMarkPendingEmailVerify, useSignIn } from '@/stores/auth';
 import { C, F, G, shadow } from '@/theme';
 
 export default function Register() {
@@ -16,6 +16,7 @@ export default function Register() {
   const insets = useSafeAreaInsets();
   const register = useRegister();
   const signIn = useSignIn();
+  const markPendingVerify = useMarkPendingEmailVerify();
 
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '' });
   const set = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -30,7 +31,12 @@ export default function Register() {
       },
       {
         // Xem ghi chú ở login.tsx: bật phiên xong để Stack.Protected tự đổi route
-        onSuccess: (session) => signIn(session),
+        onSuccess: (session) => {
+          // Bật cờ TRƯỚC khi đổi phiên: `(tabs)/_layout` đọc nó ngay lượt mount đầu tiên,
+          // và lượt đó do chính `signIn` kích hoạt. Bật sau là màn tabs đã dựng xong.
+          markPendingVerify();
+          signIn(session);
+        },
         onError: (e: Error) => toast(e.message),
       },
     );

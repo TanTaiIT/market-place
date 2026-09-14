@@ -2,6 +2,8 @@ import {
   authLogin,
   authLogout,
   authRefresh,
+  authSendEmailCode,
+  authVerifyEmail,
   authRegister,
   categoryGetTemplate,
   categoryList,
@@ -289,6 +291,8 @@ function toProfile(dto: MeProfile): Profile {
     showPhone: dto.showPhone,
     posted: '—',
     sold: '—',
+    email: dto.email,
+    emailVerified: dto.isEmailVerified,
     rating: dto.ratingCount > 0 ? dto.ratingAvg.toFixed(1) : '—',
   };
 }
@@ -526,6 +530,27 @@ export const api = {
   async refreshSession(refreshToken: string): Promise<AuthSession> {
     const res = await authRefresh({ body: { refreshToken } });
     return toSession(unwrap(res, 'Phiên đăng nhập đã hết, đăng nhập lại nhé'));
+  },
+
+  /* ---------------- xác thực email ---------------- */
+
+  /**
+   * Xin một mã 6 số gửi về hộp thư.
+   *
+   * Không truyền email: BE lấy địa chỉ từ token. Đó là chốt chống dò tài khoản ở phía BE, và
+   * hệ quả ở đây là app không có cách nào gửi mã tới một hộp thư không phải của mình.
+   *
+   * `withAuthRetry` vì cả hai đường đều đòi đăng nhập — màn nhập mã có thể mở lâu (người dùng
+   * đi mở hộp thư rồi quay lại), đủ để access token 15 phút hết hạn giữa chừng.
+   */
+  async sendEmailCode(): Promise<{ expiresInSeconds: number; resendAfterSeconds: number }> {
+    const res = await withAuthRetry(() => authSendEmailCode());
+    return unwrap(res, 'Không gửi được mã xác thực');
+  },
+
+  async verifyEmail(code: string): Promise<void> {
+    const res = await withAuthRetry(() => authVerifyEmail({ body: { code } }));
+    unwrap(res, 'Mã không đúng hoặc đã hết hạn');
   },
 
   /* ---------------- categories ---------------- */

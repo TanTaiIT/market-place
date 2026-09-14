@@ -216,6 +216,8 @@ export const GENDER_LABEL: Record<Gender, string> = {
 
 export type Profile = {
   name: string;
+  /** Hộp thư đăng nhập — màn xác thực cần nó để nói rõ mã vừa gửi đi đâu. */
+  email: string;
   org: string;
   phone: string;
   avatar: string;
@@ -244,6 +246,13 @@ export type Profile = {
   area: { province: ProvinceName; source: 'profile' | 'listings' } | null;
   /** Cho hiện SĐT trên tin đăng MỚI. Tin đã đăng giữ nguyên vì `posterContact` là snapshot. */
   showPhone: boolean;
+  /**
+   * Hộp thư đã được chứng minh là của người này chưa.
+   *
+   * Tài khoản Google luôn `true` ngay từ lượt đăng nhập đầu — Google vừa chứng minh hộp thư.
+   * Tài khoản mật khẩu thì `false` cho tới khi gõ đúng mã 6 số (`/verify-email`).
+   */
+  emailVerified: boolean;
   /** Chuỗi chứ không phải số: BE chưa trả thống kê nào, nên `—` là giá trị hợp lệ. */
   posted: string;
   sold: string;

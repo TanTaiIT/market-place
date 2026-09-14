@@ -28,6 +28,26 @@ export function useRegister() {
   });
 }
 
+/**
+ * Xin mã xác thực email.
+ *
+ * Không tham số: BE lấy địa chỉ từ token (chốt chống dò tài khoản), nên app không chọn được
+ * hộp thư nhận. Không invalidate gì — gửi mã không đổi trạng thái nào mà UI đang đọc.
+ */
+export function useSendEmailCode() {
+  return useMutation({ mutationFn: () => api.sendEmailCode() });
+}
+
+export function useVerifyEmail() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => api.verifyEmail(code),
+    // `isEmailVerified` sống trong hồ sơ, và BE cố tình không trả hồ sơ ở đường này để không
+    // có hai nguồn cho cùng một dữ liệu — nên phải đọc lại.
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.profile() }),
+  });
+}
+
 /* --------------------------- session lifecycle --------------------------- */
 
 /**

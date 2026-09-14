@@ -152,6 +152,13 @@ export default function RootLayout() {
                 <Stack.Screen name="listing/[id]" />
                 <Stack.Screen name="user/[id]" />
                 <Stack.Screen name="org/[slug]/index" />
+                {/* Bài viết pháp lý — cụm tạm thời, công thức gỡ ở `@/api/legal`. Công khai
+                    có chủ ý: cả điểm của nó là cho người chưa có tài khoản đọc. */}
+                <Stack.Screen name="legal/[slug]" />
+                {/* Hai màn của cột "Hỗ trợ khách hàng" — dựng dạng modal cho khớp bản web.
+                    Route TĨNH nên expo-router ưu tiên chúng trước `legal/[slug]`. */}
+                <Stack.Screen name="legal/feedback" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="legal/feedback-list" options={{ presentation: 'modal' }} />
 
                 {/* Mọi route cần đăng nhập phải khai ở đây, kể cả route không cần option
                     riêng — screen không nằm trong khối này vẫn mở được bằng deep link. */}
@@ -160,6 +167,9 @@ export default function RootLayout() {
                   <Stack.Screen name="mylistings" />
                   <Stack.Screen name="saved" />
                   <Stack.Screen name="settings" />
+                  {/* Cần đăng nhập vì BE lấy địa chỉ nhận mã từ TOKEN, không từ body — xem
+                      `auth.routes.ts`. Khách chưa có tài khoản thì chưa có gì để xác thực. */}
+                  <Stack.Screen name="verify-email" />
                   {/* Cần đăng nhập nhưng KHÔNG cần thuộc tổ chức nào — đây chính là đường vào
                       tổ chức đầu tiên của một tài khoản mới. */}
                   <Stack.Screen name="join-org" />

@@ -178,4 +178,15 @@ export const qk = {
     ['admin', 'user-report', orgSlug, granularity, from ?? '', to ?? ''] as const,
   /** Từ điển field dùng chung — nguồn của bộ chọn field khi soạn template. */
   fieldDefinitions: () => ['admin', 'field-definitions'] as const,
+
+  /*
+   * Ý kiến của tổ chức xã hội (cụm TẠM THỜI — công thức gỡ ở `@/api/legal`).
+   *
+   * Hàng đợi duyệt đứng NGOÀI cụm `admin`: một lượt duyệt tin quét sạch `adminRoot()`, mà hàng
+   * đợi này thì không đổi theo lượt duyệt tin nào cả. Nó cũng KHÔNG mang `orgSlug` — ý kiến gửi
+   * cho pháp nhân vận hành sàn, không cho một nhóm nào (xem `social-feedback.model.ts`).
+   */
+  socialFeedback: () => ['social-feedback'] as const,
+  socialFeedbackQueueRoot: () => ['social-feedback', 'queue'] as const,
+  socialFeedbackQueue: (status: string) => ['social-feedback', 'queue', status] as const,
 };

@@ -86,6 +86,24 @@ export default function Profile() {
         </View>
       )}
 
+      {/*
+        Lối vào THỨ HAI của màn nhập mã — lối thứ nhất là lời mời tự bật ngay sau khi đăng ký
+        (`(tabs)/_layout`). Có chỗ này thì nút "Để sau" ở màn đó mới là hoãn chứ không phải mất
+        đường quay lại. Tài khoản Google luôn đã xác thực nên dải này không bao giờ hiện với họ.
+      */}
+      {!profile.emailVerified && (
+        <Pressable style={styles.verifyBanner} onPress={() => router.push('/verify-email')}>
+          <Text style={styles.verifyIcon}>✉️</Text>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.verifyTitle}>Email chưa được xác thực</Text>
+            <Text style={styles.verifyNote} numberOfLines={1}>
+              {profile.email} · chạm để nhập mã
+            </Text>
+          </View>
+          <Text style={styles.verifyGo}>›</Text>
+        </Pressable>
+      )}
+
       <View style={styles.menu}>
         {menu.map((m, i) => (
           <Animated.View key={m.text} entering={FadeInDown.delay(i * 60).duration(320)}>
@@ -135,6 +153,26 @@ const styles = StyleSheet.create({
   statNum: { fontFamily: F.monoBold, fontSize: 18, color: C.ink },
   statLabel: { fontFamily: F.ui, fontSize: 10.5, color: C.inkSoft, marginTop: 2 },
   orgBlock: { paddingHorizontal: 16, marginTop: 14 },
+
+  /* Nền vàng `tape` + viền trái: cùng ngôn ngữ "cần bạn để mắt" với các dải nhắc việc khác,
+     không phải `danger` — chưa xác thực là việc chưa làm, không phải lỗi. */
+  verifyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 16,
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: C.orangeLt,
+    borderLeftWidth: 3,
+    borderLeftColor: C.orange,
+  },
+  verifyIcon: { fontSize: 18 },
+  verifyTitle: { fontFamily: F.uiBold, fontSize: 13, color: C.ink },
+  verifyNote: { fontFamily: F.ui, fontSize: 11, color: C.inkSoft, marginTop: 2 },
+  verifyGo: { fontFamily: F.uiBold, fontSize: 18, color: C.orange },
   menu: { padding: 20, gap: 10 },
   row: {
     flexDirection: 'row',

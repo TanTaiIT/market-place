@@ -3,27 +3,36 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 /**
- * "Xem gần đây" của màn Khám phá — SNAPSHOT tại máy, không phải query.
+ * Dấu vết tin đã mở — **TÍN HIỆU, không còn là thứ để bày ra màn hình**.
  *
- * BE không có lịch sử xem (và không nên: đó là dữ liệu hành vi, gửi lên server phải hỏi
- * người dùng trước). Lưu nguyên mảnh hiển thị (tiêu đề, giá, ảnh) thay vì chỉ id: dải
- * "Xem gần đây" vẽ được ngay khi mở app, không bắn N request chỉ để dựng lại thumbnail.
- * Giá/tiêu đề vì thế có thể cũ vài ngày — chấp nhận được cho một dải gợi nhớ; bấm vào là
- * thấy bản thật.
+ * Trước đây store này nuôi dải "Xem gần đây" nên phải giữ cả tiêu đề, giá và ảnh để vẽ lại
+ * mà không bắn N request. Dải đó đã bị thay bằng "Gợi ý cho bạn", và người dùng không còn
+ * nhìn thấy lịch sử xem của mình ở đâu nữa — nó chỉ chảy vào bộ xếp hạng (`queries/suggested`).
  *
- * Khai lại type thay vì import `Listing` từ `@/api/db`: store là lá, không được import
- * layer khác (cùng lý do với `auth.ts`). `photo` khớp cấu trúc với `Grad` của theme.
+ * Vì thế ba trường hiển thị bị bỏ, đổi lấy hai trường bộ xếp hạng thật sự cần: `categoryId`
+ * (tín hiệu chính) và `province` (để xếp tin cùng tỉnh lên trước).
+ *
+ * Vẫn ở MÁY, không gửi lên server. Đây là dữ liệu hành vi: đẩy lên BE phải hỏi người dùng
+ * trước, và toàn bộ việc xếp hạng làm được tại chỗ nên chưa có lý do gì để hỏi.
+ *
+ * Khai lại type thay vì import `Listing` từ `@/api/db`: store là lá, không được import layer
+ * khác (cùng lý do với `auth.ts`).
  */
 export type RecentListing = {
   id: string;
-  title: string;
-  price: string;
-  photo: readonly [string, string];
-  photoUrl?: string;
+  /**
+   * Hai trường TUỲ CHỌN vì bản trước không ghi chúng.
+   *
+   * Không vứt bản ghi cũ: thiếu danh mục thì chúng không cộng điểm cho danh mục nào được,
+   * nhưng `id` vẫn còn giá trị — bộ gợi ý dùng nó để KHÔNG gợi lại tin người dùng vừa xem.
+   * Vứt đi là mất luôn vế đó, đổi lấy không được gì.
+   */
+  categoryId?: string;
+  province?: string;
 };
 
-/** Dải chỉ là một hàng cuộn ngang — quá 10 mục thì mục cuối không ai lướt tới. */
-const MAX_RECENT = 10;
+/** 20 mục: không còn là một dải để lướt mà là mẫu hành vi — mẫu càng rộng thì gợi ý càng đỡ lệch. */
+const MAX_RECENT = 20;
 
 type RecentState = {
   items: RecentListing[];
@@ -35,7 +44,8 @@ export const useRecentStore = create<RecentState>()(
   persist(
     (set) => ({
       items: [],
-      // Xem lại tin cũ thì đưa nó lên đầu chứ không nhân bản — dải là "gần đây nhất trước".
+      // Xem lại tin cũ thì đưa nó lên đầu chứ không nhân bản — thứ tự CHÍNH LÀ độ mới, và bộ
+      // xếp hạng đọc thứ tự đó để tin xem gần đây cân nặng hơn tin xem tuần trước.
       record: (item) =>
         set((s) => ({
           items: [item, ...s.items.filter((x) => x.id !== item.id)].slice(0, MAX_RECENT),
@@ -45,10 +55,24 @@ export const useRecentStore = create<RecentState>()(
     {
       name: 'ghim-recent',
       storage: createJSONStorage(() => AsyncStorage),
-      // Bản ghi hỏng (app cũ, ghi dở) thì vứt: dải trống là trạng thái hợp lệ, còn một mảng
-      // rác sẽ crash ngay ở `.filter` của lần `record` kế tiếp.
+      /*
+       * Chuẩn hoá lúc đọc đĩa, không migrate bằng `version`: bản ghi cũ mang thừa ba trường
+       * hiển thị và thiếu hai trường tín hiệu, mà cả hai chuyện đó xử được bằng một lượt map.
+       *
+       * Mảng rác (app cũ, ghi dở) thì vứt: rỗng là trạng thái hợp lệ, còn một mảng sai kiểu
+       * sẽ nổ ngay ở `.filter` của lần `record` kế tiếp.
+       */
       onRehydrateStorage: () => (state) => {
-        if (state && !Array.isArray(state.items)) useRecentStore.setState({ items: [] });
+        if (!state) return;
+        if (!Array.isArray(state.items)) {
+          useRecentStore.setState({ items: [] });
+          return;
+        }
+        useRecentStore.setState({
+          items: state.items
+            .filter((x): x is RecentListing => typeof x?.id === 'string')
+            .map(({ id, categoryId, province }) => ({ id, categoryId, province })),
+        });
       },
     },
   ),

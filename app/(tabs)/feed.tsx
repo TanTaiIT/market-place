@@ -10,8 +10,8 @@ import {
   CategoryStrip,
   FeaturedStrip,
   OrgNearbyStrip,
-  RecentStrip,
 } from '@/components/FeedHighlights';
+import { FeedSuggested } from '@/components/FeedSuggested';
 import { SiteFooter } from '@/components/SiteFooter';
 import { useRequireAuth } from '@/components/GuestGate';
 import { useCollapsingHeader } from '@/components/useCollapsingHeader';
@@ -24,9 +24,12 @@ import type { ProvinceName } from '@/api/location';
 import { C } from '@/theme';
 
 /**
- * Trang chủ là trang KHÁM PHÁ, không phải bảng tin: các dải nổi bật + khu vực + xem gần
- * đây + banner. Danh sách tin đầy đủ nằm sau tìm kiếm — chip danh mục và thẻ tìm kiếm
- * trên thanh đầu đều dẫn thẳng sang trang kết quả thay vì lọc tại chỗ như bản trước.
+ * Trang chủ là trang KHÁM PHÁ, không phải bảng tin: các dải nổi bật + khu vực + gợi ý theo gu
+ * + banner. Danh sách tin đầy đủ nằm sau tìm kiếm — chip danh mục và thẻ tìm kiếm trên thanh
+ * đầu đều dẫn thẳng sang trang kết quả thay vì lọc tại chỗ như bản trước.
+ *
+ * Dải "Xem gần đây" đã bị thay bằng `FeedSuggested`: bày lại đúng những tin người dùng vừa mở
+ * là nhắc lại thứ họ đã thấy, còn lịch sử đó dùng làm tín hiệu thì dẫn họ tới tin MỚI cùng gu.
  */
 export default function Feed() {
   const router = useRouter();
@@ -107,7 +110,7 @@ export default function Feed() {
           area={profile?.area ?? null}
           onOpen={(slug) => router.push(`/org/${slug}`)}
         />
-        <RecentStrip onOpen={(id) => router.push(`/listing/${id}`)} />
+        <FeedSuggested onOpen={(id) => router.push(`/listing/${id}`)} />
 
         {/*
           Ba khối TIẾP THỊ, LUÔN hiện, đặt ở cuối.

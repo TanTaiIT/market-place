@@ -40,6 +40,14 @@ export const qk = {
   /** Không nằm dưới prefix `listings()`: gợi ý gắn với MỘT tin, đăng tin mới không làm nó sai. */
   listingSuggestions: (id: string) => ['listing', id, 'suggestions'] as const,
   /**
+   * Dải "Gợi ý cho bạn" ở trang chủ. `signals` là tín hiệu đã chốt ở máy (xem `queries/suggested`).
+   *
+   * Cũng đứng ngoài prefix `listings()`, nhưng vì lý do khác `listingSuggestions`: dải này đọc
+   * theo GU người dùng, nên một lượt đăng tin hay một lượt duyệt tin không làm nó sai — quét
+   * nó cùng cụm `listings` là ném đi một câu trả lời vẫn còn đúng.
+   */
+  suggested: (signals: string) => ['suggested', signals] as const,
+  /**
    * Cả bộ lọc nằm trong key: mỗi tổ hợp là một tập kết quả khác, không phải cùng một truy vấn.
    * Liệt kê từng field theo thứ tự cố định thay vì `JSON.stringify` — thứ tự khoá của object
    * không có gì bảo đảm, và hai key khác chuỗi cho cùng một bộ lọc là hai lần gọi mạng.

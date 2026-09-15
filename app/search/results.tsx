@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { FlatList, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { useRequireAuth } from '@/components/GuestGate';
 import { EmptyState, Loading, PagedFooter, ScreenHeader } from '@/components/ui';
 import { useSavedIds, useSearch, useToggleSaved } from '@/queries/listings';
 import { useMyOrgs } from '@/queries/org';
+import { useRecordSearch } from '@/stores/search-history';
 import { hasSearchCriteria, paramsToSearch, searchToParams } from '@/api/db';
 import type { SearchFilter } from '@/api/db';
 import { C } from '@/theme';
@@ -24,6 +25,27 @@ export default function SearchResults() {
   const params = useLocalSearchParams();
   const filter = paramsToSearch(params as Record<string, string | string[] | undefined>);
   const { data, error, isFetching, total, loadMore, isFetchingNextPage } = useSearch(filter);
+
+  /*
+   * Ghi lượt tìm làm tín hiệu cho "Gợi ý cho bạn" — ghi ở ĐÂY chứ không ở form `/search`.
+   *
+   * Màn kết quả là nơi duy nhất mọi đường tìm kiếm đi qua: form lọc, chip danh mục ở thanh đầu
+   * bảng tin, ô tìm nhanh, và cả deep link. Ghi ở form thì ba đường kia không được đếm.
+   *
+   * Bỏ qua lượt "mở trang kết quả rỗng" (không tiêu chí nào): nó không nói lên sở thích gì, mà
+   * lại là đường người dùng bấm nhiều nhất — đếm nó vào là làm loãng mọi tín hiệu thật.
+   */
+  const recordSearch = useRecordSearch();
+  // Tách ba trường ra biến rời: `filter` là object MỚI mỗi lần render, để nó trong mảng
+  // dependency là effect chạy mỗi khung hình và ghi lại cùng một lượt tìm hàng chục lần.
+  const { q, categoryId, province } = filter;
+  // Chỉ ghi khi có tín hiệu THẬT trong ba trường được ghi xuống. `hasSearchCriteria` rộng hơn
+  // thế (còn tính giá, xã, nhóm), nên dựa vào nó sẽ ghi những bản ghi rỗng không nói lên gì.
+  const hasSignal = q.trim() !== '' || categoryId !== null || province !== null;
+  useEffect(() => {
+    if (!hasSignal) return;
+    recordSearch({ q: q.trim(), categoryId, province });
+  }, [hasSignal, q, categoryId, province, recordSearch]);
 
   /*
    * Thẻ tin của bảng tin cần bốn thứ ngoài `item`: trạng thái đã lưu, hành động lưu, tên tổ chức

@@ -9,7 +9,7 @@ import Animated, {
 import { useRouter } from 'expo-router';
 import type { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRequireAuth } from './GuestGate';
+import { useRequireAuth, useRequireVerifiedEmail } from './GuestGate';
 import { useConversations } from '@/queries/chat';
 import { useNotifications } from '@/queries/notifications';
 import { onSocketEvent } from '@/api/socket';
@@ -42,6 +42,7 @@ export function TabBar({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const requireAuth = useRequireAuth();
+  const requireVerified = useRequireVerifiedEmail();
   const { data: conversations } = useConversations();
   const hasUnread = !!conversations?.some((c) => c.unread);
   const { data: notifs } = useNotifications();
@@ -92,7 +93,12 @@ export function TabBar({ state, navigation }: TabBarProps) {
         {left.map(renderItem)}
 
         <Pressable
-          onPress={() => requireAuth(() => router.push('/post'), 'Đăng nhập để đăng tin')}
+          onPress={() =>
+            requireAuth(
+              () => requireVerified(() => router.push('/post'), 'Xác thực email trước khi đăng tin'),
+              'Đăng nhập để đăng tin',
+            )
+          }
           style={({ pressed }) => [styles.fabSlot, pressed && { opacity: 0.85 }]}
         >
           <View style={styles.fab}>

@@ -659,6 +659,55 @@ export const api = {
   },
 
   /**
+   * Nguồn của dải "Gợi ý cho bạn" — gom vài lượt tìm hẹp rồi trộn lại.
+   *
+   * Khác `getSuggestions` ở câu hỏi nó trả lời: đường kia hỏi "tin nào giống TIN NÀY", đường
+   * này hỏi "tin nào hợp GU người này". Tín hiệu do `queries/suggested` tính ở máy và truyền
+   * vào đây dưới dạng đã chốt — tầng này không biết gì về lịch sử xem hay lịch sử tìm.
+   *
+   * TỐI ĐA 2 lượt gọi, và đó là trần cố ý: đây là màn đầu tiên người dùng thấy khi mở app,
+   * nên mỗi request thêm vào là thời gian họ nhìn màn trống. Hai lượt × 10 dòng cho ra tối đa
+   * 20 ứng viên, thừa cho một dải 6 thẻ kể cả sau khi trừ trùng và trừ tin đã xem.
+   *
+   * `province` XẾP chứ không LỌC — cùng luật với `getSuggestions`, và BE cũng chốt thế cho
+   * `ward` ở `/listings/nearby`: lọc cứng ở tỉnh thưa tin thì người xem nhận về khoảng trống.
+   */
+  async getSuggestedFeed(input: {
+    /** Tối đa 2 lượt gọi: mỗi phần tử là query của một lượt. */
+    probes: { q?: string; category?: string; province?: ProvinceName }[];
+    province: ProvinceName | null;
+    /** Tin người dùng vừa xem — gợi lại chúng thì dải này chỉ là "Xem gần đây" đội tên khác. */
+    excludeIds: string[];
+    take: number;
+  }): Promise<Listing[]> {
+    const [pages, names] = await Promise.all([
+      Promise.all(
+        input.probes
+          .slice(0, 2)
+          .map((p) => withAuthRetry(() => listingList({ query: { ...p, limit: PAGE_SIZE } }))),
+      ),
+      categoryNames(),
+    ]);
+
+    const skip = new Set(input.excludeIds);
+    const seen = new Set<string>();
+    const rows: Listing[] = [];
+    // Duyệt theo thứ tự `probes` để lượt gọi đầu (tín hiệu mạnh nhất) chiếm chỗ trước khi
+    // lượt sau chen vào — `Promise.all` giữ nguyên thứ tự đầu vào nên chỗ này tin được.
+    for (const page of pages) {
+      for (const dto of unwrap(page, 'Không tải được tin gợi ý')) {
+        if (skip.has(dto._id) || seen.has(dto._id)) continue;
+        seen.add(dto._id);
+        rows.push(toListing(dto, names));
+      }
+    }
+
+    const here = rows.filter((l) => l.province === input.province);
+    const elsewhere = rows.filter((l) => l.province !== input.province);
+    return [...here, ...elsewhere].slice(0, input.take);
+  },
+
+  /**
    * MỘT tin của chính mình, mọi trạng thái — dùng để dựng form sửa.
    *
    * Không dùng `getListing` cho form sửa: `GET /listings/{id}` lọc `status ∈ {active, sold,

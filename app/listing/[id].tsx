@@ -16,7 +16,7 @@ import { ListingSuggestions } from '@/components/ListingSuggestions';
 import { ReportButton } from '@/components/ReportButton';
 import { Avatar, EmptyState, Loading, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
-import { useRequireAuth } from '@/components/GuestGate';
+import { useRequireAuth, useRequireVerifiedEmail } from '@/components/GuestGate';
 import { useIsAuthenticated } from '@/stores/auth';
 import { useRecordRecent } from '@/stores/recent';
 import { useListing, useSavedIds, useToggleSaved } from '@/queries/listings';
@@ -31,6 +31,7 @@ export default function ListingDetail() {
   const listingId = id ?? '';
   const router = useRouter();
   const requireAuth = useRequireAuth();
+  const requireVerified = useRequireVerifiedEmail();
   const isAuthenticated = useIsAuthenticated();
   const toast = useToast();
   const insets = useSafeAreaInsets();
@@ -62,19 +63,19 @@ export default function ListingDetail() {
   }, [listingId]);
 
   /*
-   * Ghi vào "Xem gần đây" khi tin VỀ ĐẾN nơi, không phải khi màn mount: id sai/404 mà cũng
-   * ghi thì dải ở trang chủ sẽ bày một thẻ bấm vào chỉ thấy lỗi. Snapshot đúng các mảnh dải
-   * cần vẽ — xem lý do ở `@/stores/recent`.
+   * Ghi dấu vết khi tin VỀ ĐẾN nơi, không phải khi màn mount: id sai/404 mà cũng ghi thì bộ
+   * gợi ý học từ một tin không tồn tại.
+   *
+   * Chỉ ghi danh mục + tỉnh, không ghi tiêu đề/giá/ảnh như bản trước: dấu vết này không còn
+   * được bày ra màn hình nào nữa, nó chỉ chảy vào bộ xếp hạng — xem `@/stores/recent`.
    */
   const recordRecent = useRecordRecent();
   useEffect(() => {
     if (listing) {
       recordRecent({
         id: listing.id,
-        title: listing.title,
-        price: listing.price,
-        photo: listing.photo,
-        photoUrl: listing.photoUrls?.[0],
+        categoryId: listing.categoryId,
+        province: listing.province ?? undefined,
       });
     }
   }, [listing, recordRecent]);
@@ -124,13 +125,22 @@ export default function ListingDetail() {
       );
     }, 'Đăng nhập để lưu tin');
 
+  /*
+   * Hai cửa lồng nhau, và THỨ TỰ là cố ý: hỏi "bạn là ai" trước, rồi mới hỏi "hộp thư đó có
+   * thật của bạn không". Đảo lại thì khách chưa đăng nhập bị mời đi xác thực một email họ
+   * chưa từng khai.
+   */
   const onMessage = () =>
-    requireAuth(() => {
-      openChat.mutate(listingId, {
-        onSuccess: (c) => router.push(`/chat/${c.id}`),
-        onError: (e: Error) => toast(`📌 ${e.message}`),
-      });
-    }, 'Đăng nhập để nhắn cho người bán');
+    requireAuth(
+      () =>
+        requireVerified(() => {
+          openChat.mutate(listingId, {
+            onSuccess: (c) => router.push(`/chat/${c.id}`),
+            onError: (e: Error) => toast(`📌 ${e.message}`),
+          });
+        }, 'Xác thực email trước khi nhắn cho người bán'),
+      'Đăng nhập để nhắn cho người bán',
+    );
 
   if (isLoading) return <Loading />;
   // `isLoading` chỉ true ở lần fetch đầu: query hỏng hoặc id không tồn tại đều rơi xuống đây,

@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useIsAuthenticated } from '@/stores/auth';
+import { useProfile } from '@/queries/listings';
 import { PinButton, TabHeader } from './ui';
 import { useToast } from './Toast';
 import { C, F, R } from '@/theme';
@@ -55,6 +56,40 @@ export function useRequireAuth() {
       router.push('/login');
     },
     [isAuthenticated, router, toast],
+  );
+}
+
+/**
+ * Bọc một hành động cần ĐÃ XÁC THỰC EMAIL — đăng tin, nhắn tin.
+ *
+ * Cùng hình dạng `useRequireAuth` vì đây là cùng một loại cửa, chỉ khác điều kiện: một cửa hỏi
+ * "bạn là ai", cửa này hỏi "hộp thư đó có thật là của bạn không". Đặt cạnh nhau trong một file
+ * để lời hứa "chỗ nào bị chặn" nằm ở một chỗ.
+ *
+ * Chốt THẬT nằm ở BE (`requireVerifiedEmail`, trả 403). Hàm này chỉ để người dùng gặp lời mời
+ * kèm lối đi thay vì một câu báo lỗi cụt — chặn ở client không phải là bảo mật.
+ *
+ * Người dùng CHƯA đăng nhập đi qua đây mà không bị chặn: gọi tầng nào trước là việc của
+ * call-site, và mọi call-site hiện tại đều bọc `requireAuth` ở vòng ngoài.
+ */
+export function useRequireVerifiedEmail() {
+  const { data: profile } = useProfile();
+  const router = useRouter();
+  const toast = useToast();
+  // `undefined` = chưa tải xong hồ sơ hoặc đang là khách — không chặn, để BE nói tiếng nói
+  // cuối. Chặn ở đây sẽ khoá nhầm người dùng hợp lệ trong lúc hồ sơ còn đang bay về.
+  const verified = profile?.emailVerified ?? true;
+
+  return useCallback(
+    (action: () => void, why = 'Xác thực email để dùng tính năng này') => {
+      if (verified) {
+        action();
+        return;
+      }
+      toast(`✉️ ${why}`);
+      router.push('/verify-email');
+    },
+    [verified, router, toast],
   );
 }
 

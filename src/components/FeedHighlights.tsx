@@ -6,17 +6,15 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ListingPhoto } from './ListingPhoto';
+import { ListingSlide, SlideRow } from './ListingSlide';
 import { squareUrl } from '@/api/cloudinary';
 import { gradOf, initialsOf } from '@/api/client';
-import { useRecentListings } from '@/stores/recent';
 import type { Category, Listing, Profile } from '@/api/db';
 import type { OrgRow } from '@/api/org';
 import { SectionHead } from './SectionHead';
-import { C, F, R, S, T, shadow } from '@/theme';
+import { C, F, S, T, shadow } from '@/theme';
 
 /**
  * Các dải DỮ LIỆU của màn Khám phá — khác `FeedStrips` (trang trí thuần, chữ hardcode):
@@ -25,7 +23,6 @@ import { C, F, R, S, T, shadow } from '@/theme';
  * - `CategoryStrip` "Danh mục sôi động": đếm tin theo danh mục, bấm là mở kết quả lọc.
  * - `OrgNearbyStrip` "Nhóm quanh bạn": nhóm công khai cùng tỉnh với KHU VỰC ĐÃ GIẢI của người xem
  *   (`profile.area` — tự khai, hoặc suy từ nơi họ đã đăng tin).
- * - `RecentStrip` "Xem gần đây": snapshot tại máy (`@/stores/recent`), ghi mỗi lần mở tin.
  *
  * Mọi dải TỰ GIẤU khi chưa có gì để bày — dải trống với một tiêu đề trơ trọi trông như màn
  * hình lỗi, và người dùng mới (chưa xem tin nào, chưa khai tỉnh) là người dễ gặp nhất.
@@ -62,7 +59,6 @@ export function FeaturedStrip({
   /** Mở trang kết quả không kèm bộ lọc — dải chỉ bày `MAX_FEATURED` tin đầu. */
   onSeeAll?: () => void;
 }) {
-  const { width: winW } = useWindowDimensions();
   // Chỉ tin ĐÃ có người quan tâm: hệ mới toanh mà vẫn bày "nổi bật" thì đó là 8 tin
   // ngẫu nhiên đội lốt — thà giấu dải còn hơn dạy người dùng rằng nhãn này vô nghĩa.
   const top = listings
@@ -72,53 +68,14 @@ export function FeaturedStrip({
 
   if (top.length === 0) return null;
 
-  /*
-   * Mỗi slide to bằng MỘT thẻ tin của bảng (full bề ngang trừ lề 16 hai bên), chỉ hụt thêm
-   * 20px để ló mép thẻ kế — không có mép ló thì thẻ full-width trông như một tin của bảng
-   * và chẳng ai biết chỗ này lướt ngang được.
-   */
-  const cardW = winW - 32 - 20;
-  const GAP = 11;
-
   return (
     <View style={[styles.block, grid && styles.inset]}>
       <SectionHead title="Tin nổi bật 🔥" onSeeAll={onSeeAll} />
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.row}
-        // Lướt là đậu đúng mép một thẻ, không dừng lửng giữa hai tin.
-        snapToInterval={cardW + GAP}
-        decelerationRate="fast"
-      >
+      <SlideRow>
         {top.map((item) => (
-          <Pressable
-            key={item.id}
-            onPress={() => onOpen(item.id)}
-            style={({ pressed }) => [styles.featCard, { width: cardW }, pressed && { opacity: 0.9 }]}
-          >
-            <ListingPhoto
-              photo={item.photo}
-              photoUrl={item.photoUrls?.[0]}
-              style={styles.featPhoto}
-              imageStyle={styles.featPhotoRadius}
-            >
-              <View style={styles.featPrice}>
-                <Text style={styles.featPriceText}>{item.price}</Text>
-              </View>
-            </ListingPhoto>
-            <View style={styles.featBody}>
-              <Text numberOfLines={2} style={styles.featTitle}>
-                {item.title}
-              </Text>
-              <Text numberOfLines={1} style={styles.featMeta}>
-                {item.favoriteCount > 0 ? `❤️ ${item.favoriteCount} quan tâm · ` : ''}
-                👁 {item.viewCount} lượt xem
-              </Text>
-            </View>
-          </Pressable>
+          <ListingSlide key={item.id} item={item} onPress={() => onOpen(item.id)} />
         ))}
-      </ScrollView>
+      </SlideRow>
     </View>
   );
 }
@@ -280,56 +237,6 @@ export function OrgNearbyStrip({
   );
 }
 
-/* -------------------------------- Xem gần đây -------------------------------- */
-
-export function RecentStrip({ grid, onOpen }: { grid?: boolean; onOpen: (id: string) => void }) {
-  const { width: winW } = useWindowDimensions();
-  const items = useRecentListings();
-  if (items.length === 0) return null;
-
-  // Cùng số đo slide với `FeaturedStrip` — hai dải thẻ tin trên cùng một màn mà hai cỡ
-  // khác nhau thì trông như hai app ghép lại.
-  const cardW = winW - 32 - 20;
-  const GAP = 11;
-
-  return (
-    <View style={[styles.block, grid && styles.inset]}>
-      <SectionHead title="Xem gần đây" />
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.row}
-        snapToInterval={cardW + GAP}
-        decelerationRate="fast"
-      >
-        {items.map((item) => (
-          <Pressable
-            key={item.id}
-            onPress={() => onOpen(item.id)}
-            style={({ pressed }) => [styles.featCard, { width: cardW }, pressed && { opacity: 0.9 }]}
-          >
-            <ListingPhoto
-              photo={item.photo}
-              photoUrl={item.photoUrl}
-              style={styles.featPhoto}
-              imageStyle={styles.featPhotoRadius}
-            >
-              <View style={styles.featPrice}>
-                <Text style={styles.featPriceText}>{item.price}</Text>
-              </View>
-            </ListingPhoto>
-            <View style={styles.featBody}>
-              <Text numberOfLines={2} style={styles.featTitle}>
-                {item.title}
-              </Text>
-            </View>
-          </Pressable>
-        ))}
-      </ScrollView>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   /* `S.xl` giữa hai khối, không phải 18: đây là đòn 'thoáng' mạnh nhất của cả màn — khoảng thở
      giữa các mục là thứ mắt đọc ra trước cả màu và cỡ chữ. Đừng hạ để nhồi thêm mục. */
@@ -337,28 +244,6 @@ const styles = StyleSheet.create({
   /** Chế độ LƯỚI không có lề ngang ở container của danh sách nên dải phải tự bù. */
   inset: { paddingHorizontal: S.lg },
   row: { gap: S.md, paddingRight: S.xs },
-
-  featCard: { backgroundColor: C.paperWarm, borderRadius: R.md, ...shadow },
-  featPhoto: { height: 200, borderTopLeftRadius: R.md, borderTopRightRadius: R.md },
-  featPhotoRadius: { borderTopLeftRadius: R.md, borderTopRightRadius: R.md },
-  /** Nhãn giá đè góc ảnh — cùng thủ pháp `priceTag` của NoteCard, người dùng đã quen mắt. */
-  featPrice: {
-    position: 'absolute',
-    left: S.lg,
-    bottom: -2,
-    backgroundColor: C.brandDark,
-    paddingHorizontal: S.md,
-    paddingVertical: S.xs + 1,
-    borderRadius: R.sm,
-    borderBottomLeftRadius: 0,
-  },
-  featPriceText: { color: '#fff', fontFamily: F.monoBold, ...T.sm },
-  featBody: { padding: S.lg },
-  /* Tiêu đề thẻ về `T.md` (15/22) từ 19/25. Cỡ 19 trên một thẻ ngang 280pt ăn hết hai dòng cho
-     một tiêu đề, đẩy phần meta xuống và làm thẻ trông đầy; 15 với `lineHeight` 1.47× vừa gọn
-     vừa đủ chỗ cho dấu tiếng Việt. */
-  featTitle: { fontFamily: F.uiBold, ...T.md, color: C.ink },
-  featMeta: { fontFamily: F.ui, ...T.sm, color: C.inkSoft, marginTop: S.sm },
 
   /* Vòng tròn dùng chung cho danh mục và nhóm — hai dải cùng ngôn ngữ "story" như Mioto. */
   circleItem: { alignItems: 'center', width: 96 },

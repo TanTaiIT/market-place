@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ModListing } from '@/api/admin';
 import { ListingPhoto } from './ListingPhoto';
@@ -33,11 +34,19 @@ export function AdminListingSheet({
   const insets = useSafeAreaInsets();
 
   return (
-    <Modal visible={!!item} transparent animationType="slide" onRequestClose={onClose}>
+    /*
+      `fade` chứ KHÔNG `slide`: `animationType` trượt TOÀN BỘ nội dung Modal, mà nền mờ nằm bên
+      trong nên nó trượt lên theo — thành một mảng xám chạy lên giữa màn hình, đúng thứ nhìn rất
+      xấu. Để Modal lo phần hiện nền mờ, còn cú trượt do chính tấm sheet làm bằng `entering`.
+    */
+    <Modal visible={!!item} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.scrim} onPress={onClose} />
 
       {!!item && (
-        <View style={[styles.sheet, { paddingBottom: insets.bottom }]}>
+        <Animated.View
+          entering={SlideInDown.duration(260)}
+          style={[styles.sheet, { paddingBottom: insets.bottom }]}
+        >
           <View style={styles.head}>
             <Text style={styles.headTitle}>Chi tiết tin đăng</Text>
             <Pressable onPress={onClose} hitSlop={10} style={styles.close}>
@@ -94,7 +103,7 @@ export function AdminListingSheet({
               <Text style={styles.btnDangerText}>Gỡ khỏi bảng</Text>
             </Pressable>
           </View>
-        </View>
+        </Animated.View>
       )}
     </Modal>
   );

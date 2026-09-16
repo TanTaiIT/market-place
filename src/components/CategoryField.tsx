@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CategoryPicker } from './CategoryPicker';
 import { useCategories } from '@/queries/listings';
-import { C, F, shadow } from '@/theme';
+import { C, F, S, shadow } from '@/theme';
 
 /**
  * Ô danh mục của form đăng tin — thực chất hai thứ: MỘT dòng hiện danh mục đã chọn, và cái cửa
@@ -83,10 +83,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: C.paperWarm,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 18,
+    borderRadius: 12,
+    /*
+     * KHÔNG còn `marginBottom`: thẻ này giờ là một khối ngang hàng với các mục của form, và
+     * khoảng cách giữa các khối do `gap` của vùng cuộn lo. Giữ lề riêng ở đây thì nó cộng
+     * thêm vào `gap` và khe đầu tiên rộng gấp đôi mọi khe còn lại.
+     *
+     * Đệm và bo góc khớp `styles.card` bên `ListingForm` — cùng một loại khối thì cùng số đo.
+     */
+    paddingHorizontal: S.lg,
+    paddingVertical: S.md,
     ...shadow,
   },
   rowLabel: { fontFamily: F.mono, fontSize: 9.5, letterSpacing: 1.2, color: C.inkSoft },

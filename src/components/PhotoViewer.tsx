@@ -67,7 +67,13 @@ export function PhotoViewer({
             setPage(Math.round(e.nativeEvent.contentOffset.x / width))
           }
           renderItem={({ item }) => (
-            <ZoomableImage uri={item} width={width} height={height} onZoomChange={setZoomed} />
+            <ZoomableImage
+              uri={item}
+              width={width}
+              height={height}
+              onZoomChange={setZoomed}
+              onClose={onClose}
+            />
           )}
         />
 
@@ -98,11 +104,14 @@ function ZoomableImage({
   width,
   height,
   onZoomChange,
+  onClose,
 }: {
   uri: string;
   width: number;
   height: number;
   onZoomChange: (zoomed: boolean) => void;
+  /** Chạm vùng tối quanh ảnh — xem `tapBackdrop`. */
+  onClose: () => void;
 }) {
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -189,9 +198,39 @@ function ZoomableImage({
       settle(scale.value > 1 ? 1 : 2);
     });
 
-  // Pinch và pan phải chạy song song (chụm hai ngón cũng là kéo). Double-tap đứng TRƯỚC trong
-  // `Exclusive`: để sau thì pan giành quyền ngay từ chạm đầu và cú chạm đôi không bao giờ tới.
-  const gesture = Gesture.Exclusive(doubleTap, Gesture.Simultaneous(pinch, pan));
+  /**
+   * Chạm VÙNG TỐI quanh ảnh để đóng — lối thoát thứ hai, cạnh nút ✕.
+   *
+   * Chỉ tính phần nền, không tính chính tấm ảnh: `resizeMode="contain"` nên ảnh thật chỉ chiếm
+   * `fit.w × fit.h` ở giữa, trong khi ô nhận chạm phủ trọn màn. Đóng khi chạm cả vào ảnh sẽ
+   * cướp mất thao tác tự nhiên nhất của một người đang soi món hàng — chạm vào chỗ họ muốn nhìn kỹ.
+   *
+   * Đang phóng to thì KHÔNG đóng: lúc đó ảnh tràn ra ngoài khung nên chỗ nào cũng là ảnh, và
+   * một cú chạm hụt trong lúc xoay xở sẽ ném họ ra khỏi màn.
+   */
+  const tapBackdrop = Gesture.Tap()
+    .numberOfTaps(1)
+    .maxDistance(TAP_SLOP)
+    .onEnd((e) => {
+      'worklet';
+      if (scale.value > 1) return;
+      const insideX = Math.abs(e.x - width / 2) <= fit.w / 2;
+      const insideY = Math.abs(e.y - height / 2) <= fit.h / 2;
+      if (!insideX || !insideY) scheduleOnRN(onClose);
+    });
+
+  /*
+   * Pinch và pan phải chạy song song (chụm hai ngón cũng là kéo). Double-tap đứng TRƯỚC trong
+   * `Exclusive`: để sau thì pan giành quyền ngay từ chạm đầu và cú chạm đôi không bao giờ tới.
+   *
+   * `tapBackdrop` xếp SAU `doubleTap` cũng vì thứ tự đó: `Exclusive` chỉ cho nó kích hoạt khi
+   * double-tap đã thua, nên một cú chạm đôi để phóng to không bị đóng màn ngay ở nhịp đầu.
+   */
+  const gesture = Gesture.Exclusive(
+    doubleTap,
+    tapBackdrop,
+    Gesture.Simultaneous(pinch, pan),
+  );
 
   const style = useAnimatedStyle(() => ({
     transform: [{ translateX: x.value }, { translateY: y.value }, { scale: scale.value }],

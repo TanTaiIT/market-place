@@ -197,4 +197,20 @@ export const qk = {
   socialFeedback: () => ['social-feedback'] as const,
   socialFeedbackQueueRoot: () => ['social-feedback', 'queue'] as const,
   socialFeedbackQueue: (status: string) => ['social-feedback', 'queue', status] as const,
+
+  /**
+   * Kênh hỗ trợ. `supportRoot` là prefix để một lần invalidate quét cả hàng đợi lẫn từng
+   * luồng — trả lời một luồng làm đổi cả hai.
+   *
+   * KHÔNG nằm dưới `adminRoot`: luồng của chính người dùng là dữ liệu của họ, không phải dữ
+   * liệu quản trị, và mọi mutation của bàn quản trị đang quét sạch `adminRoot()`.
+   *
+   * `supportThread` không mang `userId`: BE lấy người gọi từ access token nên id ở đây là một
+   * tham số giả, không chọn ra câu trả lời nào. Đổi tài khoản thì `qc.clear()` lúc đăng xuất
+   * đã dọn sạch cache.
+   */
+  supportRoot: () => ['support'] as const,
+  supportThread: () => ['support', 'me'] as const,
+  supportQueue: (waiting: boolean) => ['support', 'queue', waiting] as const,
+  supportThreadDetail: (id: string) => ['support', 'thread', id] as const,
 };

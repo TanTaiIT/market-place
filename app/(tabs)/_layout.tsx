@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react';
+import { View } from 'react-native';
 import { Tabs, useRouter } from 'expo-router';
+import { SupportFab } from '@/components/SupportFab';
 import { TabBar } from '@/components/TabBar';
 import { useAuthStore, usePendingEmailVerify } from '@/stores/auth';
 
@@ -25,14 +27,26 @@ export default function TabsLayout() {
   }, [pendingVerify, router]);
 
   return (
-    <Tabs
-      tabBar={(props) => <TabBar {...props} />}
-      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: 'transparent' } }}
-    >
-      <Tabs.Screen name="feed" />
-      <Tabs.Screen name="chatlist" />
-      <Tabs.Screen name="notif" />
-      <Tabs.Screen name="profile" />
-    </Tabs>
+    /*
+     * `SupportFab` là ANH EM của `<Tabs>`, không nằm trong màn nào: nút phải theo người dùng qua
+     * cả bốn tab. Đặt vào từng màn là bốn bản sao có thể lệch nhau, và nút sẽ nhấp nháy mỗi lần
+     * đổi tab vì bị mount lại.
+     *
+     * Khai SAU `<Tabs>` để nằm trên, và `flex: 1` trên khung bọc để navigator vẫn chiếm trọn
+     * màn — thiếu nó thì `<Tabs>` co lại bằng nội dung và cả cụm tab biến mất.
+     */
+    <View style={{ flex: 1 }}>
+      <Tabs
+        tabBar={(props) => <TabBar {...props} />}
+        screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: 'transparent' } }}
+      >
+        <Tabs.Screen name="feed" />
+        <Tabs.Screen name="chatlist" />
+        <Tabs.Screen name="notif" />
+        <Tabs.Screen name="profile" />
+      </Tabs>
+
+      <SupportFab />
+    </View>
   );
 }

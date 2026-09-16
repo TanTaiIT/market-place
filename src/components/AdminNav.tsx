@@ -131,6 +131,9 @@ const GROUPS: NavGroup[] = [
       { href: '/admin/organizations', icon: '🏫', label: 'Tổ chức', gate: 'master' },
       // `GET /users` đòi `requireMaster` (user.routes.ts) — thiếu gate là admin org bấm vào ăn 403.
       { href: '/admin/users', icon: '◍', label: 'Người dùng', gate: 'master' },
+      // Hộp thư của đội ngũ nền tảng — người dùng nhắn tới từ nút nổi trong app. Thuộc nhóm
+      // hệ thống chứ không nhóm org: kênh này không thuộc tổ chức nào, BE chặn bằng `requireMaster`.
+      { href: '/admin/support', icon: '✉️', label: 'Hỗ trợ người dùng', gate: 'master' },
       { href: '/admin/categories', icon: '▩', label: 'Danh mục', gate: 'master' },
       { href: '/admin/category-templates', icon: '⛭', label: 'Mẫu thuộc tính', gate: 'master' },
       { href: '/admin/coverage', icon: '◰', label: 'Phủ sóng', gate: 'master' },

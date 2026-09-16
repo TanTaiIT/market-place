@@ -8,7 +8,7 @@ import {
   View,
   type TextInputProps,
 } from 'react-native';
-import { C, F } from '@/theme';
+import { C, F, S } from '@/theme';
 
 /**
  * Bộ dựng hình cho form đăng tin — tiêu đề nhóm + ô nhập dạng thẻ.
@@ -22,9 +22,26 @@ import { C, F } from '@/theme';
  * mô tả.
  */
 
-export function FormSection({ step, title, hint }: { step?: number; title: string; hint?: string }) {
+export function FormSection({
+  step,
+  title,
+  hint,
+  flush,
+}: {
+  step?: number;
+  title: string;
+  hint?: string;
+  /**
+   * Bỏ lề trên. Dùng khi mục đã nằm trong một THẺ riêng — lúc đó đệm của thẻ đã tạo khoảng
+   * cách, và lề 22px mặc định chồng thêm thành một mảng trống ở đầu mỗi thẻ.
+   *
+   * Lề mặc định giữ nguyên cho form cũ (`org/[slug]/edit`) vốn xếp mọi mục trong một tờ liền —
+   * ở đó lề chính là thứ duy nhất tách hai mục ra.
+   */
+  flush?: boolean;
+}) {
   return (
-    <View style={styles.section}>
+    <View style={[styles.section, flush && styles.sectionFlush]}>
       <View style={styles.sectionRow}>
         {step !== undefined && (
           <View style={styles.stepBadge}>
@@ -42,12 +59,21 @@ export function FormSection({ step, title, hint }: { step?: number; title: strin
 export function BoxField({
   label,
   suffix,
+  counter,
   style,
   ...props
 }: TextInputProps & {
   label: string;
   /** Đơn vị đứng cuối ô — "đ", "m²". Nằm ngoài `value` nên không lọt vào dữ liệu gửi đi. */
   suffix?: string;
+  /**
+   * Bật bộ đếm "đã gõ / tối đa" dưới ô. Chỉ có nghĩa khi đã truyền `maxLength` — nó đọc chính
+   * con số đó, nên không có cách nào để đếm và trần thực tế nói hai điều khác nhau.
+   *
+   * Không bật mặc định: ô ngắn như giá thì trần là chuyện của máy, người gõ không cần biết.
+   * Đáng bật ở ô mà người ta thật sự viết dài và có thể đụng trần — tiêu đề, mô tả.
+   */
+  counter?: boolean;
 }) {
   const [focused, setFocused] = React.useState(false);
 
@@ -70,6 +96,11 @@ export function BoxField({
         />
         {!!suffix && <Text style={styles.suffix}>{suffix}</Text>}
       </View>
+      {counter && !!props.maxLength && (
+        <Text style={styles.counter}>
+          {String(props.value ?? '').length} / {props.maxLength}
+        </Text>
+      )}
     </View>
   );
 }
@@ -139,8 +170,16 @@ export function BoxGroup({ label, children }: { label: string; children: React.R
 }
 
 const styles = StyleSheet.create({
-  section: { marginTop: 22, marginBottom: 12 },
-  sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  /*
+   * Mọi khoảng cách dưới đây bám thang `S` của theme, không còn số tự chọn.
+   *
+   * Bản trước dùng 13 / 9 / 4 / 10 / 22 / 7 / 5 — mỗi con số đều hợp lý khi nhìn riêng, nhưng
+   * không cái nào là bội của cái nào, nên không có nhịp dọc nào để mắt bám vào. Đó là lý do
+   * form đọc ra 'chật và lộn xộn' chứ không phải vì thiếu chỗ ở một ô cụ thể.
+   */
+  section: { marginTop: S.xl, marginBottom: S.md },
+  sectionFlush: { marginTop: 0 },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', gap: S.sm },
   stepBadge: {
     width: 22,
     height: 22,
@@ -151,7 +190,7 @@ const styles = StyleSheet.create({
   },
   stepText: { fontFamily: F.uiBlack, fontSize: 12, color: C.ink },
   sectionTitle: { fontFamily: F.uiBlack, fontSize: 15, color: C.ink },
-  sectionHint: { fontFamily: F.ui, fontSize: 12, color: C.inkSoft, marginTop: 4, lineHeight: 17 },
+  sectionHint: { fontFamily: F.ui, fontSize: 12, color: C.inkSoft, marginTop: S.sm, lineHeight: 18 },
   hintIndent: { marginLeft: 30 },
 
   box: {
@@ -159,19 +198,31 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.line,
     borderRadius: 10,
-    paddingHorizontal: 13,
-    paddingTop: 9,
-    paddingBottom: 4,
-    marginBottom: 10,
+    paddingHorizontal: S.md,
+    paddingTop: S.md,
+    /*
+     * Đáy 8 chứ không 4. Bản trước đỉnh 9 / đáy 4 — lệch hơn gấp đôi, nên chữ trong ô luôn
+     * trông như tụt xuống sát mép dưới, và bộ đếm ký tự mới thêm chỉ cách viền đúng 4px.
+     */
+    paddingBottom: S.sm,
+    marginBottom: S.md,
   },
   // Viền đổi màu khi gõ: trên một form toàn thẻ giống nhau, đây là tín hiệu duy nhất cho biết
   // bàn phím đang gõ vào ô nào.
   boxOn: { borderColor: C.pin, backgroundColor: C.paperWarm },
   boxLabel: { fontFamily: F.ui, fontSize: 11, color: C.inkSoft },
-  boxLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  boxInput: { flex: 1, fontFamily: F.uiBold, fontSize: 15, color: C.ink, paddingVertical: 7 },
+  /** Canh phải: mắt đọc ô từ trái, con số phụ đứng cuối dòng thì không chen vào nội dung. */
+  counter: {
+    fontFamily: F.mono,
+    fontSize: 10.5,
+    color: C.muted,
+    textAlign: 'right',
+    marginTop: S.sm,
+  },
+  boxLine: { flexDirection: 'row', alignItems: 'center', gap: S.sm },
+  boxInput: { flex: 1, fontFamily: F.uiBold, fontSize: 15, color: C.ink, paddingVertical: S.sm },
   suffix: { fontFamily: F.uiBold, fontSize: 14, color: C.inkSoft },
-  boxValue: { flex: 1, fontFamily: F.uiBold, fontSize: 15, color: C.ink, paddingVertical: 7 },
+  boxValue: { flex: 1, fontFamily: F.uiBold, fontSize: 15, color: C.ink, paddingVertical: S.sm },
   chevron: { fontFamily: F.ui, fontSize: 13, color: C.inkSoft },
   switchBox: {
     flexDirection: 'row',
@@ -183,7 +234,7 @@ const styles = StyleSheet.create({
   groupBody: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingTop: 9,
-    paddingBottom: 5,
+    paddingTop: S.md,
+    paddingBottom: S.sm,
   },
 });

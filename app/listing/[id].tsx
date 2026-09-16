@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated, {
-  FadeIn,
   FadeInDown,
   useAnimatedStyle,
   useSharedValue,
@@ -12,9 +11,11 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ListingAttrs } from '@/components/ListingAttrs';
 import { ListingGallery } from '@/components/ListingGallery';
+import { ListingSeller } from '@/components/ListingSeller';
 import { ListingSuggestions } from '@/components/ListingSuggestions';
+import { SafetyNote } from '@/components/SafetyNote';
 import { ReportButton } from '@/components/ReportButton';
-import { Avatar, EmptyState, Loading, PinButton } from '@/components/ui';
+import { EmptyState, Loading, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useRequireAuth, useRequireVerifiedEmail } from '@/components/GuestGate';
 import { useIsAuthenticated } from '@/stores/auth';
@@ -22,7 +23,7 @@ import { useRecordRecent } from '@/stores/recent';
 import { useListing, useSavedIds, useToggleSaved } from '@/queries/listings';
 import { useOpenConversation } from '@/queries/chat';
 import { useCreateReport } from '@/queries/report';
-import { C, F, shadow } from '@/theme';
+import { C, F, T, shadow } from '@/theme';
 
 export default function ListingDetail() {
   // `mod=1`: mở từ hàng đợi báo cáo của bàn quản trị — đọc qua cửa bàn duyệt (xem `useListing`).
@@ -178,12 +179,21 @@ export default function ListingDetail() {
             </Pressable>
           </Animated.View>
 
-          <Animated.View entering={FadeIn.delay(120)} style={styles.priceFloat}>
-            <Text style={styles.priceFloatText}>{listing.price}</Text>
-          </Animated.View>
         </ListingGallery>
 
-        <Animated.View entering={FadeInDown.duration(380)} style={styles.body}>
+        {/*
+          BỐN KHỐI RỜI trên nền xám, không phải một trang liền.
+
+          Trang chi tiết trả lời bốn câu hỏi khác nhau — "món này là gì", "ai bán", "người bán
+          nói gì", "có an toàn không" — mà bản cũ đổ hết vào một dải chữ liền không có ranh giới
+          nào. Mắt phải tự tìm chỗ mỗi phần bắt đầu, và trên màn hẹp thì bảng thông số dính
+          liền vào đoạn mô tả.
+
+          Khe hở `gap` để lộ nền `C.paper` chính là đường phân chia, nên các khối KHÔNG cần
+          viền hay bóng: nền trang làm nốt việc đó, và thêm viền là vẽ hai đường cho một ranh giới.
+        */}
+        <Animated.View entering={FadeInDown.duration(380)} style={styles.sheet}>
+          <View style={styles.block}>
           {!!listing.cat && (
             <View style={styles.catBadge}>
               <Text style={styles.catBadgeText}>{listing.cat}</Text>
@@ -193,6 +203,16 @@ export default function ListingDetail() {
           <Text style={styles.title}>{listing.title}</Text>
 
           {/*
+            Giá nằm TRONG khối, không còn là nhãn nổi đè lên ảnh.
+
+            Nhãn nổi neo `bottom: -18` nên nó thò xuống dưới ảnh — cách đó chạy được khi phần
+            thân không có nền, nhưng từ khi trang chia thành các khối ĐỤC thì khối 1 vẽ đè lên
+            đúng chỗ đó và giá bị che mất. Đặt giá thành một dòng thật trong khối vừa hết chồng
+            lấn, vừa cho nó đứng đúng thứ tự người ta đọc: tên món → giá → ở đâu, bao giờ.
+          */}
+          <Text style={styles.price}>{listing.price}</Text>
+
+          {/*
             Ba mảnh RỜI thay cho một chuỗi `meta` mờ.
 
             Lượt xem trước đây chỉ có trên thẻ ở bảng tin, không có ở đây — đúng chỗ người mua
@@ -200,28 +220,22 @@ export default function ListingDetail() {
             quyết định có đi xem hàng được không.
           */}
           <View style={styles.metaRow}>
-            {!!listing.province && <Text style={styles.metaItem}>📍 {listing.province}</Text>}
+            {/*
+              Tới cấp PHƯỜNG khi có: "Hồ Chí Minh" không nói được gì về việc đi xem hàng có
+              tiện không, mà `ward` vốn đã nằm sẵn trong payload — bản cũ chỉ đơn giản là không
+              đọc tới nó.
+            */}
+            {!!listing.province && (
+              <Text style={styles.metaItem}>
+                📍 {listing.ward ? `${listing.ward}, ${listing.province}` : listing.province}
+              </Text>
+            )}
             <Text style={styles.metaItem}>🕘 {listing.meta}</Text>
             <Text style={styles.metaItem}>👁 {listing.viewCount} lượt xem</Text>
             {listing.favoriteCount > 0 && (
               <Text style={styles.metaItem}>📌 {listing.favoriteCount} quan tâm</Text>
             )}
           </View>
-
-          {/* Tin của chính mình không mở hồ sơ: hồ sơ công khai là chỗ để soi NGƯỜI LẠ trước khi
-              giao dịch, còn tự soi mình thì đã có tab Hồ sơ với đủ thông tin hơn hẳn. */}
-          <Pressable
-            disabled={listing.mine}
-            onPress={() => router.push(`/user/${listing.sellerId}`)}
-            style={({ pressed }) => [styles.sellerCard, pressed && { opacity: 0.7 }]}
-          >
-            <Avatar text={listing.avatar} url={listing.avatarUrl} size={42} color={C.amber} textColor={C.amberInk} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.sellerName}>{listing.seller}</Text>
-              {!!listing.contact && <Text style={styles.sellerOrg}>{listing.contact}</Text>}
-            </View>
-            {!listing.mine && <Text style={styles.sellerChevron}>›</Text>}
-          </Pressable>
 
           {/*
             Thuộc tính đứng TRƯỚC mô tả.
@@ -232,7 +246,18 @@ export default function ListingDetail() {
             Tự ẩn khi tin không có thuộc tính nào — tin cũ đăng trước hệ template là ca thường.
           */}
           <ListingAttrs listing={listing} />
+          </View>
 
+          {/* Khối 2 — AI BÁN. Đứng riêng vì nó là thứ người mua cân nhắc tách khỏi món hàng. */}
+          <View style={styles.block}>
+            <ListingSeller
+              listing={listing}
+              onOpen={() => router.push(`/user/${listing.sellerId}`)}
+            />
+          </View>
+
+          {/* Khối 3 — NGƯỜI BÁN NÓI GÌ. */}
+          <View style={styles.block}>
           <Text style={styles.label}>Mô tả</Text>
           <Text style={styles.desc} numberOfLines={descOpen ? undefined : 4}>
             {listing.desc}
@@ -247,10 +272,20 @@ export default function ListingDetail() {
               <Text style={styles.more}>Xem thêm</Text>
             </Pressable>
           )}
+          </View>
+
+          {/*
+            Khối 4 — CÓ AN TOÀN KHÔNG. Chỉ tin của NGƯỜI KHÁC: nhắc chính mình cẩn thận khi
+            giao dịch với chính mình là một câu vô nghĩa nằm chắn giữa chủ tin và nút sửa tin,
+            và nếu khối rỗng thì đừng để lại một tấm thẻ trắng trơn.
+          */}
+          {!listing.mine && (
+          <View style={styles.block}>
+          <SafetyNote />
 
           {/* Tin của mình thì không: BE trả 400 cho tự báo cáo chính mình, hiện nút ra chỉ để
               người ta bấm vào một lỗi. */}
-          {!listing.mine && isAuthenticated && (
+          {isAuthenticated && (
             <ReportButton
               label="⚑ Báo cáo tin này"
               target="tin này"
@@ -268,6 +303,8 @@ export default function ListingDetail() {
                 )
               }
             />
+          )}
+          </View>
           )}
         </Animated.View>
 
@@ -335,7 +372,14 @@ export default function ListingDetail() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.paper },
-  hero: { height: 260 },
+  /*
+   * TỈ LỆ chứ không phải chiều cao cố định.
+   *
+   * 260px cứng là một con số đúng cho đúng một cỡ máy: trên máy rộng nó thành một dải thấp lè
+   * tè so với bề ngang, trên máy hẹp lại chiếm quá nửa màn. 4:3 giữ nguyên tương quan ở mọi
+   * máy, và trên máy 390pt nó cho 292px — to hơn hẳn mà vẫn chừa chỗ cho khối 1 ló lên.
+   */
+  hero: { aspectRatio: 4 / 3 },
   circleBtn: {
     position: 'absolute',
     width: 34,
@@ -347,19 +391,14 @@ const styles = StyleSheet.create({
     zIndex: 5,
     ...shadow,
   },
-  priceFloat: {
-    position: 'absolute',
-    bottom: -18,
-    left: 20,
-    backgroundColor: C.moss,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    borderBottomLeftRadius: 0,
-    ...shadow,
-  },
-  priceFloatText: { color: '#fff', fontFamily: F.monoBold, fontSize: 16 },
-  body: { paddingHorizontal: 20, paddingTop: 32 },
+  /**
+   * Con số lớn nhất màn — `T.xl` là bậc chữ chỉ dùng cho MỘT dòng mỗi màn, và ở trang này đúng
+   * là giá. `monoBold` để các chữ số đều bề ngang, không nhảy khi giá đổi.
+   */
+  price: { fontFamily: F.monoBold, ...T.xl, color: C.moss, marginTop: 10 },
+  /** Khe hở giữa các khối — chính nó để lộ nền `C.paper` và làm đường phân chia. */
+  sheet: { gap: 9 },
+  block: { backgroundColor: C.paperWarm, paddingHorizontal: 20, paddingVertical: 18 },
   catBadge: {
     alignSelf: 'flex-start',
     backgroundColor: C.tape,
@@ -378,19 +417,6 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 8, marginBottom: 20 },
   metaItem: { fontFamily: F.mono, fontSize: 11.5, color: C.inkSoft },
   more: { fontFamily: F.uiBold, fontSize: 13, color: C.moss, marginTop: 8 },
-  sellerCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: C.paperWarm,
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 20,
-    ...shadow,
-  },
-  sellerName: { fontFamily: F.uiBold, fontSize: 13.5, color: C.ink },
-  sellerOrg: { fontFamily: F.ui, fontSize: 11, color: C.inkSoft, marginTop: 1 },
-  sellerChevron: { fontFamily: F.uiBold, fontSize: 20, color: C.inkSoft },
   label: {
     fontFamily: F.uiBold,
     fontSize: 11.5,

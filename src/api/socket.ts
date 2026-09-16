@@ -25,8 +25,17 @@ const SOCKET_URL = API_BASE_URL.replace(/\/api\/v\d+\/?$/, '');
  * Sự kiện server phát. `chat:inbox` khác `chat:message` ở NGƯỜI NGHE, không ở nội dung: nó đi
  * vào phòng riêng của từng người nhận nên tới được cả khi họ đang ở màn khác — xem
  * `useInboxSignal`.
+ *
+ * `support:reply` cũng đi phòng riêng của từng người (`emitToUser`), mà phòng đó socket tự vào
+ * lúc bắt tay — nên nó không có cặp join/leave như `chat:*` và `admin:*`, và không có id nào
+ * để lỡ nghe nhầm luồng của người khác.
  */
-type ServerEvent = 'chat:message' | 'chat:inbox' | 'notif:new' | 'admin:activity';
+type ServerEvent =
+  | 'chat:message'
+  | 'chat:inbox'
+  | 'notif:new'
+  | 'admin:activity'
+  | 'support:reply';
 type EventHandler = (payload: unknown) => void;
 
 let socket: Socket | null = null;

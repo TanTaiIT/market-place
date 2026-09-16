@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Loading, PagedFooter, nearEnd } from './ui';
 import { initialsOf } from '@/api/client';
@@ -59,11 +60,15 @@ export function AdminOrgSheet({ org, onClose }: { org: Organization | null; onCl
   const members = useOrgMemberList(org?.slug ?? '');
 
   return (
-    <Modal visible={!!org} transparent animationType="slide" onRequestClose={onClose}>
+    /* `fade` + `entering` chứ không `slide` — xem lý do đầy đủ ở `AdminListingSheet`. */
+    <Modal visible={!!org} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.scrim} onPress={onClose} />
 
       {!!org && (
-        <View style={[styles.sheet, { paddingBottom: insets.bottom }]}>
+        <Animated.View
+          entering={SlideInDown.duration(260)}
+          style={[styles.sheet, { paddingBottom: insets.bottom }]}
+        >
           <View style={styles.head}>
             <Text style={styles.headTitle}>Chi tiết tổ chức</Text>
             <Pressable onPress={onClose} hitSlop={10} style={styles.close}>
@@ -178,7 +183,7 @@ export function AdminOrgSheet({ org, onClose }: { org: Organization | null; onCl
             )}
             <PagedFooter loading={members.isFetchingNextPage} onDark />
           </ScrollView>
-        </View>
+        </Animated.View>
       )}
     </Modal>
   );

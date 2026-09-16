@@ -16,7 +16,8 @@ import { C, type Grad } from '@/theme';
 
 /**
  * Hero của màn chi tiết: vuốt ngang qua các ảnh đã upload, kèm chấm chỉ vị trí.
- * Chạm vào ảnh thì mở `PhotoViewer` xem toàn màn — hero chỉ cao 260px, không đủ để soi món hàng.
+ * Chạm vào ảnh thì mở `PhotoViewer` xem toàn màn — hero chỉ cao bằng 3/4 bề ngang, vẫn không
+ * đủ để soi một món hàng cũ.
  * Tin chưa có ảnh thật thì uỷ lại cho `ListingPhoto` dựng gradient.
  */
 export function ListingGallery({

@@ -11,6 +11,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import Animated, { SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Loading } from './ui';
 import { C, F } from '@/theme';
@@ -122,10 +123,12 @@ export function PickerSheet<T extends string>({
   }, [visible]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    /* `fade` + `entering` chứ không `slide` — xem lý do đầy đủ ở `AdminListingSheet`. */
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.scrim} onPress={onClose} />
 
-      <View
+      <Animated.View
+        entering={SlideInDown.duration(260)}
         style={[
           styles.sheet,
           {
@@ -156,7 +159,7 @@ export function PickerSheet<T extends string>({
           }}
           emptyAll={emptyAll}
         />
-      </View>
+      </Animated.View>
     </Modal>
   );
 }

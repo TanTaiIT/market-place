@@ -891,6 +891,39 @@ export type SystemMetrics = {
     };
 };
 
+export type MySupportThread = {
+    id: string | null;
+    messages: Array<{
+        from: 'user' | 'master';
+        body: string;
+        at: string;
+        byUserId: string;
+    }>;
+    unread: boolean;
+    updatedAt: string | null;
+};
+
+export type SupportThread = {
+    id: string;
+    userId: string;
+    userName: string;
+    messages: Array<{
+        from: 'user' | 'master';
+        body: string;
+        at: string;
+        byUserId: string;
+    }>;
+};
+
+export type SupportQueueItem = {
+    id: string;
+    userId: string;
+    userName: string;
+    lastUserAt: string | null;
+    lastMasterAt: string | null;
+    waiting: boolean;
+};
+
 export type SendVerificationCode = {
     expiresInSeconds: number;
     resendAfterSeconds: number;
@@ -5232,6 +5265,230 @@ export type MetricsSystemResponses = {
 };
 
 export type MetricsSystemResponse = MetricsSystemResponses[keyof MetricsSystemResponses];
+
+export type SupportMyThreadData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/support/me';
+};
+
+export type SupportMyThreadErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+};
+
+export type SupportMyThreadError = SupportMyThreadErrors[keyof SupportMyThreadErrors];
+
+export type SupportMyThreadResponses = {
+    /**
+     * Luồng của tôi
+     */
+    200: {
+        success: true;
+        message: string;
+        data: MySupportThread;
+    };
+};
+
+export type SupportMyThreadResponse = SupportMyThreadResponses[keyof SupportMyThreadResponses];
+
+export type SupportSendData = {
+    body?: {
+        body: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/support/me/messages';
+};
+
+export type SupportSendErrors = {
+    /**
+     * Nội dung quá ngắn, quá dài, hoặc chứa cụm từ cấm
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+};
+
+export type SupportSendError = SupportSendErrors[keyof SupportSendErrors];
+
+export type SupportSendResponses = {
+    /**
+     * Đã gửi
+     */
+    200: {
+        success: true;
+        message: string;
+        data: MySupportThread;
+    };
+};
+
+export type SupportSendResponse = SupportSendResponses[keyof SupportSendResponses];
+
+export type SupportMarkReadData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/support/me/read';
+};
+
+export type SupportMarkReadErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+};
+
+export type SupportMarkReadError = SupportMarkReadErrors[keyof SupportMarkReadErrors];
+
+export type SupportMarkReadResponses = {
+    /**
+     * Đã đánh dấu
+     */
+    200: {
+        success: true;
+        message: string;
+        data: {
+            unread: boolean;
+        };
+    };
+};
+
+export type SupportMarkReadResponse = SupportMarkReadResponses[keyof SupportMarkReadResponses];
+
+export type SupportQueueData = {
+    body?: never;
+    path?: never;
+    query?: {
+        waiting?: 'true' | 'false';
+        page?: number;
+        limit?: number;
+    };
+    url: '/support/threads';
+};
+
+export type SupportQueueErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+};
+
+export type SupportQueueError = SupportQueueErrors[keyof SupportQueueErrors];
+
+export type SupportQueueResponses = {
+    /**
+     * Hàng đợi
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<SupportQueueItem>;
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNextPage: boolean;
+            hasPrevPage: boolean;
+        };
+    };
+};
+
+export type SupportQueueResponse = SupportQueueResponses[keyof SupportQueueResponses];
+
+export type SupportThreadData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/support/threads/{id}';
+};
+
+export type SupportThreadErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy luồng hỗ trợ này
+     */
+    404: ErrorResponse;
+};
+
+export type SupportThreadError = SupportThreadErrors[keyof SupportThreadErrors];
+
+export type SupportThreadResponses = {
+    /**
+     * Luồng
+     */
+    200: {
+        success: true;
+        message: string;
+        data: SupportThread;
+    };
+};
+
+export type SupportThreadResponse = SupportThreadResponses[keyof SupportThreadResponses];
+
+export type SupportReplyData = {
+    body?: {
+        body: string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/support/threads/{id}/reply';
+};
+
+export type SupportReplyErrors = {
+    /**
+     * Nội dung không hợp lệ
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy luồng hỗ trợ này
+     */
+    404: ErrorResponse;
+};
+
+export type SupportReplyError = SupportReplyErrors[keyof SupportReplyErrors];
+
+export type SupportReplyResponses = {
+    /**
+     * Đã trả lời
+     */
+    200: {
+        success: true;
+        message: string;
+        data: SupportThread;
+    };
+};
+
+export type SupportReplyResponse = SupportReplyResponses[keyof SupportReplyResponses];
 
 export type SocialFeedbackListData = {
     body?: never;

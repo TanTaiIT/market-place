@@ -26,12 +26,24 @@ export const EMPTY_LOCATION: ListingLocation = { province: null, ward: null, add
  *
  * `address` không nằm trong đây: BE khai optional, và tin chỉ có tỉnh/xã vẫn tìm được bình thường.
  */
-export function validateLocation(location: ListingLocation): string | null {
+/**
+ * Chỗ còn thiếu của khối khu vực — TÊN ô để liệt kê, kèm câu giải thích đầy đủ.
+ *
+ * Hai thứ đó đi cùng nhau ở một chỗ vì chúng phải nói về CÙNG một điều kiện: dòng "còn thiếu"
+ * dưới chân form và câu lỗi lúc bấm gửi mà lệch nhau thì người dùng sửa xong vẫn không bấm được.
+ */
+export function locationGap(location: ListingLocation): { label: string; message: string } | null {
   // Thiếu tỉnh thì tin không lên được bộ lọc khu vực, coi như người mua gần đó không thấy.
-  if (!location.province) return '⚠️ Chọn tỉnh / thành để người mua gần bạn tìm được';
-  if (!location.ward) return '⚠️ Chọn phường / xã';
+  if (!location.province) {
+    return {
+      label: 'tỉnh / thành',
+      message: '⚠️ Chọn tỉnh / thành để người mua gần bạn tìm được',
+    };
+  }
+  if (!location.ward) return { label: 'phường / xã', message: '⚠️ Chọn phường / xã' };
   return null;
 }
+
 
 export function LocationFields({
   value,

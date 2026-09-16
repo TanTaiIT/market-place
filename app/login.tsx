@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withDelay, withSpring } from 'react-native-reanimated';
@@ -8,7 +16,7 @@ import { Field, GhostButton, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useLogin } from '@/queries/auth';
 import { useSignIn } from '@/stores/auth';
-import { C, F, shadow } from '@/theme';
+import { C, F, G, shadow } from '@/theme';
 
 export default function Login() {
   const router = useRouter();
@@ -30,6 +38,17 @@ export default function Login() {
     transform: [{ translateY: drop.value }, { scale: scale.value }],
   }));
 
+  /**
+   * Đường thoát khỏi màn đăng nhập — khách vẫn xem tin được, nên màn này KHÔNG phải bức tường.
+   *
+   * `back()` trước, `replace` sau: gần như mọi lối vào đây đều là `router.push` từ một màn
+   * khách đang xem (`GuestGate`, `useRequireAuth`), nên quay lại đúng chỗ họ đang dở còn hơn
+   * ném họ về đầu bảng tin và mất vị trí cuộn. Chỉ khi không có gì để lùi — mở thẳng bằng deep
+   * link — mới về bảng tin. Cùng công thức `ScreenHeader` đang dùng cho nút quay lại.
+   */
+  const keepBrowsing = () =>
+    router.canGoBack() ? router.back() : router.replace('/(tabs)/feed');
+
   const submit = () => {
     login.mutate(
       { email: email.trim(), password },
@@ -43,7 +62,7 @@ export default function Login() {
   };
 
   return (
-    <LinearGradient colors={[C.cork, C.corkDark]} style={{ flex: 1 }}>
+    <LinearGradient colors={G.auth} style={{ flex: 1 }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView
           contentContainerStyle={[styles.wrap, { paddingTop: insets.top + 40, paddingBottom: 40 }]}
@@ -51,7 +70,10 @@ export default function Login() {
         >
           <Animated.View style={[styles.pinDrop, pinStyle]} />
 
-          <Animated.View entering={FadeInDown.delay(320).duration(450).springify()} style={styles.card}>
+          {/* `entering` và `transform` (góc nghiêng trong styles.card) phải ở hai lớp khác nhau,
+              không thì layout animation ghi đè transform — Reanimated 4 cảnh báo lúc chạy. */}
+          <Animated.View entering={FadeInDown.delay(320).duration(450).springify()}>
+          <View style={styles.card}>
             <Text style={styles.brand}>
               Ghim<Text style={{ color: C.pin }}>.</Text>
             </Text>
@@ -92,6 +114,30 @@ export default function Login() {
                 Đăng ký ngay
               </Text>
             </Text>
+          </View>
+          </Animated.View>
+
+          {/*
+            NGOÀI thẻ giấy, không phải một dòng nữa trong form: đây là hành động RỜI màn này,
+            còn mọi thứ trong thẻ đều là các cách để ở lại và đăng nhập. Đặt lẫn vào trong thẻ
+            là mời người ta bấm nhầm giữa "đăng nhập bằng cách khác" và "thôi không đăng nhập".
+
+            Hiện sau thẻ một nhịp, cùng ngôn ngữ chuyển động với thẻ — xuất hiện cùng lúc thì
+            nó tranh mất sự chú ý của chính cái form là trọng tâm màn.
+          */}
+          <Animated.View entering={FadeInDown.delay(520).duration(400)}>
+            <Pressable
+              onPress={keepBrowsing}
+              hitSlop={10}
+              style={({ pressed }) => [styles.escape, pressed && { opacity: 0.55 }]}
+            >
+              {/*
+                "Quay lại" chứ không phải "Tiếp tục": ngay trên nó đã có "Tiếp tục với Google",
+                mà hai nhãn cùng mở đầu bằng một từ nhưng dẫn đi hai hướng ngược nhau (ở lại
+                đăng nhập / rời khỏi màn) là chỗ để bấm nhầm khi lướt nhanh.
+              */}
+              <Text style={styles.escapeText}>← Quay lại xem tin</Text>
+            </Pressable>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -136,4 +182,9 @@ const styles = StyleSheet.create({
   dividerText: { fontFamily: F.ui, fontSize: 12, color: '#B7AE95' },
   switch: { textAlign: 'center', marginTop: 18, fontFamily: F.ui, fontSize: 12.5, color: C.inkSoft },
   link: { color: C.pin, fontFamily: F.uiBold },
+  /** Vùng chạm rộng hơn hẳn phần chữ: đây là lối thoát, hụt tay ở đây là kẹt lại trong màn. */
+  escape: { alignSelf: 'center', marginTop: 20, paddingVertical: 12, paddingHorizontal: 18 },
+  // Nền `G.auth` sáng (#F4FCF7 → #E4E6EA) nên chữ mực đọc rõ; cố tình KHÔNG dùng màu nhấn —
+  // nút chính của màn là "Đăng nhập", lối thoát phải lùi lại sau nó.
+  escapeText: { fontFamily: F.uiSemi, fontSize: 13.5, color: C.inkSoft },
 });

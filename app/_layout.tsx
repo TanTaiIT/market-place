@@ -7,22 +7,25 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
-import { Kalam_400Regular, Kalam_700Bold } from '@expo-google-fonts/kalam';
+/*
+ * Chỉ nạp những face mà `F` (trong `theme`) thật sự trỏ tới — hiện là bốn weight của Manrope.
+ *
+ * Kalam và JetBrains Mono CỐ TÌNH không có ở đây dù `package.json` còn hai gói đó: sau đợt
+ * đổi sang hệ phẳng, `F` không còn trỏ tới chúng ở đâu nữa (chỉ còn vài chú thích nhắc tên),
+ * nên nạp thêm là tải bốn file font mỗi lần mở app mà không một chữ nào vẽ bằng chúng.
+ */
 import {
   Manrope_500Medium,
   Manrope_600SemiBold,
   Manrope_700Bold,
   Manrope_800ExtraBold,
 } from '@expo-google-fonts/manrope';
-import {
-  JetBrainsMono_400Regular,
-  JetBrainsMono_600SemiBold,
-} from '@expo-google-fonts/jetbrains-mono';
 import { BootSplash } from '@/components/BootSplash';
 import { ErrorScreen } from '@/components/ErrorScreen';
 import { ToastProvider } from '@/components/Toast';
 import { useSyncAccessToken, useValidateSession } from '@/queries/auth';
-import { useChatSocket } from '@/queries/chat';
+import { useChatSocket, useInboxSignal } from '@/queries/chat';
+import { useNotifSignal } from '@/queries/notifications';
 import { useAuthHydrated, useIsAuthenticated, useOrgSlug } from '@/stores/auth';
 import { C } from '@/theme';
 
@@ -66,14 +69,10 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
-    Kalam_400Regular,
-    Kalam_700Bold,
     Manrope_500Medium,
     Manrope_600SemiBold,
     Manrope_700Bold,
     Manrope_800ExtraBold,
-    JetBrainsMono_400Regular,
-    JetBrainsMono_600SemiBold,
   });
 
   const isAuthenticated = useIsAuthenticated();
@@ -87,6 +86,17 @@ export default function RootLayout() {
   useValidateSession(queryClient);
   // Mở kết nối realtime theo phiên. Effect nên nó chạy sau khi token đã được đẩy xuống ở trên.
   useChatSocket();
+  /*
+   * Tín hiệu 'có tin nhắn mới' khi người dùng đang ở màn khác.
+   *
+   * Phải ở ĐÂY chứ không trong màn chat: đặt trong màn chat thì nó chết ngay khi người dùng
+   * rời màn đó — tức đúng lúc cần nó nhất. Nó chỉ quét lại `conversations()`, mà chấm chưa đọc
+   * trên tab Tin nhắn vốn đã đọc từ đúng query đó, nên badge tự sáng không cần thêm state nào.
+   */
+  useInboxSignal(queryClient);
+  // Đối xứng cho hộp thư thông báo. Hiệu ứng lắc chuông KHÔNG ở đây mà ở `TabBar` — nó thuộc
+  // về cái chuông, còn hook này phải sống cả khi thanh tab không hiển thị.
+  useNotifSignal(queryClient);
 
   const [splashDone, setSplashDone] = useState(false);
   const finishSplash = useCallback(() => setSplashDone(true), []);
@@ -125,25 +135,48 @@ export default function RootLayout() {
                   <Stack.Screen name="register" options={{ animation: 'fade' }} />
                 </Stack.Protected>
 
+                {/*
+                  KHÔNG cần đăng nhập — khách vào xem được ngay.
+
+                  BE đã mở đúng những đường đọc này (`GET /listings`, `/listings/:id`,
+                  `/users/:id`, hồ sơ công khai của tổ chức), và scope của khách chỉ thấy tin
+                  CÔNG KHAI ĐÃ DUYỆT (`tenant.middleware` → nhánh không có org), nên không có
+                  gì nội bộ lọt ra ngoài.
+
+                  Ba tab cần tài khoản (Tin nhắn · Thông báo · Cá nhân) nằm TRONG `(tabs)` nên
+                  guard ở đây không tách được chúng — mỗi màn tự dựng `GuestGate`.
+                */}
+                <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+                <Stack.Screen name="search/index" />
+                <Stack.Screen name="search/results" />
+                <Stack.Screen name="listing/[id]" />
+                <Stack.Screen name="user/[id]" />
+                <Stack.Screen name="org/[slug]/index" />
+                {/* Bài viết pháp lý — cụm tạm thời, công thức gỡ ở `@/api/legal`. Công khai
+                    có chủ ý: cả điểm của nó là cho người chưa có tài khoản đọc. */}
+                <Stack.Screen name="legal/[slug]" />
+                {/* Hai màn của cột "Hỗ trợ khách hàng" — dựng dạng modal cho khớp bản web.
+                    Route TĨNH nên expo-router ưu tiên chúng trước `legal/[slug]`. */}
+                <Stack.Screen name="legal/feedback" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="legal/feedback-list" options={{ presentation: 'modal' }} />
+
                 {/* Mọi route cần đăng nhập phải khai ở đây, kể cả route không cần option
                     riêng — screen không nằm trong khối này vẫn mở được bằng deep link. */}
                 <Stack.Protected guard={isAuthenticated}>
-                  <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
                   <Stack.Screen name="post" options={{ animation: 'slide_from_bottom' }} />
-                  <Stack.Screen name="search" />
                   <Stack.Screen name="mylistings" />
                   <Stack.Screen name="saved" />
                   <Stack.Screen name="settings" />
+                  {/* Cần đăng nhập vì BE lấy địa chỉ nhận mã từ TOKEN, không từ body — xem
+                      `auth.routes.ts`. Khách chưa có tài khoản thì chưa có gì để xác thực. */}
+                  <Stack.Screen name="verify-email" />
                   {/* Cần đăng nhập nhưng KHÔNG cần thuộc tổ chức nào — đây chính là đường vào
                       tổ chức đầu tiên của một tài khoản mới. */}
                   <Stack.Screen name="join-org" />
                   {/* `org/[slug]/` là thư mục không có `_layout` riêng, nên hai file trong đó thành
                       hai route NGANG HÀNG ở stack này — khai `org/[slug]` không còn khớp gì. */}
-                  <Stack.Screen name="org/[slug]/index" />
                   <Stack.Screen name="org/[slug]/edit" />
-                  <Stack.Screen name="listing/[id]" />
                   <Stack.Screen name="listing/edit/[id]" />
-                  <Stack.Screen name="user/[id]" />
                   <Stack.Screen name="chat/[id]" />
                   {/* Khai cả cụm `admin` một lần: `app/admin/_layout.tsx` giữ Stack riêng bên trong */}
                   <Stack.Screen name="admin" />

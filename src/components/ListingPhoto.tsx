@@ -1,6 +1,7 @@
 import React from 'react';
 import { Image, StyleSheet, View, type ImageStyle, type StyleProp, type ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { displayUrl } from '@/api/cloudinary';
 import type { Grad } from '@/theme';
 
 /**
@@ -25,8 +26,11 @@ export function ListingPhoto({
   if (photoUrl) {
     return (
       <View style={style}>
+        {/* 800px cho MỌI thumbnail: thẻ rộng nhất (`ListingCard`) chỉ ~400pt logic, 800 là đủ
+            cho màn 2x mà vẫn nhẹ hơn ảnh gốc 3-5 lần. Cần ảnh to hơn thì là việc của
+            `ListingGallery`/`PhotoViewer`, không phải của thẻ. */}
         <Image
-          source={{ uri: photoUrl }}
+          source={{ uri: displayUrl(photoUrl, 800) }}
           style={[StyleSheet.absoluteFill, imageStyle]}
           resizeMode="cover"
         />

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminContentApi } from '@/api/admin-content';
 import { useOrgSlug } from '@/stores/auth';
 import { qk } from './keys';
+import { usePagedList } from './paged';
 
 /**
  * Nhóm "Nội dung": danh mục và thông báo đẩy.
@@ -45,9 +46,7 @@ export function useEditCategory() {
 
 export function useSentNotices() {
   const orgSlug = useOrgSlug();
-  return useQuery({
-    queryKey: qk.adminNotices(orgSlug ?? '-'),
-    queryFn: adminContentApi.getNotices,
+  return usePagedList(qk.adminNotices(orgSlug ?? '-'), adminContentApi.getNotices, {
     // `scope=managed` đọc theo tổ chức đang thao tác — chưa chọn thì không có gì để hỏi.
     enabled: Boolean(orgSlug),
   });

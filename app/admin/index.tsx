@@ -4,13 +4,16 @@ import { CategoryBars, TrendChart } from '@/components/AdminChart';
 import { AdminKpis } from '@/components/AdminKpis';
 import { AdminReviewDesk } from '@/components/AdminReviewDesk';
 import { AdminPanel, AdminScreen } from '@/components/AdminScreen';
+import { AdminSystemOverview } from '@/components/AdminSystemOverview';
 import { EmptyState, Loading } from '@/components/ui';
 import { useToast } from '@/components/Toast';
+import { isMaster } from '@/api/admin';
 import {
   useAdminActivity,
   useAdminActivityStream,
   useAdminListings,
   useAdminOverview,
+  useMyGrants,
   useSetListingStatus,
 } from '@/queries/admin';
 import type { AdminEvent, ModListing } from '@/api/admin';
@@ -24,11 +27,42 @@ const EVENT_TONE: Record<AdminEvent['tone'], string> = {
   muted: C.deskTxtDim,
 };
 
+/**
+ * `/admin` là MỘT route nhưng HAI bàn khác nhau, rẽ theo vai — không phải hai đường dẫn.
+ *
+ * Giữ một route vì ngăn kéo trỏ vào đó cho cả hai loại người dùng, và vì 'trang chủ của bàn
+ * quản trị' là một khái niệm chung: chỉ nội dung của nó mới đổi theo việc bạn làm gì ở đây.
+ * Tách thành `/admin` + `/admin/system` sẽ để lại một câu hỏi không có câu trả lời đúng —
+ * master vào `/admin` thì thấy gì?
+ *
+ * `useMyGrants` là nguồn duy nhất phân biệt, KHÔNG phải `memberships.role`: master cố ý không
+ * thuộc tổ chức nào (xem `canAdminOrg` bên `api/admin.ts`).
+ */
 export default function AdminOverview() {
+  const { data: grants } = useMyGrants();
+
+  /*
+   * Bàn hệ thống dựng SafeArea/header riêng của nó qua `AdminScreen` ở đây, nhưng KHÔNG nhận
+   * prop `org`: nó không đọc `X-Org-Slug` một dòng nào. Truyền `org` vào sẽ dựng lại đúng cái
+   * cửa 'chọn tổ chức để mở' mà cả thay đổi này sinh ra để bỏ đi.
+   */
+  if (isMaster(grants)) {
+    return (
+      <AdminScreen title="Bàn quản trị" note="toàn hệ thống">
+        <AdminSystemOverview />
+      </AdminScreen>
+    );
+  }
+
+  return <OrgOverview />;
+}
+
+/** Bàn của MỘT tổ chức — 'việc hôm nay': hàng đợi duyệt nằm ngay trên màn. */
+function OrgOverview() {
   const toast = useToast();
   const { data: overview, error, isLoading } = useAdminOverview();
   const { data: events } = useAdminActivity();
-  const { data: queue } = useAdminListings('pending');
+  const { data: queue, total: queueTotal } = useAdminListings('pending');
   const setStatus = useSetListingStatus();
 
   // Vào phòng quản trị: thao tác của người khác hiện lên ngay ở "Vừa diễn ra".
@@ -61,7 +95,7 @@ export default function AdminOverview() {
 
             <View>
               <SectionTitle title="Bàn duyệt" note="duyệt xong rồi hãy đi ngủ" />
-              <AdminPanel title="Tin chờ lên bảng" note={`còn ${queue?.length ?? 0} tin`}>
+              <AdminPanel title="Tin chờ lên bảng" note={`còn ${queueTotal} tin`}>
                 <AdminReviewDesk
                   queue={queue ?? []}
                   busy={setStatus.isPending}

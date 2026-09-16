@@ -133,7 +133,12 @@ export function AdminReviewDesk({
           <Animated.View style={[styles.slip, slipStyle]}>
             <View style={styles.slipPin} />
             <View style={styles.slipTop}>
-              <ListingPhoto photo={current.photo} style={styles.slipPhoto} imageStyle={styles.slipPhotoRadius} />
+              <ListingPhoto
+                photo={current.photo}
+                photoUrl={current.photoUrl}
+                style={styles.slipPhoto}
+                imageStyle={styles.slipPhotoRadius}
+              />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.slipCat}>{current.cat}</Text>
                 <Text style={styles.slipTitle}>{current.title}</Text>

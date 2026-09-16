@@ -1,5 +1,5 @@
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated, {
   FadeIn,
@@ -16,26 +16,92 @@ import { ListingSuggestions } from '@/components/ListingSuggestions';
 import { ReportButton } from '@/components/ReportButton';
 import { Avatar, EmptyState, Loading, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
+import { useRequireAuth, useRequireVerifiedEmail } from '@/components/GuestGate';
+import { useIsAuthenticated } from '@/stores/auth';
+import { useRecordRecent } from '@/stores/recent';
 import { useListing, useSavedIds, useToggleSaved } from '@/queries/listings';
 import { useOpenConversation } from '@/queries/chat';
 import { useCreateReport } from '@/queries/report';
 import { C, F, shadow } from '@/theme';
 
 export default function ListingDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // `mod=1`: mở từ hàng đợi báo cáo của bàn quản trị — đọc qua cửa bàn duyệt (xem `useListing`).
+  const { id, mod } = useLocalSearchParams<{ id: string; mod?: string }>();
   // ObjectId của BE là chuỗi 24 hex — `Number()` ở đây sẽ ra NaN.
   const listingId = id ?? '';
   const router = useRouter();
+  const requireAuth = useRequireAuth();
+  const requireVerified = useRequireVerifiedEmail();
+  const isAuthenticated = useIsAuthenticated();
   const toast = useToast();
   const insets = useSafeAreaInsets();
 
-  const { data: listing, error, isLoading } = useListing(listingId);
+  const { data: listing, error, isLoading } = useListing(listingId, mod === '1');
   const { data: savedIds } = useSavedIds();
   const toggleSaved = useToggleSaved();
   const openChat = useOpenConversation();
   const report = useCreateReport();
 
   const saved = !!savedIds?.includes(listingId);
+
+  /*
+   * Về đầu trang khi ĐỔI tin.
+   *
+   * `/listing/[id]` là MỘT màn, và dải tin tương tự chuyển tin bằng `router.replace` cùng
+   * route — nên màn không remount, chỉ `id` đổi. Không có lượt cuộn này thì bấm một tin gợi ý
+   * xong người xem vẫn đứng nguyên ở chân trang, tức là nhìn thấy dải gợi ý của tin MỚI mà
+   * chưa từng thấy chính tin đó. Đúng chỗ khó nhận ra vì màn vẫn đổi nội dung như thường.
+   *
+   * `animated: false`: đây là một trang khác, không phải người dùng vừa cuộn — cuộn có hiệu ứng
+   * sẽ trông như trang tự trôi.
+   */
+  // `ComponentRef` chứ không `useRef<ScrollView>`: `ScrollView` là component, còn `scrollTo`
+  // nằm trên INSTANCE của nó — `useRef<FlatList>` ở màn chat may mắn hợp lệ, ở đây thì không.
+  const pageRef = React.useRef<React.ComponentRef<typeof ScrollView>>(null);
+  useEffect(() => {
+    pageRef.current?.scrollTo({ y: 0, animated: false });
+  }, [listingId]);
+
+  /*
+   * Ghi dấu vết khi tin VỀ ĐẾN nơi, không phải khi màn mount: id sai/404 mà cũng ghi thì bộ
+   * gợi ý học từ một tin không tồn tại.
+   *
+   * Chỉ ghi danh mục + tỉnh, không ghi tiêu đề/giá/ảnh như bản trước: dấu vết này không còn
+   * được bày ra màn hình nào nữa, nó chỉ chảy vào bộ xếp hạng — xem `@/stores/recent`.
+   */
+  const recordRecent = useRecordRecent();
+  useEffect(() => {
+    if (listing) {
+      recordRecent({
+        id: listing.id,
+        categoryId: listing.categoryId,
+        province: listing.province ?? undefined,
+      });
+    }
+  }, [listing, recordRecent]);
+
+  /*
+   * Mô tả rút gọn 4 dòng.
+   *
+   * Không phải để cho đẹp: mô tả dài đẩy thẻ người bán, thuộc tính và tin gợi ý xuống dưới
+   * màn hình thứ hai, mà đó mới là thứ quyết định có nhắn tin hay không. Người muốn đọc hết
+   * bấm một lần; người không muốn thì không phải cuộn qua.
+   */
+  const [descOpen, setDescOpen] = useState(false);
+
+  /*
+   * Số điện thoại người bán — CÓ THẬT trong payload (`posterContact`), và trước bản này bị vứt đi.
+   *
+   * BE chỉ trả nó khi người bán bật `showPhone`, nên chuỗi rỗng là một lựa chọn của họ, không
+   * phải dữ liệu thiếu. Nút chính vì thế phải đổi theo: có số thì GỌI được thật, không có số
+   * thì nhắn tin lên làm việc chính — chứ không phải một cái nút "Liên hệ" bắn ra toast rồi
+   * thôi, đúng thứ nó đang làm.
+   */
+  const phone = listing?.contact?.replace(/[^+d]/g, "") ?? "";
+
+  const share = () =>
+    // Không `catch` im lặng: bấm Huỷ trên sheet chia sẻ cũng vào đây, mà đó không phải lỗi.
+    void Share.share({ message: `${listing?.title ?? ''} — ${listing?.price ?? ''}` }).catch(() => {});
 
   // @keyframes saveBounce — phóng to + xoay nhẹ rồi về chỗ cũ
   const bounce = useSharedValue(1);
@@ -44,18 +110,37 @@ export default function ListingDetail() {
     transform: [{ scale: bounce.value }, { rotate: `${rot.value}deg` }],
   }));
 
-  const onToggleSave = () => {
-    bounce.value = withSequence(withSpring(1.3, { damping: 6 }), withSpring(1));
-    rot.value = withSequence(withSpring(-10, { damping: 6 }), withSpring(0));
-    toggleSaved.mutate({ id: listingId, saved: !saved }, { onError: (e) => toast(`⚠️ ${e.message}`) });
-  };
+  /*
+   * Khách xem được tin này nhưng không lưu/nhắn được: cả hai đều là hành động CỦA một tài khoản
+   * (`POST /favorites`, `POST /chats` đều đòi token). Chặn ngay ở đầu hành động chứ không để
+   * mutation bay rồi hiện 401 — người dùng cần biết phải làm gì, không cần biết mã lỗi.
+   */
+  const onToggleSave = () =>
+    requireAuth(() => {
+      bounce.value = withSequence(withSpring(1.3, { damping: 6 }), withSpring(1));
+      rot.value = withSequence(withSpring(-10, { damping: 6 }), withSpring(0));
+      toggleSaved.mutate(
+        { id: listingId, saved: !saved },
+        { onError: (e) => toast(`⚠️ ${e.message}`) },
+      );
+    }, 'Đăng nhập để lưu tin');
 
-  const onMessage = () => {
-    openChat.mutate(listingId, {
-      onSuccess: (c) => router.push(`/chat/${c.id}`),
-      onError: (e: Error) => toast(`📌 ${e.message}`),
-    });
-  };
+  /*
+   * Hai cửa lồng nhau, và THỨ TỰ là cố ý: hỏi "bạn là ai" trước, rồi mới hỏi "hộp thư đó có
+   * thật của bạn không". Đảo lại thì khách chưa đăng nhập bị mời đi xác thực một email họ
+   * chưa từng khai.
+   */
+  const onMessage = () =>
+    requireAuth(
+      () =>
+        requireVerified(() => {
+          openChat.mutate(listingId, {
+            onSuccess: (c) => router.push(`/chat/${c.id}`),
+            onError: (e: Error) => toast(`📌 ${e.message}`),
+          });
+        }, 'Xác thực email trước khi nhắn cho người bán'),
+      'Đăng nhập để nhắn cho người bán',
+    );
 
   if (isLoading) return <Loading />;
   // `isLoading` chỉ true ở lần fetch đầu: query hỏng hoặc id không tồn tại đều rơi xuống đây,
@@ -66,13 +151,25 @@ export default function ListingDetail() {
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        ref={pageRef}
+        contentContainerStyle={{ paddingBottom: 120 }}
+        showsVerticalScrollIndicator={false}
+      >
         <ListingGallery photo={listing.photo} photoUrls={listing.photoUrls} style={styles.hero}>
           <Pressable
             onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/feed'))}
             style={[styles.circleBtn, { top: insets.top + 8, left: 16 }]}
           >
             <Text style={{ fontSize: 16 }}>←</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={share}
+            style={[styles.circleBtn, { top: insets.top + 8, right: 60 }]}
+            hitSlop={8}
+          >
+            <Text style={{ fontSize: 15 }}>↗</Text>
           </Pressable>
 
           <Animated.View style={[styles.circleBtn, { top: insets.top + 8, right: 16 }, saveStyle, saved && { backgroundColor: C.pin }]}>
@@ -94,7 +191,22 @@ export default function ListingDetail() {
           )}
 
           <Text style={styles.title}>{listing.title}</Text>
-          <Text style={styles.meta}>{listing.meta}</Text>
+
+          {/*
+            Ba mảnh RỜI thay cho một chuỗi `meta` mờ.
+
+            Lượt xem trước đây chỉ có trên thẻ ở bảng tin, không có ở đây — đúng chỗ người mua
+            cần nó nhất để đoán tin còn sống hay đã nguội. Khu vực tách riêng vì nó là thứ
+            quyết định có đi xem hàng được không.
+          */}
+          <View style={styles.metaRow}>
+            {!!listing.province && <Text style={styles.metaItem}>📍 {listing.province}</Text>}
+            <Text style={styles.metaItem}>🕘 {listing.meta}</Text>
+            <Text style={styles.metaItem}>👁 {listing.viewCount} lượt xem</Text>
+            {listing.favoriteCount > 0 && (
+              <Text style={styles.metaItem}>📌 {listing.favoriteCount} quan tâm</Text>
+            )}
+          </View>
 
           {/* Tin của chính mình không mở hồ sơ: hồ sơ công khai là chỗ để soi NGƯỜI LẠ trước khi
               giao dịch, còn tự soi mình thì đã có tab Hồ sơ với đủ thông tin hơn hẳn. */}
@@ -111,15 +223,34 @@ export default function ListingDetail() {
             {!listing.mine && <Text style={styles.sellerChevron}>›</Text>}
           </Pressable>
 
-          <Text style={styles.label}>Mô tả</Text>
-          <Text style={styles.desc}>{listing.desc}</Text>
+          {/*
+            Thuộc tính đứng TRƯỚC mô tả.
 
-          {/* Tự ẩn khi tin không có thuộc tính nào — tin cũ đăng trước hệ template là ca thường. */}
+            Người mua hỏi "có đúng thứ tôi cần không" trước khi hỏi "người bán nói gì" — mà câu
+            đầu do bảng thông số trả lời trong hai giây, còn câu sau là một đoạn văn. Xếp ngược
+            lại là bắt họ đọc hết đoạn văn mới biết mình xem nhầm tin.
+            Tự ẩn khi tin không có thuộc tính nào — tin cũ đăng trước hệ template là ca thường.
+          */}
           <ListingAttrs listing={listing} />
+
+          <Text style={styles.label}>Mô tả</Text>
+          <Text style={styles.desc} numberOfLines={descOpen ? undefined : 4}>
+            {listing.desc}
+          </Text>
+          {/*
+            Nút chỉ dựng khi mô tả ĐỦ DÀI để bị cắt. Đo bằng độ dài chuỗi chứ không đo layout:
+            `onTextLayout` cho con số chính xác hơn nhưng phải render một lượt rồi mới biết, và
+            cái nút nhấp nháy hiện ra sau đó tệ hơn hẳn một ngưỡng xấp xỉ.
+          */}
+          {!descOpen && listing.desc.length > 160 && (
+            <Pressable onPress={() => setDescOpen(true)} hitSlop={8}>
+              <Text style={styles.more}>Xem thêm</Text>
+            </Pressable>
+          )}
 
           {/* Tin của mình thì không: BE trả 400 cho tự báo cáo chính mình, hiện nút ra chỉ để
               người ta bấm vào một lỗi. */}
-          {!listing.mine && (
+          {!listing.mine && isAuthenticated && (
             <ReportButton
               label="⚑ Báo cáo tin này"
               target="tin này"
@@ -140,22 +271,63 @@ export default function ListingDetail() {
           )}
         </Animated.View>
 
-        <ListingSuggestions current={listing} />
+        {/*
+          `key` theo id, cùng lý do với lượt cuộn về đầu ở trên: màn không remount khi đổi tin,
+          nên dải gợi ý sẽ giữ nguyên số trang đang xem và vị trí lướt ngang của TIN CŨ. Đổi
+          `key` là dựng lại nó sạch — rẻ hơn hẳn việc tự đồng bộ hai thứ trạng thái đó bằng tay.
+        */}
+        <ListingSuggestions key={listing.id} current={listing} />
       </ScrollView>
 
+      {/*
+        Tin của CHÍNH MÌNH thì không có ai để liên hệ — chỗ đó thành đường sửa tin.
+        Bản cũ hiện "Liên hệ người bán" trên cả tin của mình, tức là mời người ta tự gọi mình.
+      */}
       <View style={[styles.cta, { paddingBottom: insets.bottom || 14 }]}>
-        <Pressable
-          onPress={onMessage}
-          style={({ pressed }) => [styles.ctaSecondary, pressed && { opacity: 0.6 }]}
-        >
-          <Text style={{ fontSize: 17 }}>💬</Text>
-        </Pressable>
-        <PinButton
-          label="📞 Liên hệ người bán"
-          depth={5}
-          style={{ flex: 1 }}
-          onPress={() => toast('📞 Đang kết nối tới người bán...')}
-        />
+        {listing.mine ? (
+          <PinButton
+            label="✎ Sửa tin này"
+            depth={5}
+            style={{ flex: 1 }}
+            onPress={() => router.push(`/listing/edit/${listingId}`)}
+          />
+        ) : (
+          <>
+            {/* Nút biểu tượng CHỈ dựng khi nút chính là "gọi": không có số thì nhắn tin đã là
+                nút chính, và hai đường dẫn tới cùng một chỗ chỉ làm người ta phân vân. */}
+            {!!phone && (
+              <Pressable
+                onPress={onMessage}
+                style={({ pressed }) => [styles.ctaSecondary, pressed && { opacity: 0.6 }]}
+              >
+                <Text style={{ fontSize: 17 }}>💬</Text>
+              </Pressable>
+            )}
+            {phone ? (
+              <PinButton
+                // Nhãn nói HÀNH ĐỘNG, không nhắc lại số: số đã nằm trên thẻ người bán ngay
+                // trên kia, và một số dài sẽ đẩy nhãn xuống hai dòng trên máy hẹp.
+                label="📞 Gọi người bán"
+                depth={5}
+                style={{ flex: 1 }}
+                onPress={() => {
+                  // `canOpenURL` bỏ qua: máy không gọi điện được (tablet, giả lập) sẽ ném ở
+                  // `openURL`, và một câu báo lỗi thật vẫn hơn một nút im lặng không phản ứng.
+                  void Linking.openURL(`tel:${phone}`).catch(() =>
+                    toast('⚠️ Máy này không gọi điện được — thử nhắn tin'),
+                  );
+                }}
+              />
+            ) : (
+              <PinButton
+                label="💬 Nhắn cho người bán"
+                depth={5}
+                style={{ flex: 1 }}
+                onPress={onMessage}
+              />
+            )}
+          </>
+        )}
       </View>
     </View>
   );
@@ -169,7 +341,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: 'rgba(250,248,240,0.92)',
+    backgroundColor: C.glassLift,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 5,
@@ -199,7 +371,13 @@ const styles = StyleSheet.create({
   },
   catBadgeText: { fontFamily: F.uiBold, fontSize: 11, color: C.tapeInk },
   title: { fontFamily: F.uiBlack, fontSize: 19, color: C.ink, lineHeight: 26, marginBottom: 6 },
-  meta: { fontFamily: F.mono, fontSize: 11.5, color: C.inkSoft, marginBottom: 20 },
+  /*
+   * `flexWrap` là bắt buộc, không phải đề phòng: bốn mảnh cộng lại vượt bề ngang máy hẹp,
+   * và một hàng không xuống dòng sẽ cắt cụt "lượt xem" ở đúng máy nhỏ nhất.
+   */
+  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 8, marginBottom: 20 },
+  metaItem: { fontFamily: F.mono, fontSize: 11.5, color: C.inkSoft },
+  more: { fontFamily: F.uiBold, fontSize: 13, color: C.moss, marginTop: 8 },
   sellerCard: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -95,6 +95,11 @@ export function useActiveOrg() {
 
   return {
     slug,
+    /**
+     * `undefined` với master: họ không nằm trong `myOrgs` nên không tra ra id. Không phải
+     * thiếu sót — `canAdminOrg` short-circuit ở `isMaster` trước khi cần tới id.
+     */
+    id: mine?.id,
     name: mine?.name ?? profile.data?.name,
     layout: mine?.feedLayout ?? profile.data?.feedLayout ?? ('feed' as const),
     // `isLoading` chứ không `isPending`: query đang `enabled: false` (chưa có slug) đứng
@@ -108,11 +113,14 @@ const AVATAR_STACK = 4;
 /*
  * Tin xem trước trong hồ sơ nhóm — đủ để biết nhóm đang sống, không phải để lướt thay bảng tin.
  *
- * Một con số duy nhất kể từ khi màn nhóm bày tin bằng DÒNG GỌN (`ListingRow`) cho mọi nhóm: số
- * tin không còn đổi theo `feedLayout` nữa. Sáu dòng cao xấp xỉ ba thẻ lớn cũ, nên vẫn là "xem
- * trước" chứ không thành bảng tin thứ hai.
+ * Một con số duy nhất cho mọi nhóm: số tin không đổi theo `feedLayout`.
+ *
+ * 6 → 3 khi màn nhóm chuyển sang `ListingCard`. Con số 6 được chọn cho thẻ dòng-gọn cũ và
+ * "sáu dòng cao xấp xỉ ba thẻ lớn"; giữ nguyên 6 với thẻ lớn là lặng lẽ nhân ba chiều cao của
+ * mục này — khoảng 2.300px cuộn sau phần hồ sơ, tức đúng cái "bảng tin thứ hai" mà dòng đầu
+ * docblock này nói là không được thành.
  */
-const PEEK_ROWS = 6;
+const PEEK_ROWS = 3;
 
 /**
  * Danh bạ + tin của nhóm đang mở hồ sơ.

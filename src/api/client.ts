@@ -1,6 +1,9 @@
 import {
   authLogin,
+  authLogout,
   authRefresh,
+  authSendEmailCode,
+  authVerifyEmail,
   authRegister,
   categoryGetTemplate,
   categoryList,
@@ -16,13 +19,17 @@ import {
   favoriteRemove,
   listingCreate,
   listingGetById,
+  listingMineById,
   listingList,
   listingMine,
   listingQuota,
+  listingMarkSold,
   listingRemove,
+  listingRenew,
   listingUpdate,
   locationProvinces,
   locationWards,
+  moderationGetListing,
   notificationList,
   notificationMarkRead,
   userGetById,
@@ -35,10 +42,11 @@ import type {
   Listing as ListingDto,
   MeProfile,
   Message as MessageDto,
+  OwnerListing as OwnerListingDto,
   PublicProfile as PublicProfileDto,
 } from './generated';
 import type { Province, ProvinceName } from './location';
-import { CHAT_COLORS, hasSearchCriteria, NEW_PHOTOS } from './db';
+import { CHAT_COLORS, NEW_PHOTOS, locationApplies } from './db';
 import type {
   AuthSession,
   Category,
@@ -48,6 +56,7 @@ import type {
   ListingAttributes,
   Message,
   Notif,
+  PostingQuota,
   Profile,
   PublicProfile,
   SearchFilter,
@@ -76,19 +85,57 @@ type SdkResult<TPayload> = { data?: ApiEnvelope<TPayload>; error?: unknown };
  */
 export function unwrap<TPayload>(res: SdkResult<TPayload>, fallback: string): TPayload {
   if (res.error) {
-    const message = (res.error as { message?: unknown }).message;
-    throw new Error(typeof message === 'string' && message ? message : fallback);
+    const err = res.error as { message?: unknown; details?: { message?: string }[] };
+    // Lỗi validation của BE mang câu trả lời THẬT trong `details`, còn `message` chỉ là
+    // "Validation failed" — hiện mỗi câu đó thì người dùng không biết sửa gì. Lấy chi tiết
+    // đầu tiên: một lỗi đọc được còn hơn ba lỗi in đè nhau trong một toast.
+    const detail = err.details?.find((d) => d.message)?.message;
+    const message = typeof err.message === 'string' && err.message ? err.message : fallback;
+    throw new Error(detail ? `${message}: ${detail}` : message);
   }
   if (!res.data) throw new Error(fallback);
   return res.data.data;
 }
 
+/** Mỗi trang xin ĐÚNG trần của BE (`PAGINATION.MAX_LIMIT`) — xin hơn là 400, không phải bị kẹp. */
+export const PAGE_SIZE = 10;
+
+/** Một trang của danh sách cuộn-tới-đâu-tải-tới-đó — hình dạng duy nhất mọi API list trả về. */
+export type Page<T> = { items: T[]; hasNext: boolean; total: number };
+
+type PagedEnvelope<TItem> = ApiEnvelope<TItem[]> & {
+  meta?: { hasNextPage: boolean; total: number };
+};
+
+/**
+ * Như `unwrap`, nhưng GIỮ `meta`: `hasNext` là thứ duy nhất cho hook biết còn trang sau hay
+ * không, `total` là con số cho badge — cả hai không suy được từ độ dài của trang vừa nhận.
+ */
+export function unwrapPage<TItem, TOut>(
+  res: { data?: PagedEnvelope<TItem>; error?: unknown },
+  fallback: string,
+  map: (item: TItem) => TOut,
+): Page<TOut> {
+  const items = unwrap(res as SdkResult<TItem[]>, fallback).map(map);
+  const meta = res.data?.meta;
+  return { items, hasNext: meta?.hasNextPage ?? false, total: meta?.total ?? items.length };
+}
+
 // ── MAPPER: DTO → domain ────────────────────────────────────────────
 
-/** Hermes không có Intl đầy đủ nên `toLocaleString` không tin được — chấm nghìn bằng tay. */
+/**
+ * Chấm nghìn kiểu Việt: `"3500000"` → `"3.500.000"`. Hermes không có Intl đầy đủ nên
+ * `toLocaleString` không tin được — cắt bằng tay.
+ *
+ * Tách khỏi `formatPrice` cho Ô NHẬP giá: ô nhập cần đúng phần chấm nghìn, không cần đuôi "đ"
+ * lẫn nhánh "Miễn phí" — hai thứ đó lọt vào `value` là người dùng phải xoá chúng trước khi gõ.
+ */
+export const groupDigits = (digits: string): string =>
+  digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
 export function formatPrice(price: number): string {
   if (price <= 0) return 'Miễn phí';
-  return `${String(Math.round(price)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}đ`;
+  return `${groupDigits(String(Math.round(price)))}đ`;
 }
 
 /** Chữ viết tắt vẽ trong vòng tròn khi người dùng chưa có ảnh thật — xem `Avatar`. */
@@ -124,12 +171,51 @@ export function relativeTime(iso: string): string {
 }
 
 /**
+ * Nhãn hạn hiển thị, nói theo NGÀY.
+ *
+ * Ngày chứ không giờ: hạn tin là 30 ngày nên "còn 2 ngày" là thông tin, còn "còn 47 giờ" là
+ * đố người đọc tự chia. Trả `undefined` khi tin còn dài hạn — call-site giấu dòng đó đi thay
+ * vì hiện một con số không ai cần.
+ */
+export function expiryLabel(expiresAt: string | undefined, expired: boolean, within = 7) {
+  if (!expiresAt) return expired ? 'Đã hết hạn' : undefined;
+
+  const days = Math.round((new Date(expiresAt).getTime() - Date.now()) / 86_400_000);
+  if (expired) {
+    if (days >= 0) return 'Đã hết hạn';
+    return days === -1 ? 'Hết hạn hôm qua' : `Hết hạn ${-days} ngày trước`;
+  }
+  if (days > within) return undefined;
+  if (days <= 0) return 'Hết hạn hôm nay';
+  return days === 1 ? 'Còn 1 ngày' : `Còn ${days} ngày`;
+}
+
+/**
  * `seller` và `category` chỉ là ObjectId dạng chuỗi: BE cố tình **không** populate chúng —
  * populate `seller` sẽ đọc xuyên org và lách mất cách ly tenant, còn model `Category` thì chưa
  * tồn tại. Tên/liên hệ người đăng vì thế lấy từ snapshot `posterName`/`posterContact` mà BE chốt
  * lúc tạo tin, đúng như `listing.repository.ts` ghi.
  */
-function toListing(dto: ListingDto, names: Map<string, string>): Listing {
+/**
+ * 8 trạng thái BE → 4 trạng thái UI.
+ *
+ * `expired` và `sold` phải đi RIÊNG vì mỗi cái mở ra một hành động khác: hết hạn thì hiện nút
+ * gia hạn, đã bán thì không hiện gì. Gộp chúng vào `pending` (như bản trước) là hứa với chủ
+ * tin rằng tin đang chờ duyệt, và họ ngồi đợi một hàng đợi không tồn tại.
+ */
+function toStatus(status: ListingDto['status']): Listing['status'] {
+  if (status === 'active') return 'live';
+  if (status === 'expired') return 'expired';
+  if (status === 'sold') return 'sold';
+  return 'pending';
+}
+
+/**
+ * Nhận `OwnerListing` (= `Listing` + `review?`) để MỘT mapper phục vụ cả hai: DTO công khai là
+ * `Listing` thuần nên gán vào được và `review` đơn giản là vắng. Tách `toOwnerListing` riêng là
+ * hai bản copy của 30 dòng chỉ khác nhau một field.
+ */
+function toListing(dto: OwnerListingDto, names: Map<string, string>): Listing {
   const isMine = dto.seller === getCurrentUserId();
   const sellerName = isMine ? 'Bạn' : dto.posterName || 'Người bán';
 
@@ -160,8 +246,9 @@ function toListing(dto: ListingDto, names: Map<string, string>): Listing {
     // kiểu để switch và dropdown chọn lại được lựa chọn cũ.
     attributes: dto.attributes as ListingAttributes | undefined,
     templateVersion: dto.templateRef?.version,
-    // UI chỉ có hai trạng thái; 5 trạng thái còn lại của BE đều là "chưa hiển thị".
-    status: dto.status === 'active' ? 'live' : 'pending',
+    status: toStatus(dto.status),
+    review: dto.review,
+    expiresAt: dto.expiresAt ?? undefined,
     mine: isMine,
     viewCount: dto.viewCount,
     favoriteCount: dto.favoriteCount,
@@ -200,9 +287,12 @@ function toProfile(dto: MeProfile): Profile {
     province: dto.location?.province,
     ward: dto.location?.ward,
     address: dto.location?.address,
+    area: dto.area,
     showPhone: dto.showPhone,
     posted: '—',
     sold: '—',
+    email: dto.email,
+    emailVerified: dto.isEmailVerified,
     rating: dto.ratingCount > 0 ? dto.ratingAvg.toFixed(1) : '—',
   };
 }
@@ -230,6 +320,10 @@ function toConversation(dto: ConversationDto): Conversation {
     id: dto.id,
     listingId: dto.listingId,
     listingTitle: dto.listingTitle,
+    listingImage: dto.listingImage || undefined,
+    // Dải màu suy từ id TIN, không từ id hội thoại: cùng một tin phải ra cùng một cặp màu ở
+    // thẻ trên bảng và ở dòng tin nhắn, nếu không thì hai chỗ nói về một món đồ mà nhìn như hai.
+    listingPhoto: gradOf(dto.listingId),
     name: dto.partnerName,
     avatar: initialsOf(dto.partnerName),
     avatarUrl: dto.partnerAvatar || undefined,
@@ -419,9 +513,44 @@ export const api = {
    * Không đi qua `getCurrentUserId()`/session ở module scope: hàm này chạy đúng lúc access token
    * đã hết hạn, nên refresh token phải do caller truyền vào.
    */
+  /**
+   * Báo server cắt phiên — KHÔNG chỉ xoá token khỏi máy.
+   *
+   * Refresh token là bearer sống 30 ngày: xoá khỏi máy mà không báo server thì bản sao nào
+   * đã bị đọc trộm (AsyncStorage không mã hoá) vẫn dùng được tới hết hạn. Gọi đường này là
+   * tăng `tokenVersion`, giết mọi refresh token đã phát — trên mọi thiết bị.
+   *
+   * KHÔNG `withAuthRetry`: đang đăng xuất thì một vòng refresh để "cứu" phiên là đi ngược
+   * ý định, và token vừa bị giết cũng không refresh được.
+   */
+  async signOut(): Promise<void> {
+    await authLogout();
+  },
+
   async refreshSession(refreshToken: string): Promise<AuthSession> {
     const res = await authRefresh({ body: { refreshToken } });
     return toSession(unwrap(res, 'Phiên đăng nhập đã hết, đăng nhập lại nhé'));
+  },
+
+  /* ---------------- xác thực email ---------------- */
+
+  /**
+   * Xin một mã 6 số gửi về hộp thư.
+   *
+   * Không truyền email: BE lấy địa chỉ từ token. Đó là chốt chống dò tài khoản ở phía BE, và
+   * hệ quả ở đây là app không có cách nào gửi mã tới một hộp thư không phải của mình.
+   *
+   * `withAuthRetry` vì cả hai đường đều đòi đăng nhập — màn nhập mã có thể mở lâu (người dùng
+   * đi mở hộp thư rồi quay lại), đủ để access token 15 phút hết hạn giữa chừng.
+   */
+  async sendEmailCode(): Promise<{ expiresInSeconds: number; resendAfterSeconds: number }> {
+    const res = await withAuthRetry(() => authSendEmailCode());
+    return unwrap(res, 'Không gửi được mã xác thực');
+  },
+
+  async verifyEmail(code: string): Promise<void> {
+    const res = await withAuthRetry(() => authVerifyEmail({ body: { code } }));
+    unwrap(res, 'Mã không đúng hoặc đã hết hạn');
   },
 
   /* ---------------- categories ---------------- */
@@ -431,6 +560,7 @@ export const api = {
     return unwrap(res, 'Không tải được danh mục').map((c) => ({
       id: c.id,
       name: c.name,
+      slug: c.slug,
       icon: c.icon,
     }));
   },
@@ -465,7 +595,7 @@ export const api = {
     // Không gửi `status`: `listingQuerySchema` của BE không khai field đó (chỉ caller nội bộ mới
     // được ép status), và `buildFilter` đã mặc định ACTIVE. Gửi thêm chỉ bị zod strip im lặng.
     const [res, names] = await Promise.all([
-      withAuthRetry(() => listingList({ query: { limit: 50, category: categoryId } })),
+      withAuthRetry(() => listingList({ query: { limit: PAGE_SIZE, category: categoryId } })),
       categoryNames(),
     ]);
     return unwrap(res, 'Không tải được bảng tin').map((l) => toListing(l, names));
@@ -481,7 +611,18 @@ export const api = {
   async getOrgListings(slug: string, take: number): Promise<Listing[]> {
     const [res, names] = await Promise.all([
       withAuthRetry(() =>
-        listingList({ query: { limit: take }, headers: { [ORG_HEADER]: slug } }),
+        listingList({
+          /*
+           * `visibility: 'org_internal'` là BẮT BUỘC ở đây, không phải tinh chỉnh.
+           *
+           * Scope đọc của BE là "nhánh org HOẶC nhánh công khai" — đúng cho bảng tin chính,
+           * nhưng ở mục "Tin trong nhóm" thì không lọc gì nghĩa là hứng luôn cả trục công khai.
+           * Triệu chứng đã gặp: một nhóm vừa tạo, chưa mời ai, chưa có tin nào, vẫn bày ra 6
+           * tin `organizationId: null` chẳng liên quan gì tới nhóm.
+           */
+          query: { limit: take, visibility: 'org_internal' },
+          headers: { [ORG_HEADER]: slug },
+        }),
       ),
       categoryNames(),
     ]);
@@ -501,7 +642,8 @@ export const api = {
    */
   async getSuggestions(current: Pick<Listing, 'id' | 'categoryId' | 'province'>, take: number) {
     const [res, names] = await Promise.all([
-      withAuthRetry(() => listingList({ query: { limit: take * 3, category: current.categoryId } })),
+      withAuthRetry(() => // Trần trang của BE là 10 — dải gợi ý vẽ 3–4 tin nên 10 vẫn đủ để lọc và xếp.
+        listingList({ query: { limit: Math.min(take * 3, PAGE_SIZE), category: current.categoryId } })),
       categoryNames(),
     ]);
 
@@ -516,6 +658,84 @@ export const api = {
     return [...sameProvince, ...elsewhere].slice(0, take);
   },
 
+  /**
+   * Nguồn của dải "Gợi ý cho bạn" — gom vài lượt tìm hẹp rồi trộn lại.
+   *
+   * Khác `getSuggestions` ở câu hỏi nó trả lời: đường kia hỏi "tin nào giống TIN NÀY", đường
+   * này hỏi "tin nào hợp GU người này". Tín hiệu do `queries/suggested` tính ở máy và truyền
+   * vào đây dưới dạng đã chốt — tầng này không biết gì về lịch sử xem hay lịch sử tìm.
+   *
+   * TỐI ĐA 2 lượt gọi, và đó là trần cố ý: đây là màn đầu tiên người dùng thấy khi mở app,
+   * nên mỗi request thêm vào là thời gian họ nhìn màn trống. Hai lượt × 10 dòng cho ra tối đa
+   * 20 ứng viên, thừa cho một dải 6 thẻ kể cả sau khi trừ trùng và trừ tin đã xem.
+   *
+   * `province` XẾP chứ không LỌC — cùng luật với `getSuggestions`, và BE cũng chốt thế cho
+   * `ward` ở `/listings/nearby`: lọc cứng ở tỉnh thưa tin thì người xem nhận về khoảng trống.
+   */
+  async getSuggestedFeed(input: {
+    /** Tối đa 2 lượt gọi: mỗi phần tử là query của một lượt. */
+    probes: { q?: string; category?: string; province?: ProvinceName }[];
+    province: ProvinceName | null;
+    /** Tin người dùng vừa xem — gợi lại chúng thì dải này chỉ là "Xem gần đây" đội tên khác. */
+    excludeIds: string[];
+    take: number;
+  }): Promise<Listing[]> {
+    const [pages, names] = await Promise.all([
+      Promise.all(
+        input.probes
+          .slice(0, 2)
+          .map((p) => withAuthRetry(() => listingList({ query: { ...p, limit: PAGE_SIZE } }))),
+      ),
+      categoryNames(),
+    ]);
+
+    const skip = new Set(input.excludeIds);
+    const seen = new Set<string>();
+    const rows: Listing[] = [];
+    // Duyệt theo thứ tự `probes` để lượt gọi đầu (tín hiệu mạnh nhất) chiếm chỗ trước khi
+    // lượt sau chen vào — `Promise.all` giữ nguyên thứ tự đầu vào nên chỗ này tin được.
+    for (const page of pages) {
+      for (const dto of unwrap(page, 'Không tải được tin gợi ý')) {
+        if (skip.has(dto._id) || seen.has(dto._id)) continue;
+        seen.add(dto._id);
+        rows.push(toListing(dto, names));
+      }
+    }
+
+    const here = rows.filter((l) => l.province === input.province);
+    const elsewhere = rows.filter((l) => l.province !== input.province);
+    return [...here, ...elsewhere].slice(0, input.take);
+  },
+
+  /**
+   * MỘT tin của chính mình, mọi trạng thái — dùng để dựng form sửa.
+   *
+   * Không dùng `getListing` cho form sửa: `GET /listings/{id}` lọc `status ∈ {active, sold,
+   * expired}` ở BE, nên tin 'Chờ duyệt' (thứ hay cần sửa nhất) trả 404 'Listing not found' —
+   * đúng lỗi mà nút sửa ở 'Tin đã đăng' gặp. Đường này chốt bằng `seller` từ token và không
+   * tăng `viewCount`: mở form sửa không phải một lượt xem.
+   */
+  async getMyListing(id: string): Promise<Listing> {
+    const [res, names] = await Promise.all([
+      withAuthRetry(() => listingMineById({ path: { id } })),
+      categoryNames(),
+    ]);
+    return toListing(unwrap(res, 'Không tìm thấy tin này'), names);
+  },
+
+  /**
+   * Một tin qua cửa BÀN DUYỆT — cho người xử báo cáo mở tin bị tố. Khác `getListing` ở hai ca
+   * mà đường công khai trả 404: tin đã bị ẩn / đang chờ duyệt, và tin nội bộ của org mà master
+   * không đứng trong. BE chốt thẩm quyền theo trục của tin, người thường ăn 403.
+   */
+  async getListingForModeration(id: string): Promise<Listing> {
+    const [res, names] = await Promise.all([
+      withAuthRetry(() => moderationGetListing({ path: { id } })),
+      categoryNames(),
+    ]);
+    return toListing(unwrap(res, 'Không mở được tin này'), names);
+  },
+
   async getListing(id: string): Promise<Listing> {
     const [res, names] = await Promise.all([
       withAuthRetry(() => listingGetById({ path: { id } })),
@@ -528,21 +748,37 @@ export const api = {
    * `province` phải là đúng chuỗi trong danh sách của `/locations/provinces` — BE so khớp chính
    * xác, gửi "TP. Hồ Chí Minh" thay vì "Hồ Chí Minh" giờ là 400 chứ không còn im lặng trả rỗng.
    */
-  async searchListings(filter: SearchFilter): Promise<Listing[]> {
-    // Không ràng buộc nào thì đây là "tất cả tin", không phải một lượt tìm — trả rỗng để màn
-    // hình hiện lời mời nhập, thay vì đổ nguyên bảng tin vào ô kết quả tìm kiếm.
-    if (!hasSearchCriteria(filter)) return [];
-
+  async searchListings(filter: SearchFilter, page: number): Promise<Page<Listing>> {
+    /*
+     * KHÔNG chặn lượt tìm rỗng.
+     *
+     * Bản trước trả `[]` ngay khi chưa có tiêu chí nào, với lý do "đừng đổ nguyên bảng tin vào ô
+     * kết quả tìm kiếm". Nhưng bảng tin đã thôi bày danh sách tin (nó là màn khám phá), nên
+     * "tất cả tin" giờ KHÔNG còn trùng với màn nào — và nó chính là điểm khởi đầu đúng: mở danh
+     * sách đầy đủ trước, thu hẹp bằng `SearchCrumbBar` sau, thay vì buộc người dùng khai tiêu
+     * chí trước khi được thấy bất cứ thứ gì.
+     */
     const term = filter.q.trim();
+    /*
+     * Lọc theo nhóm = đúng cách `getOrgListings` đang làm: `X-Org-Slug` cho lượt gọi này thôi
+     * (không chuyển cả app sang nhóm đó) + `visibility: 'org_internal'` để không hứng luôn trục
+     * công khai. Không cần tham số BE mới — danh mục, giá, `q`, `attrs` vẫn `AND` lên trên
+     * trong `buildFilter`. Riêng tỉnh/xã thì KHÔNG đi cùng nhóm — xem `locationApplies`.
+     */
+    const org = filter.orgSlug;
+    const province = locationApplies(filter) ? filter.province : null;
     const [res, names] = await Promise.all([
       withAuthRetry(() =>
         listingList({
           // Bỏ hẳn field khi rỗng chứ không gửi `undefined`/`null`: `listingQuerySchema` của BE
           // coi `minPrice: null` là có mặt và ép kiểu, còn vắng mặt mới là "không lọc".
           query: {
-            limit: 50,
+            page,
+            limit: PAGE_SIZE,
             ...(term ? { q: term } : {}),
-            ...(filter.province ? { province: filter.province } : {}),
+            ...(province ? { province } : {}),
+            ...(province && filter.ward ? { ward: filter.ward } : {}),
+            ...(org ? { visibility: 'org_internal' as const } : {}),
             ...(filter.categoryId ? { category: filter.categoryId } : {}),
             ...(filter.minPrice !== null ? { minPrice: filter.minPrice } : {}),
             ...(filter.maxPrice !== null ? { maxPrice: filter.maxPrice } : {}),
@@ -552,23 +788,24 @@ export const api = {
               ? { attrs: JSON.stringify(filter.attrs) }
               : {}),
           },
+          ...(org ? { headers: { [ORG_HEADER]: org } } : {}),
         }),
       ),
       categoryNames(),
     ]);
-    return unwrap(res, 'Không tìm được tin nào').map((l) => toListing(l, names));
+    return unwrapPage(res, 'Không tìm được tin nào', (l) => toListing(l, names));
   },
 
   /**
    * Dùng `/listings/mine` chứ KHÔNG phải `/listings?seller=<id>`: cái sau lọc cứng về `active`
    * nên tin vừa ghim (luôn ở `pending`) sẽ không xuất hiện, và người đăng tưởng là đăng hụt.
    */
-  async getMyListings(): Promise<Listing[]> {
+  async getMyListings(page: number): Promise<Page<Listing>> {
     const [res, names] = await Promise.all([
-      withAuthRetry(() => listingMine({ query: { limit: 50 } })),
+      withAuthRetry(() => listingMine({ query: { page, limit: PAGE_SIZE } })),
       categoryNames(),
     ]);
-    return unwrap(res, 'Không tải được tin của bạn').map((l) => toListing(l, names));
+    return unwrapPage(res, 'Không tải được tin của bạn', (l) => toListing(l, names));
   },
 
   /**
@@ -606,9 +843,42 @@ export const api = {
    * cho người duyệt khi việc cũ đã được xử lý. Không hiện con số này ra thì lúc bị chặn họ chỉ
    * thấy một lỗi 409 và đổ cho app hỏng.
    */
-  async getQuota(): Promise<{ limit: number; pending: number; remaining: number; allowed: boolean }> {
+  async getQuota(): Promise<PostingQuota> {
     const res = await withAuthRetry(() => listingQuota());
-    return unwrap(res, 'Không đọc được hạn mức đăng tin');
+    const dto = unwrap(res, 'Không đọc được hạn mức đăng tin');
+    return {
+      allowed: dto.allowed,
+      limit: dto.limit,
+      pending: dto.pending,
+      remaining: dto.remaining,
+      needsReconcile: dto.needsReconcile.map((l) => ({
+        id: l._id,
+        title: l.title,
+        image: l.image || undefined,
+        // BE chỉ đưa vào danh sách này tin `active` hoặc `expired` — mọi thứ khác là `live`.
+        status: l.status === 'expired' ? 'expired' : 'live',
+        expiresAt: l.expiresAt ?? undefined,
+      })),
+    };
+  },
+
+  /**
+   * "Vẫn còn" — gia hạn thêm 30 ngày, và bật lại tin đã hết hạn.
+   *
+   * KHÔNG phải đẩy tin: BE cố tình không chạm `rankAt`, nên tin quay lại bảng ở đúng vị trí
+   * cũ. Đừng hứa với người bán là tin "lên đầu bảng" sau khi gia hạn.
+   */
+  async renewListing(id: string) {
+    const res = await withAuthRetry(() => listingRenew({ path: { id } }));
+    unwrap(res, 'Không gia hạn được tin này');
+    return { id };
+  },
+
+  /** "Đã bán" — idempotent ở BE, nên bấm lại không thành lỗi đỏ. */
+  async markListingSold(id: string) {
+    const res = await withAuthRetry(() => listingMarkSold({ path: { id } }));
+    unwrap(res, 'Không đánh dấu được tin này');
+    return { id };
   },
 
   /* ---------------- địa giới hành chính ---------------- */
@@ -652,12 +922,12 @@ export const api = {
    * Tin đã lưu, mới lưu trước. BE trả nguyên tin nên không còn phải lấy từng cái như bản
    * local; tin đã bị gỡ BE tự loại khỏi `data`.
    */
-  async getSavedListings(): Promise<Listing[]> {
+  async getSavedListings(page: number): Promise<Page<Listing>> {
     const [res, names] = await Promise.all([
-      withAuthRetry(() => favoriteList({ query: { limit: 50 } })),
+      withAuthRetry(() => favoriteList({ query: { page, limit: PAGE_SIZE } })),
       categoryNames(),
     ]);
-    return unwrap(res, 'Không tải được tin đã lưu').map((l) => toListing(l, names));
+    return unwrapPage(res, 'Không tải được tin đã lưu', (l) => toListing(l, names));
   },
 
   /**
@@ -672,9 +942,9 @@ export const api = {
   },
 
   /* ---------------- chat ---------------- */
-  async getConversations(): Promise<Conversation[]> {
-    const res = await withAuthRetry(() => chatList({ query: { limit: 50 } }));
-    return unwrap(res, 'Không tải được tin nhắn').map(toConversation);
+  async getConversations(page: number): Promise<Page<Conversation>> {
+    const res = await withAuthRetry(() => chatList({ query: { page, limit: PAGE_SIZE } }));
+    return unwrapPage(res, 'Không tải được tin nhắn', toConversation);
   },
 
   async getConversation(id: string): Promise<Conversation> {
@@ -683,16 +953,18 @@ export const api = {
   },
 
   /**
-   * BE trả tin mới nhất trước (phân trang lấy từ cuối lên), còn màn chat render từ cũ tới mới.
-   * Đọc ngược chỉ số thay vì `.reverse()`/`.sort()`: cả hai đều mutate mảng gốc và đều bị
-   * oxlint chặn, mà ở đây chỉ cần đảo chiều đọc chứ không cần sắp xếp lại gì.
+   * BE trả tin mới nhất trước (trang 1 = 10 tin mới nhất, trang 2 = 10 tin cũ hơn…), còn màn
+   * chat render từ cũ tới mới. Đảo chiều TRONG trang ở đây; thứ tự GIỮA các trang do
+   * `useMessages` lo (`olderPagesFirst`). Đọc ngược chỉ số thay vì `.reverse()`: nó mutate mảng
+   * gốc và bị oxlint chặn, mà ở đây chỉ cần đảo chiều đọc.
    */
-  async getMessages(conversationId: string): Promise<Message[]> {
+  async getMessages(conversationId: string, page: number): Promise<Page<Message>> {
     const res = await withAuthRetry(() =>
-      chatMessages({ path: { id: conversationId }, query: { limit: 100 } }),
+      chatMessages({ path: { id: conversationId }, query: { page, limit: PAGE_SIZE } }),
     );
-    const rows = unwrap(res, 'Không tải được tin nhắn');
-    return rows.map((_, i) => toMessage(rows[rows.length - 1 - i]));
+    const newestFirst = unwrapPage(res, 'Không tải được tin nhắn', toMessage);
+    const n = newestFirst.items.length;
+    return { ...newestFirst, items: newestFirst.items.map((_, i) => newestFirst.items[n - 1 - i]) };
   },
 
   /** Mở hội thoại cho một tin, hoặc lấy lại hội thoại đã có — BE chốt bằng unique index. */
@@ -727,15 +999,19 @@ export const api = {
    * BE đã lọc sẵn theo người gọi: thông báo cả tổ chức + thông báo của đúng nhóm con họ thuộc.
    * Tài khoản chưa thuộc tổ chức nào nhận mảng rỗng chứ không phải lỗi, nên không cần guard.
    */
-  async getNotifications(): Promise<Notif[]> {
-    const res = await withAuthRetry(() => notificationList({ query: { limit: 50 } }));
-    return unwrap(res, 'Không tải được thông báo').map((n) => ({
+  async getNotifications(page: number): Promise<Page<Notif>> {
+    const res = await withAuthRetry(() => notificationList({ query: { page, limit: PAGE_SIZE } }));
+    return unwrapPage(res, 'Không tải được thông báo', (n) => ({
       id: n.id,
       scope: n.unitId ? ('unit' as const) : ('org' as const),
       title: n.title,
       body: n.body,
       time: relativeTime(n.createdAt),
       unread: !n.isRead,
+      orgId: n.organizationId ?? undefined,
+      actorName: n.actorName,
+      listingId: n.listingId ?? undefined,
+      at: n.createdAt,
     }));
   },
 
@@ -765,12 +1041,12 @@ export const api = {
    * bộ lọc cứng về `active` của nó đúng ở đây — khách xem hồ sơ không được thấy tin chờ duyệt
    * hay tin bị từ chối của người khác.
    */
-  async getSellerListings(id: string): Promise<Listing[]> {
+  async getSellerListings(id: string, page: number): Promise<Page<Listing>> {
     const [res, names] = await Promise.all([
-      withAuthRetry(() => listingList({ query: { limit: 50, seller: id } })),
+      withAuthRetry(() => listingList({ query: { page, limit: PAGE_SIZE, seller: id } })),
       categoryNames(),
     ]);
-    return unwrap(res, 'Không tải được tin của người bán này').map((l) => toListing(l, names));
+    return unwrapPage(res, 'Không tải được tin của người bán này', (l) => toListing(l, names));
   },
 
   /**

@@ -3,11 +3,9 @@ import {
   bulkApproveJoinRequests,
   cancelJoinRequest,
   createJoinRequest,
-  createOrgUnit,
-  deleteOrgUnit,
   listJoinRequests,
-  listOrgUnits,
   membershipList,
+  membershipRemove,
   myJoinRequests,
   myOrganizations,
   organizationByCode,
@@ -15,27 +13,25 @@ import {
   organizationPublicProfile,
   organizationUpdate,
   rejectJoinRequest,
-  updateOrgUnit,
 } from './generated';
 import type {
-  CreateOrgUnit,
   JoinRequest,
   Member,
   OrganizationLookup,
+  MyOrganization,
   OrganizationProfile,
-  OrgUnit,
   UpdateOrganization,
-  UpdateOrgUnit,
 } from './generated';
 
-/** Màn hình dùng nhóm con đi qua đây, không import thẳng `generated` — `app/**` chỉ biết tới `api/**`. */
-export type { Member, OrgUnit };
+/** Màn hình đi qua đây, không import thẳng `generated` — `app/**` chỉ biết tới `api/**`. */
+export type { Member };
 /** Phần hồ sơ nhóm mà quản trị sửa được — màn sửa dùng type này, không import `generated`. */
 export type { UpdateOrganization as OrgPatch };
 /** Một thẻ nhóm trong danh sách khám phá, và hồ sơ đầy đủ của một nhóm. */
 export type OrgRow = OrganizationLookup;
 export type OrgProfile = OrganizationProfile;
-import { relativeTime, unwrap } from './client';
+import { PAGE_SIZE, relativeTime, unwrap, unwrapPage } from './client';
+import type { Page } from './client';
 import { ORG_HEADER, withAuthRetry } from './http';
 
 /**
@@ -83,15 +79,19 @@ function untilText(iso: string): string {
 }
 
 /** Một tổ chức mà tôi là thành viên — nguồn của bộ chuyển tổ chức. */
-export type MyOrg = {
-  id: string;
-  name: string;
-  slug: string;
-  role: string;
-  unitId: string | null;
-  /** Bảng tin của nhóm này bày một cột hay hai — do quản trị nhóm đặt. */
-  feedLayout: 'feed' | 'grid';
-};
+/**
+ * Một tổ chức mình thuộc về. ALIAS thẳng DTO của BE, không khai lại từng field.
+ *
+ * `orgApi.myOrgs` trả nguyên response (`unwrap` không map gì), nên một type viết tay ở đây chỉ
+ * là bản sao — và bản sao thì THIẾU ÂM THẦM: nó bỏ sót `avatarUrl` suốt thời gian qua, nên dữ
+ * liệu vẫn về tới máy mà TypeScript bảo không có, và không màn nào dùng được. Kết quả là nhóm
+ * của chính mình hiện dải màu trơn trong khi nhóm người lạ ở danh sách bên cạnh có ảnh.
+ *
+ * Ghi chú giữ lại từ bản cũ, vì nó là thứ không đọc ra được từ type: org bị KHOÁ vẫn nằm trong
+ * danh sách này (BE cố ý giữ, để phân biệt "khoá" với "không còn"). Đọc `status` trước khi
+ * chọn — gửi slug của một org không ACTIVE là ăn 403 ở mọi request.
+ */
+export type MyOrg = MyOrganization;
 
 /**
  * Một đơn trên bàn duyệt. Khác `MyJoinRequest` ở hai chỗ mà BE cố tình tách schema: có
@@ -108,53 +108,28 @@ export type JoinRequestRow = JoinRequest & {
 };
 
 export const orgApi = {
-  /** Nhóm con của tổ chức đang hoạt động — để duyệt kèm xếp nhóm luôn, đúng ý §7.2a của BE. */
-  async orgUnits(): Promise<OrgUnit[]> {
-    const res = await withAuthRetry(() => listOrgUnits());
-    return unwrap(res, 'Không đọc được danh sách nhóm con');
+  /** Một trang danh bạ của tổ chức đang hoạt động — màn Thành viên cuộn tới đâu tải tới đó. */
+  async members(page: number): Promise<Page<Member>> {
+    const res = await withAuthRetry(() => membershipList({ query: { page, limit: PAGE_SIZE } }));
+    return unwrapPage(res, 'Không tải được danh bạ thành viên', (m) => m);
   },
 
   /**
-   * Tạo nhóm con. `parentUnitId` bỏ trống = nhóm nằm thẳng dưới tổ chức.
+   * Gỡ một người khỏi tổ chức đang thao tác.
    *
-   * Không gửi `moderatorId: null` khi chưa chọn ai: BE phân biệt "không đụng tới" với "gỡ người
-   * phụ trách", mà lúc TẠO thì chỉ có nghĩa thứ nhất là đúng.
+   * BE lưu trữ chứ không xoá bản ghi — danh bạ cũ là dữ liệu của tổ chức. Hai chốt bên đó:
+   * không tự gỡ mình (400), và không gỡ người cũng đang giữ quyền quản trị (403, cần master).
    */
-  async createUnit(input: CreateOrgUnit): Promise<OrgUnit> {
-    const res = await withAuthRetry(() => createOrgUnit({ body: input }));
-    return unwrap(res, 'Không tạo được nhóm con');
+  async removeMember(userId: string): Promise<void> {
+    const res = await withAuthRetry(() => membershipRemove({ path: { userId } }));
+    unwrap(res, 'Không gỡ được thành viên');
   },
 
-  /**
-   * Đổi tên nhóm hoặc gán/gỡ người phụ trách. Ở đây `null` mang nghĩa thật: gỡ người phụ trách —
-   * nên màn hình phải gửi `null` tường minh chứ không phải bỏ trống field.
-   */
-  async updateUnit({ id, ...patch }: UpdateOrgUnit & { id: string }): Promise<OrgUnit> {
-    const res = await withAuthRetry(() => updateOrgUnit({ path: { id }, body: patch }));
-    return unwrap(res, 'Không cập nhật được nhóm con');
-  },
-
-  /** Xoá mềm. Thành viên đang thuộc nhóm không mất chỗ — họ về lại mức tổ chức. */
-  async deleteUnit(id: string): Promise<OrgUnit> {
-    const res = await withAuthRetry(() => deleteOrgUnit({ path: { id } }));
-    return unwrap(res, 'Không xoá được nhóm con');
-  },
-
-  /**
-   * Danh bạ thành viên của tổ chức đang hoạt động.
-   *
-   * `limit: 100` (trần của BE) chứ không phân trang: mọi call-site đều là dropdown "chọn một
-   * người", mà dropdown thì cần cả tập để tìm — phân trang ở đó là ẩn mất người thứ 101 khỏi ô
-   * tìm kiếm. Trường quá 100 thành viên thì đổi dropdown trước, đổi hàm này sau.
-   */
-  async members(): Promise<Member[]> {
-    const res = await withAuthRetry(() => membershipList({ query: { limit: 100 } }));
-    return unwrap(res, 'Không tải được danh bạ thành viên');
-  },
-
-  async joinRequests(status?: JoinRequestStatus): Promise<JoinRequestRow[]> {
-    const res = await withAuthRetry(() => listJoinRequests({ query: status ? { status } : {} }));
-    return unwrap(res, 'Không đọc được hàng đợi đơn').map((r) => ({
+  async joinRequests(status: JoinRequestStatus | undefined, page: number): Promise<Page<JoinRequestRow>> {
+    const res = await withAuthRetry(() =>
+      listJoinRequests({ query: { ...(status ? { status } : {}), page, limit: PAGE_SIZE } }),
+    );
+    return unwrapPage(res, 'Không đọc được hàng đợi đơn', (r) => ({
       ...r,
       sentAt: relativeTime(r.createdAt),
       expiresIn: new Date(r.expiresAt) > new Date() ? untilText(r.expiresAt) : null,
@@ -240,6 +215,17 @@ export const orgApi = {
     return unwrap(res, 'Không đọc được danh bạ nhóm');
   },
 
+  /**
+   * Một trang danh bạ của MỘT nhóm theo slug — ngăn chi tiết tổ chức của master. Cùng cách gắn
+   * `X-Org-Slug` riêng cho lượt gọi như `memberPreview`, nhưng phân trang thay vì lấy `take` dòng.
+   */
+  async memberPage(slug: string, page: number): Promise<Page<Member>> {
+    const res = await withAuthRetry(() =>
+      membershipList({ query: { page, limit: PAGE_SIZE }, headers: { [ORG_HEADER]: slug } }),
+    );
+    return unwrapPage(res, 'Không đọc được danh bạ nhóm', (m) => m);
+  },
+
   async myOrgs(): Promise<MyOrg[]> {
     const res = await withAuthRetry(() => myOrganizations());
     return unwrap(res, 'Không đọc được danh sách tổ chức của bạn');
@@ -276,6 +262,14 @@ export const orgApi = {
    * (`organizationRotateJoinCode`), nên phát nhầm thì thu lại được — slug thì không.
    *
    * Muốn xem trước tên tổ chức trước khi gửi thì gọi `orgApi.byCode` — cùng mã, không cần đăng nhập.
+   */
+  /**
+   * HAI KẾT CỤC, phân biệt bằng `status` của kết quả trả về:
+   * - `approved` — nhóm CÔNG KHAI: đã là thành viên ngay lúc này, không có ai phải duyệt.
+   * - `pending` — nhóm RIÊNG TƯ: phải chờ người có quyền duyệt trong nhóm xử lý.
+   *
+   * Call-site BẮT BUỘC đọc `status`: báo "đã gửi đơn" cho một người vừa vào nhóm xong là
+   * bắt họ ngồi đợi một hàng đợi không tồn tại.
    */
   async requestJoin(input: {
     code?: string;

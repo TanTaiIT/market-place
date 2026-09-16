@@ -1,9 +1,19 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { uploadImage } from '@/api/cloudinary';
 
 /** Cloudinary không giới hạn, nhưng 6 ảnh là đủ cho một tin */
 export const MAX_PHOTOS = 6;
+
+/**
+ * Số ảnh chuẩn hoá + upload CÙNG LÚC.
+ *
+ * Bản trước bung cả 6 ảnh một lượt: 6 lần decode 12MP song song (~280MB bitmap — Android tầm
+ * trung có thể OOM), và băng thông chia 6 nên thumbnail ĐẦU TIÊN cũng phải chờ tới cuối mới
+ * xong. Hai luồng: tổng thời gian gần như không đổi, nhưng ảnh đầu xong sau ~1s thay vì ~4s,
+ * và bộ nhớ đỉnh chỉ còn hai bitmap.
+ */
+const UPLOAD_CONCURRENCY = 2;
 
 /** Một ảnh đang được chuẩn bị cho tin đăng. `uri` local đóng vai id, `url` có khi upload xong. */
 export type ListingPhoto = {
@@ -51,18 +61,49 @@ export function useListingPhotos(initialUrls: string[] = []) {
     // `patch` là map theo uri nên ảnh bị xoá giữa chừng sẽ tự no-op, không cần huỷ tay
   };
 
+  // Hàng đợi sống ngoài render: thêm/bớt ảnh không được làm mất chỗ đứng của ảnh đang chờ.
+  const queue = useRef<string[]>([]);
+  const active = useRef(0);
+
+  const pump = () => {
+    while (active.current < UPLOAD_CONCURRENCY && queue.current.length > 0) {
+      const uri = queue.current.shift()!;
+      active.current += 1;
+      // `start` không bao giờ ném (đã bắt và ghi lên thumbnail), nên `finally` là đủ để trả chỗ.
+      void start(uri).finally(() => {
+        active.current -= 1;
+        pump();
+      });
+    }
+  };
+  const enqueue = (uri: string) => {
+    queue.current.push(uri);
+    pump();
+  };
+
   const addPhotos = (uris: string[]) => {
     const fresh = uris
       .filter((uri) => !photos.some((p) => p.uri === uri))
       .slice(0, MAX_PHOTOS - photos.length);
     if (fresh.length === 0) return;
 
+    // Xếp hàng cũng hiện là 'uploading': với người dùng, "đang chờ tới lượt" và "đang bay" là
+    // cùng một trạng thái — ảnh chưa xong và họ không cần làm gì.
     setPhotos((list) => [...list, ...fresh.map((uri) => ({ uri, status: 'uploading' as const }))]);
-    fresh.forEach((uri) => void start(uri));
+    fresh.forEach(enqueue);
   };
 
-  const removePhoto = (uri: string) => setPhotos((list) => list.filter((p) => p.uri !== uri));
-  const retryPhoto = (uri: string) => void start(uri);
+  const removePhoto = (uri: string) => {
+    // Còn đang xếp hàng thì rút khỏi hàng luôn — không upload một thứ đã bị bỏ.
+    queue.current = queue.current.filter((u) => u !== uri);
+    setPhotos((list) => list.filter((p) => p.uri !== uri));
+  };
+  const retryPhoto = (uri: string) => {
+    // Đổi trạng thái NGAY lúc bấm, không đợi tới lượt: bấm "thử lại" mà thumbnail vẫn đỏ thêm
+    // vài giây là người dùng bấm lần hai.
+    patch(uri, { status: 'uploading', error: undefined });
+    enqueue(uri);
+  };
 
   return {
     photos,

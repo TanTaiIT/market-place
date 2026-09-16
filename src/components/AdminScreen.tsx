@@ -124,7 +124,9 @@ export function AdminScreen({
       {needsOrg && decided ? (
         <NoOrgPicked
           master={master}
-          onPick={() => (master ? setPickOrg(true) : router.push('/join-org'))}
+          hasOrgs={(myOrgs ?? []).length > 1}
+          // Cùng luật với dòng mồi trong ngăn kéo: có nhóm rồi thì CHỌN, chưa có thì mới đi XIN.
+          onPick={() => (master || (myOrgs ?? []).length > 1 ? setPickOrg(true) : router.push('/join-org'))}
         />
       ) : needsOrg ? null : (
         children
@@ -142,7 +144,16 @@ export function AdminScreen({
  * query đã tự tắt bằng `enabled` khi thiếu slug (`queries/admin.ts`), nên tới đây là im lặng
  * hoàn toàn chứ không phải hiện lối thoát trong lúc vẫn bắn request hỏng phía sau.
  */
-function NoOrgPicked({ master, onPick }: { master: boolean; onPick: () => void }) {
+function NoOrgPicked({
+  master,
+  hasOrgs,
+  onPick,
+}: {
+  master: boolean;
+  /** Thuộc ≥2 nhóm mà chưa chọn — khác hẳn "chưa thuộc nhóm nào", và lời lẫn nút phải khác. */
+  hasOrgs: boolean;
+  onPick: () => void;
+}) {
   return (
     <View style={styles.noOrg}>
       <Text style={styles.noOrgIcon}>🏫</Text>
@@ -150,10 +161,12 @@ function NoOrgPicked({ master, onPick }: { master: boolean; onPick: () => void }
       <Text style={styles.noOrgText}>
         {master
           ? 'Màn này hiện dữ liệu của MỘT tổ chức — quyền của bạn không giới hạn, nhưng hàng đợi thì luôn thuộc về một nơi cụ thể. Chọn nơi bạn muốn xem; đổi lại bất cứ lúc nào ở dòng trên tiêu đề.'
-          : 'Màn này hiện dữ liệu của một tổ chức cụ thể. Bạn cần thuộc về một tổ chức trước đã.'}
+          : hasOrgs
+            ? 'Bạn thuộc nhiều tổ chức, mà màn này hiện dữ liệu của MỘT tổ chức. Chọn nơi bạn muốn quản trị — đổi lại bất cứ lúc nào ở dòng trên tiêu đề.'
+            : 'Màn này hiện dữ liệu của một tổ chức cụ thể. Bạn cần thuộc về một tổ chức trước đã.'}
       </Text>
       <PinButton
-        label={master ? 'Chọn tổ chức' : 'Tìm tổ chức'}
+        label={master || hasOrgs ? 'Chọn tổ chức' : 'Tìm tổ chức'}
         onPress={onPick}
         style={{ marginTop: 18 }}
       />

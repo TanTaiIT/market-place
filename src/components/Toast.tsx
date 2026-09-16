@@ -14,10 +14,22 @@ const Ctx = createContext<ToastCtx>(() => {});
 
 export const useToast = () => useContext(Ctx);
 
+/** Khoảng hở dưới thanh trạng thái. Nhỏ hơn nữa thì toast dính vào giờ/pin của hệ điều hành. */
+const TOP_GAP = 12;
+
+/**
+ * Chỗ nghỉ của toast khi ẩn: NGOÀI màn, phía TRÊN.
+ *
+ * Dấu âm đi cùng việc toast nằm ở đỉnh — nó phải rơi xuống rồi thụt lên đúng hướng nó biến mất.
+ * Để dương như hồi toast còn ở đáy thì toast trên đỉnh lại bay vào từ dưới lên, tức là đi xuyên
+ * qua chính chỗ nó sắp đứng.
+ */
+const HIDDEN_Y = -30;
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [msg, setMsg] = useState('');
   const insets = useSafeAreaInsets();
-  const y = useSharedValue(30);
+  const y = useSharedValue(HIDDEN_Y);
   const opacity = useSharedValue(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -28,7 +40,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       opacity.value = withTiming(1, { duration: 200 });
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => {
-        y.value = withTiming(30, { duration: 250 });
+        y.value = withTiming(HIDDEN_Y, { duration: 250 });
         opacity.value = withTiming(0, { duration: 250 });
       }, 1800);
     },
@@ -43,9 +55,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={show}>
       {children}
+      {/* Neo theo `insets.top` chứ không phải một số cố định: tai thỏ và thanh trạng thái mỗi
+          máy một chiều cao, đặt số chết là máy này vừa khít thì máy kia toast chui vào giờ/pin. */}
       <Animated.View
         pointerEvents="none"
-        style={[styles.toast, { bottom: insets.bottom + 96 }, aStyle]}
+        style={[styles.toast, { top: insets.top + TOP_GAP }, aStyle]}
       >
         <Text style={styles.text}>{msg}</Text>
       </Animated.View>

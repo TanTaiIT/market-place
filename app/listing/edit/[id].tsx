@@ -2,11 +2,11 @@ import React from 'react';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Corkboard } from '@/components/Corkboard';
+import { Surface } from '@/components/Surface';
 import { ListingForm, listingToFormValues } from '@/components/ListingForm';
 import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
-import { useListing, useUpdateListing } from '@/queries/listings';
+import { useMyListing, useUpdateListing } from '@/queries/listings';
 import { useListingPhotos } from '@/queries/upload';
 import type { Listing } from '@/api/db';
 
@@ -19,10 +19,15 @@ import type { Listing } from '@/api/db';
 export default function EditListing() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const listingId = id ?? '';
-  const { data: listing, error, isLoading } = useListing(listingId);
+  /*
+   * `useMyListing`, KHÔNG `useListing`: `GET /listings/{id}` lọc `status ∈ {active, sold,
+   * expired}` ở BE, nên mở form sửa một tin 'Chờ duyệt' trả 404 'Listing not found' — đúng
+   * lỗi của nút sửa cũ. Đo trên một tài khoản thật: 13/24 tin rơi vào ca đó.
+   */
+  const { data: listing, error, isLoading } = useMyListing(listingId);
 
   return (
-    <Corkboard>
+    <Surface>
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -44,7 +49,7 @@ export default function EditListing() {
           )}
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </Corkboard>
+    </Surface>
   );
 }
 

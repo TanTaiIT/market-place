@@ -6,6 +6,7 @@ import {
   moderationRerouteListing,
   moderationOverview,
   moderationPublicOverview,
+  listingBump,
   moderationRemoveListing,
   moderationSetListingStatus,
   myRoleGrants,
@@ -14,7 +15,8 @@ import {
 } from './generated';
 import type { Listing as ListingDto, RerouteListing, RoleGrant } from './generated';
 import { reportKindLabel } from './report';
-import { formatPrice, gradOf, initialsOf, relativeTime, unwrap } from './client';
+import { PAGE_SIZE, formatPrice, gradOf, initialsOf, relativeTime, unwrap, unwrapPage } from './client';
+import type { Page } from './client';
 import { withAuthRetry } from './http';
 import type { Grad } from '@/theme';
 
@@ -42,7 +44,17 @@ export type ModListing = {
   title: string;
   price: string;
   cat: string;
+  /** Gradient dự phòng, dựng từ id — dùng khi tin KHÔNG có ảnh nào. */
   photo: Grad;
+  /**
+   * Ảnh đầu của tin. `undefined` khi tin chưa có ảnh → `ListingPhoto` rơi về `photo`.
+   *
+   * Thiếu field này là lý do bàn duyệt chỉ hiện gradient: `ListingPhoto` chỉ vẽ `<Image>`
+   * khi có `photoUrl`, còn `photo` một mình luôn cho ra ô màu. DTO đã mang `images` từ đầu
+   * (mapper tin công khai đọc nó ở `client.ts`), chỉ mapper của bàn duyệt là chưa lấy —
+   * di sản từ hồi màn này còn chạy fixture, lúc `gradOf(id)` là toàn bộ phần hình.
+   */
+  photoUrl?: string;
   seller: string;
   avatar: string;
   /** Snapshot ảnh đại diện lúc tạo tin. Rỗng = rơi về chữ viết tắt. */
@@ -58,6 +70,9 @@ export type ModListing = {
 export type Report = {
   id: string;
   urgent: boolean;
+  /** Để bấm vào xem ĐỐI TƯỢNG bị tố — tin thì mở qua cửa bàn duyệt, người thì mở hồ sơ công khai. */
+  targetType: 'listing' | 'user';
+  targetId: string;
   target: string;
   kind: string;
   by: string;
@@ -112,6 +127,7 @@ function toModListing(dto: ListingDto, categoryNames: Map<string, string>): ModL
     price: formatPrice(dto.price),
     cat: categoryNames.get(dto.category) ?? '',
     photo: gradOf(dto._id),
+    photoUrl: dto.images[0] || undefined,
     seller: dto.posterName || 'Người bán',
     avatar: initialsOf(dto.posterName || 'Người bán'),
     avatarUrl: dto.posterAvatar || undefined,
@@ -180,7 +196,7 @@ export const adminApi = {
     };
   },
   async getEvents(): Promise<AdminEvent[]> {
-    const res = await withAuthRetry(() => moderationActivity({ query: { limit: 20 } }));
+    const res = await withAuthRetry(() => moderationActivity({ query: { limit: PAGE_SIZE } }));
     return unwrap(res, 'Không tải được dòng hoạt động').map((log) => ({
       id: log.id,
       tone: EVENT_TONE[log.action] ?? 'info',
@@ -196,11 +212,21 @@ export const adminApi = {
   async getListings(
     status: ModStatus | undefined,
     categoryNames: Map<string, string>,
-  ): Promise<ModListing[]> {
+    page: number,
+    filter: { category?: string; q?: string } = {},
+  ): Promise<Page<ModListing>> {
     const res = await withAuthRetry(() =>
-      moderationListings({ query: { status, limit: 100 } }),
+      moderationListings({
+        query: {
+          status,
+          category: filter.category,
+          q: filter.q?.trim() || undefined,
+          page,
+          limit: PAGE_SIZE,
+        },
+      }),
     );
-    return unwrap(res, 'Không tải được tin đăng').map((l) => toModListing(l, categoryNames));
+    return unwrapPage(res, 'Không tải được tin đăng', (l) => toModListing(l, categoryNames));
   },
 
   /**
@@ -211,9 +237,12 @@ export const adminApi = {
   async getPublicQueue(
     status: ModStatus | undefined,
     categoryNames: Map<string, string>,
-  ): Promise<ModListing[]> {
-    const res = await withAuthRetry(() => moderationPublicQueue({ query: { status, limit: 100 } }));
-    return unwrap(res, 'Không tải được hàng đợi công khai').map((l) =>
+    page: number,
+  ): Promise<Page<ModListing>> {
+    const res = await withAuthRetry(() =>
+      moderationPublicQueue({ query: { status, page, limit: PAGE_SIZE } }),
+    );
+    return unwrapPage(res, 'Không tải được hàng đợi công khai', (l) =>
       toModListing(l, categoryNames),
     );
   },
@@ -238,12 +267,16 @@ export const adminApi = {
     return unwrap(res, 'Không chuyển được tin sang ô khác');
   },
 
-  async getReports(): Promise<Report[]> {
-    const res = await withAuthRetry(() => reportList({ query: { status: 'open', limit: 50 } }));
-    return unwrap(res, 'Không tải được báo cáo').map((r) => ({
+  async getReports(page: number): Promise<Page<Report>> {
+    const res = await withAuthRetry(() =>
+      reportList({ query: { status: 'open', page, limit: PAGE_SIZE } }),
+    );
+    return unwrapPage(res, 'Không tải được báo cáo', (r) => ({
       id: r.id,
       // "Nghi lừa đảo" là loại nặng nhất — viền đỏ, xếp trước.
       urgent: r.kind === 'scam',
+      targetType: r.targetType,
+      targetId: r.targetId,
       target: r.targetTitle,
       // Nhãn lấy từ `report.ts` — cùng bản với ngăn người dùng chọn lúc gửi (xem file đó).
       kind: reportKindLabel(r.kind),
@@ -262,6 +295,19 @@ export const adminApi = {
       }),
     );
     unwrap(res, 'Không cập nhật được trạng thái tin');
+    return { id };
+  },
+
+  /**
+   * Đẩy tin lên đầu bảng — MIỄN PHÍ, không qua gói nào.
+   *
+   * Nằm ở `/listings/:id/bump` chứ không dưới `/moderation`: đây không phải một phán quyết
+   * về nội dung, mà là một quyết định phân phối. BE chốt thẩm quyền theo TRỤC CỦA TIN — tin
+   * công khai thuộc người phụ trách danh mục, tin nội bộ thuộc quản trị nhóm.
+   */
+  async bump(id: string) {
+    const res = await withAuthRetry(() => listingBump({ path: { id } }));
+    unwrap(res, 'Không đẩy được tin này lên đầu bảng');
     return { id };
   },
 

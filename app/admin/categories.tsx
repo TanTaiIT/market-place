@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AdminPanel, AdminScreen } from '@/components/AdminScreen';
 import { AdminSmallBtn, adminFormStyles } from '@/components/AdminPicker';
+import { CategoryIconPicker } from '@/components/CategoryIconPicker';
 import { EmptyState, Field, Loading, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useAddCategory, useAdminCategories, useEditCategory } from '@/queries/admin-content';
@@ -43,6 +44,7 @@ export default function AdminCategories() {
 
   const submit = () => {
     if (!name.trim()) return toast('⚠️ Nhập tên danh mục trước đã');
+    if (!icon) return toast('⚠️ Chọn một biểu tượng cho danh mục');
 
     const done = (msg: string) => ({
       onSuccess: () => {
@@ -133,14 +135,7 @@ export default function AdminCategories() {
               onChangeText={setName}
               placeholder="Ví dụ: Dụng cụ thể thao"
             />
-            <Field
-              onDark
-              label="Biểu tượng (emoji)"
-              value={icon}
-              onChangeText={setIcon}
-              placeholder="🏸"
-              maxLength={4}
-            />
+            <CategoryIconPicker value={icon} onChange={setIcon} />
             <Field
               onDark
               label="Thứ tự hiển thị"

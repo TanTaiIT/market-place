@@ -21,7 +21,12 @@ import { API_BASE_URL } from './http';
 const SOCKET_URL = API_BASE_URL.replace(/\/api\/v\d+\/?$/, '');
 
 /** Sự kiện BE phát xuống. Union thay vì `string` để một cú gõ nhầm là lỗi biên dịch. */
-type ServerEvent = 'chat:message' | 'admin:activity';
+/**
+ * Sự kiện server phát. `chat:inbox` khác `chat:message` ở NGƯỜI NGHE, không ở nội dung: nó đi
+ * vào phòng riêng của từng người nhận nên tới được cả khi họ đang ở màn khác — xem
+ * `useInboxSignal`.
+ */
+type ServerEvent = 'chat:message' | 'chat:inbox' | 'notif:new' | 'admin:activity';
 type EventHandler = (payload: unknown) => void;
 
 let socket: Socket | null = null;

@@ -6,7 +6,8 @@ import {
   updateCategory,
 } from './generated';
 import type { Category as CategoryDto } from './generated';
-import { relativeTime, unwrap } from './client';
+import { PAGE_SIZE, relativeTime, unwrap, unwrapPage } from './client';
+import type { Page } from './client';
 import { withAuthRetry } from './http';
 
 /**
@@ -98,11 +99,17 @@ export const adminContentApi = {
   /**
    * Tạo danh mục (chỉ master). Không gửi `slug`: BE tự sinh từ tên, và một slug gõ tay lệch với
    * tên là thứ chỉ lộ ra nhiều tháng sau, lúc đã có tin trỏ vào nó.
+   *
+   * `icon` là điều kiện của BE (`categoryIconSchema`), chặn lại ở đây để lỗi nói được phải làm
+   * gì — thông điệp của validator chỉ nói field nào sai, không nói bấm vào đâu.
    */
   async addCategory(input: CategoryDraft): Promise<AdminCategory> {
-    const { name, ...rest } = categoryBody(input);
+    // Bóc `icon` ra khỏi spread: guard chỉ thu hẹp được biến, không thu hẹp field trong object
+    // spread — để nguyên thì `CreateCategory.icon` (required sau khi BE siết) không nhận.
+    const { name, icon, ...rest } = categoryBody(input);
     if (!name) throw new Error('Nhập tên danh mục trước đã');
-    const res = await withAuthRetry(() => createCategory({ body: { ...rest, name } }));
+    if (!icon) throw new Error('Chọn một biểu tượng cho danh mục');
+    const res = await withAuthRetry(() => createCategory({ body: { ...rest, name, icon } }));
     return unwrap(res, 'Không tạo được danh mục');
   },
 
@@ -132,11 +139,11 @@ export const adminContentApi = {
    * nào, nên thông báo họ vừa gửi cho một nhóm không nằm trong hộp thư của họ — panel này sẽ
    * báo gửi xong rồi hiện một danh sách không có nó.
    */
-  async getNotices(): Promise<SentNotice[]> {
+  async getNotices(page: number): Promise<Page<SentNotice>> {
     const res = await withAuthRetry(() =>
-      notificationList({ query: { limit: 20, scope: 'managed' } }),
+      notificationList({ query: { page, limit: PAGE_SIZE, scope: 'managed' } }),
     );
-    return unwrap(res, 'Không tải được thông báo đã gửi').map((n) => ({
+    return unwrapPage(res, 'Không tải được thông báo đã gửi', (n) => ({
       id: n.id,
       title: n.title,
       unitId: n.unitId,

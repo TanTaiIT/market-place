@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { adminSystemApi } from '@/api/admin-system';
+import { adminSystemApi, type ReportQuery } from '@/api/admin-system';
+import { useOrgSlug } from '@/stores/auth';
 import { qk } from './keys';
 
 /**
@@ -83,6 +84,41 @@ export function useRemoveProduct() {
  * Thống kê nặng (quét tin theo cửa sổ ngày) và không ai cần nó tươi từng phút — đây là dữ liệu
  * để CHỐT một cái giá, việc làm vài lần mỗi quý.
  */
+/**
+ * Báo cáo đăng tin theo thời gian.
+ *
+ * `staleTime` 5 phút: dữ liệu chỉ đổi khi có người đăng tin mới, mà một báo cáo xu hướng
+ * không cần tươi tới từng giây — đổi độ mịn qua lại sẽ đọc cache thay vì bắn lại một aggregate
+ * quét cả bảng.
+ */
+export function useListingReport(query: ReportQuery, enabled = true) {
+  // BE scope theo `X-Org-Slug` mà `http.ts` gắn sẵn: có org là bản của nhóm, không có là toàn sàn.
+  const orgSlug = useOrgSlug();
+  return useQuery({
+    queryKey: qk.adminListingReport(orgSlug ?? '-', query.granularity, query.from, query.to),
+    queryFn: () => adminSystemApi.getListingReport(query),
+    staleTime: 5 * 60_000,
+    enabled,
+  });
+}
+
+/**
+ * Báo cáo người dùng — báo cáo con thứ hai.
+ *
+ * `enabled` có mặt vì màn Thống kê gọi CẢ HAI hook (quy tắc hook: không gọi có điều kiện)
+ * nhưng chỉ một tab đang mở. Thiếu cờ này thì mỗi lần đổi độ mịn là hai aggregate quét cả bảng
+ * chạy song song, một trong hai không ai nhìn.
+ */
+export function useUserReport(query: ReportQuery, enabled = true) {
+  const orgSlug = useOrgSlug();
+  return useQuery({
+    queryKey: qk.adminUserReport(orgSlug ?? '-', query.granularity, query.from, query.to),
+    queryFn: () => adminSystemApi.getUserReport(query),
+    staleTime: 5 * 60_000,
+    enabled,
+  });
+}
+
 export function usePostingStats(days: number) {
   return useQuery({
     queryKey: qk.adminPostingStats(days),

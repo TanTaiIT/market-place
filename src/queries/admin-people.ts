@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminPeopleApi } from '@/api/admin-people';
 import type { UserFilter } from '@/api/admin-people';
 import { qk } from './keys';
+import { usePagedList } from './paged';
 
 /**
  * Bảng người dùng toàn hệ thống (master).
@@ -28,13 +29,11 @@ export function useAdminUsers(filter: UserFilter = {}, enabled = true) {
 
   const status = filter.status;
 
-  return useQuery({
-    queryKey: qk.adminUsers(settled, status ?? 'all'),
-    queryFn: () => adminPeopleApi.getUsers({ q: settled, status }),
-    enabled,
-    placeholderData: keepPreviousData,
-    staleTime: 60_000,
-  });
+  return usePagedList(
+    qk.adminUsers(settled, status ?? 'all'),
+    (page) => adminPeopleApi.getUsers({ q: settled, status }, page),
+    { enabled, keepPrevious: true, staleTime: 60_000 },
+  );
 }
 
 function usePeopleMutation<TVars, TData>(fn: (vars: TVars) => Promise<TData>) {

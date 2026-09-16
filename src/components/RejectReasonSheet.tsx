@@ -95,7 +95,7 @@ export function RejectReasonSheet({
 }
 
 const styles = StyleSheet.create({
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: C.scrim },
+  scrim: { ...StyleSheet.absoluteFill, backgroundColor: C.scrim },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   card: {
     width: '100%',

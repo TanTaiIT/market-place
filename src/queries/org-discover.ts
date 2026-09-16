@@ -106,10 +106,13 @@ export function useActiveOrg() {
 /** Bao nhiêu avatar xếp chồng trên hồ sơ trước khi đổi sang "+N" — quá 4 là hết chỗ trên một dòng. */
 const AVATAR_STACK = 4;
 /*
- * Tin xem trước trong hồ sơ nhóm — đủ để biết nhóm đang sống, không phải để lướt thay bảng
- * tin. Lưới lấy 4 để không hở nửa hàng; một-tin-một-dòng lấy 3 vì mỗi thẻ cao gần nửa màn.
+ * Tin xem trước trong hồ sơ nhóm — đủ để biết nhóm đang sống, không phải để lướt thay bảng tin.
+ *
+ * Một con số duy nhất kể từ khi màn nhóm bày tin bằng DÒNG GỌN (`ListingRow`) cho mọi nhóm: số
+ * tin không còn đổi theo `feedLayout` nữa. Sáu dòng cao xấp xỉ ba thẻ lớn cũ, nên vẫn là "xem
+ * trước" chứ không thành bảng tin thứ hai.
  */
-const PEEK_BY_LAYOUT = { feed: 3, grid: 4 } as const;
+const PEEK_ROWS = 6;
 
 /**
  * Danh bạ + tin của nhóm đang mở hồ sơ.
@@ -117,15 +120,12 @@ const PEEK_BY_LAYOUT = { feed: 3, grid: 4 } as const;
  * `enabled: joined` là chốt bắt buộc, không phải tối ưu: cả hai endpoint đòi tư cách thành
  * viên, nên gọi cho nhóm mình chưa vào là hai request chắc chắn 403 mỗi lần mở hồ sơ.
  */
-export function useOrgPeek(slug: string, joined: boolean, layout: 'feed' | 'grid') {
-  const take = PEEK_BY_LAYOUT[layout];
+export function useOrgPeek(slug: string, joined: boolean) {
   return useQuery({
-    // `take` nằm trong key: đổi cách bày là đổi số tin cần lấy, dùng chung key thì lưới
-    // hiện lại đúng 3 tin của lần đọc trước.
-    queryKey: qk.orgPeek(slug, take),
+    queryKey: qk.orgPeek(slug, PEEK_ROWS),
     queryFn: async () => ({
       members: await orgApi.memberPreview(slug, AVATAR_STACK),
-      listings: await api.getOrgListings(slug, take),
+      listings: await api.getOrgListings(slug, PEEK_ROWS),
     }),
     enabled: slug.length > 0 && joined,
     staleTime: 60_000,

@@ -1,16 +1,14 @@
 import { FlatList, Share, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
-import { FeedCard } from '@/components/FeedCard';
-import { NoteCard } from '@/components/NoteCard';
+import { ListingRow } from '@/components/ListingRow';
 import { Header } from '@/components/OrgProfileCard';
 import { useToast } from '@/components/Toast';
 import { useMyOrgs, useRequestJoin } from '@/queries/org';
 import { useOrgPeek, useOrgProfile } from '@/queries/org-discover';
 import { useMyGrants } from '@/queries/admin';
 import { canAdminOrg } from '@/api/admin';
-import { useProfile, useSavedIds, useToggleSaved } from '@/queries/listings';
-import { useOpenConversation } from '@/queries/chat';
+import { useProfile } from '@/queries/listings';
 import type { OrgProfile } from '@/api/org';
 import { C, F } from '@/theme';
 
@@ -32,14 +30,14 @@ export default function OrgProfileScreen() {
   const { data: me } = useProfile();
   const join = useRequestJoin();
   /*
-   * Bảng tin trong nhóm bày theo đúng thiết lập của NHÓM ĐÓ, không phải của org người xem
-   * đang thao tác: mở hồ sơ trường B thì thấy trường B bày như chủ nhóm B đã chọn.
+   * Bảng tin trong nhóm bày bằng DÒNG GỌN — cùng `ListingRow` với màn tìm kiếm, để ai đã quen
+   * quét danh sách ở đó thì ở đây đọc y như vậy.
    *
-   * Rơi về `feed` trong lúc hồ sơ còn đang tải — `org` chưa có thì chưa biết hỏi ai.
+   * Cố tình KHÔNG đọc `feedLayout` của nhóm: thiết lập đó vẫn điều khiển tab Bảng tin (thẻ lớn
+   * hay lưới), nhưng hồ sơ nhóm là chỗ NGƯỜI TA ĐỌC ĐỂ QUYẾT ĐỊNH xin vào — ở đó cần thấy được
+   * nhiều tin trong một màn hơn là thấy một tin thật lớn.
    */
-  const layout = org?.feedLayout ?? 'feed';
-  const grid = layout === 'grid';
-  const peek = useOrgPeek(slug ?? '', Boolean(org?.joined), layout);
+  const peek = useOrgPeek(slug ?? '', Boolean(org?.joined));
   /*
    * Ai được sửa: master, hoặc người giữ grant `manager` trên ĐÚNG nhóm này — xem `canAdminOrg`.
    *
@@ -49,13 +47,6 @@ export default function OrgProfileScreen() {
    */
   const { data: grants } = useMyGrants();
   const { data: myOrgs } = useMyOrgs();
-
-  // Cùng ba đường của bảng tin, không phải bản sao rút gọn: thẻ tin ở đây là CÙNG một
-  // `FeedCard`, nên ai đã học cách bấm ở bảng tin thì ở đây phải bấm ra cùng thứ.
-  const { data: savedIds } = useSavedIds();
-  const toggleSaved = useToggleSaved();
-  const openChat = useOpenConversation();
-  const saved = new Set(savedIds ?? []);
 
   if (isPending) return <Shell><Loading /></Shell>;
   if (error || !org) {
@@ -81,12 +72,6 @@ export default function OrgProfileScreen() {
       },
     );
 
-  const message = (listingId: string) =>
-    openChat.mutate(listingId, {
-      onSuccess: (c) => router.push(`/chat/${c.id}`),
-      onError: (e: Error) => toast(`⚠️ ${e.message}`),
-    });
-
   const invite = () =>
     void Share.share({
       message: `Vào nhóm "${org.name}" trên Ghim — mã tham gia: ${org.joinCode}`,
@@ -97,11 +82,7 @@ export default function OrgProfileScreen() {
       <FlatList
         data={peek.data?.listings ?? []}
         keyExtractor={(l) => l.id}
-        // `numColumns` không đổi tại chỗ được: RN đòi dựng lại danh sách, `key` là đòn bẩy duy nhất.
-        key={layout}
-        numColumns={grid ? 2 : 1}
-        columnWrapperStyle={grid ? styles.gridRow : undefined}
-        contentContainerStyle={[styles.body, { gap: grid ? 14 : 22 }]}
+        contentContainerStyle={[styles.body, { gap: 10 }]}
         ListHeaderComponent={
           <Header
             org={org}
@@ -129,24 +110,15 @@ export default function OrgProfileScreen() {
           />
         }
         ListHeaderComponentStyle={{ marginBottom: 4 }}
-        renderItem={({ item, index }) =>
-          grid ? (
-            // Cùng ô thumbnail mà bảng tin dùng ở chế độ lưới — một bộ layout cho cả hai màn.
-            <NoteCard item={item} index={index} onPress={() => router.push(`/listing/${item.id}`)} />
-          ) : (
-            <View style={styles.post}>
-              <FeedCard
-                item={item}
-                index={index}
-                orgName={org.name}
-                saved={saved.has(item.id)}
-                onPress={() => router.push(`/listing/${item.id}`)}
-                onToggleSave={() => toggleSaved.mutate({ id: item.id, saved: !saved.has(item.id) })}
-                onMessage={() => message(item.id)}
-              />
-            </View>
-          )
-        }
+        renderItem={({ item, index }) => (
+          <View style={styles.post}>
+            <ListingRow
+              item={item}
+              index={index}
+              onPress={() => router.push(`/listing/${item.id}`)}
+            />
+          </View>
+        )}
         ListEmptyComponent={<GroupFeed org={org} />}
       />
     </Shell>
@@ -183,18 +155,11 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-
 const styles = StyleSheet.create({
-  /*
-   * Khoảng cách hàng do call-site truyền vào: lưới xếp sát hơn, còn một-tin-một-dòng phải
-   * chừa chỗ cho đinh ghim nhô lên khỏi mép thẻ.
-   */
+  /** Khoảng cách hàng do call-site truyền vào — 10, khớp danh sách của màn tìm kiếm. */
   body: { paddingBottom: 32 },
   /** Lề NGOÀI cho thẻ tin, khớp với `inset` của khối hồ sơ phía trên. */
   post: { marginHorizontal: 14 },
-  /** Lưới cần lề ở hàng chứ không ở từng thẻ — `NoteCard` không tự mang lề. */
-  gridRow: { gap: 14, paddingHorizontal: 14 },
-
 
   section: { fontFamily: F.mono, fontSize: 10, letterSpacing: 1.2, color: C.sand, marginTop: 4 },
   rule: {

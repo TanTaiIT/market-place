@@ -48,8 +48,16 @@ export function PhotoPicker({
       // `allowsEditing` bị bỏ qua khi chọn nhiều ảnh — cắt ảnh hàng loạt không được hỗ trợ
       allowsMultipleSelection: true,
       selectionLimit: remaining,
-      // Nén ngay trên máy: ảnh gốc điện thoại 3-12MB, upload bằng 3G sẽ treo rất lâu
-      quality: 0.7,
+      /*
+       * KHÔNG nén ở picker. `quality < 1` là OS decode + encode lại nguyên 12MP ngay trong
+       * picker (chọn 6 ảnh = treo 6 lần), rồi `prepare` ở `cloudinary.ts` lại decode + encode
+       * lần nữa và vứt kết quả lần đầu. Nén một lần, ở một chỗ — chỗ đó là `prepare`.
+       */
+      quality: 1,
+      // iOS: trả đúng file đang có (HEIC) thay vì transcode sang JPEG — thêm một lần encode
+      // 12MP nữa, mà `prepare` đọc HEIC được. Android bỏ qua tuỳ chọn này.
+      preferredAssetRepresentationMode:
+        ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Current,
     });
     if (res.canceled) return;
 
@@ -69,40 +77,42 @@ export function PhotoPicker({
   return (
     <View style={styles.wrap}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+        {/* Layout animation (`entering`) và `transform` phải nằm trên hai lớp khác nhau:
+            để chung một view thì entering ghi đè transform lúc chạy — Reanimated 4 cảnh báo
+            "Property 'transform' of AnimatedComponent(View) may be overwritten". Lớp ngoài
+            nhận entering, lớp trong giữ góc nghiêng. */}
         {photos.map((photo, i) => (
-          <Animated.View
-            key={photo.uri}
-            entering={FadeInDown.delay(i * 60).duration(300).springify()}
-            style={[styles.slot, { transform: [{ rotate: `${TILTS[i % TILTS.length]}deg` }] }]}
-          >
-            <Pressable
-              onPress={() => photo.status === 'error' && onRetry(photo.uri)}
-              style={styles.thumbBox}
-            >
-              <Image source={{ uri: photo.uri }} style={styles.thumb} resizeMode="cover" />
+          <Animated.View key={photo.uri} entering={FadeInDown.delay(i * 60).duration(300).springify()}>
+            <View style={[styles.slot, { transform: [{ rotate: `${TILTS[i % TILTS.length]}deg` }] }]}>
+              <Pressable
+                onPress={() => photo.status === 'error' && onRetry(photo.uri)}
+                style={styles.thumbBox}
+              >
+                <Image source={{ uri: photo.uri }} style={styles.thumb} resizeMode="cover" />
 
-              {photo.status === 'uploading' && (
-                <View style={styles.overlay}>
-                  <ActivityIndicator color={C.paperWarm} size="small" />
+                {photo.status === 'uploading' && (
+                  <View style={styles.overlay}>
+                    <ActivityIndicator color={C.paperWarm} size="small" />
+                  </View>
+                )}
+
+                {photo.status === 'error' && (
+                  <View style={[styles.overlay, styles.overlayError]}>
+                    <Text style={styles.retryText}>⟳ Thử lại</Text>
+                  </View>
+                )}
+              </Pressable>
+
+              {photo.status === 'done' && i === 0 && (
+                <View style={styles.coverTag}>
+                  <Text style={styles.coverText}>Ảnh bìa</Text>
                 </View>
               )}
 
-              {photo.status === 'error' && (
-                <View style={[styles.overlay, styles.overlayError]}>
-                  <Text style={styles.retryText}>⟳ Thử lại</Text>
-                </View>
-              )}
-            </Pressable>
-
-            {photo.status === 'done' && i === 0 && (
-              <View style={styles.coverTag}>
-                <Text style={styles.coverText}>Ảnh bìa</Text>
-              </View>
-            )}
-
-            <Pressable onPress={() => onRemove(photo.uri)} hitSlop={10} style={styles.remove}>
-              <Text style={styles.removeText}>✕</Text>
-            </Pressable>
+              <Pressable onPress={() => onRemove(photo.uri)} hitSlop={10} style={styles.remove}>
+                <Text style={styles.removeText}>✕</Text>
+              </Pressable>
+            </View>
           </Animated.View>
         ))}
 
@@ -161,7 +171,7 @@ const styles = StyleSheet.create({
   thumbBox: { flex: 1, borderRadius: 4, overflow: 'hidden' },
   thumb: { flex: 1 },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: C.scrim,
     alignItems: 'center',
     justifyContent: 'center',

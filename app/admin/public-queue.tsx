@@ -2,16 +2,19 @@ import { useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { AdminFilter, AdminScreen } from '@/components/AdminScreen';
 import { AdminListingRow, RowAction } from '@/components/AdminListingRow';
+import { AdminListingSheet } from '@/components/AdminListingSheet';
 import { RerouteSheet } from '@/components/RerouteSheet';
-import { EmptyState, Loading } from '@/components/ui';
+import { EmptyState, Loading, PagedFooter } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import {
+  useBumpListing,
   useMyGrants,
   usePublicQueue,
+  useRemoveModListing,
   useRerouteListing,
   useSetListingStatus,
 } from '@/queries/admin';
-import { isMaster, type ModStatus } from '@/api/admin';
+import { isMaster, type ModListing, type ModStatus } from '@/api/admin';
 import { C, F } from '@/theme';
 
 const TABS: { value: ModStatus; label: string }[] = [
@@ -35,11 +38,18 @@ export default function PublicQueue() {
   const [tab, setTab] = useState<ModStatus>('pending');
   /** Tin đang chờ chọn ô đích. Giữ cả tiêu đề để ngăn chuyển ô nói rõ nó đang đụng vào tin nào. */
   const [moving, setMoving] = useState<{ id: string; title: string } | null>(null);
+  /**
+   * Tin đang mở chi tiết. Giữ CẢ object chứ không chỉ id: `AdminListingSheet` nhận `item` và
+   * tự đóng khi `null`, nên không có trạng thái 'mở mà không có tin' nào dựng được.
+   */
+  const [sheet, setSheet] = useState<ModListing | null>(null);
 
-  const { data, error, isLoading } = usePublicQueue(tab);
+  const { data, error, isLoading, loadMore, isFetchingNextPage } = usePublicQueue(tab);
   const { data: grants } = useMyGrants();
   const setStatus = useSetListingStatus();
   const reroute = useRerouteListing();
+  const remove = useRemoveModListing();
+  const bump = useBumpListing();
 
   const rows = data ?? [];
   // Chuyển ô là quyền của master. Manager thấy nút này chỉ để bấm rồi nhận 403.
@@ -70,11 +80,30 @@ export default function PublicQueue() {
       <FlatList
         data={rows}
         keyExtractor={(l) => l.id}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={<PagedFooter loading={isFetchingNextPage} onDark />}
         contentContainerStyle={{ padding: 16, gap: 10 }}
         renderItem={({ item }) => (
-          <AdminListingRow item={item}>
+          /*
+            Bấm vào HÀNG mở chi tiết; các nút bên trong vẫn ăn cú chạm của riêng chúng —
+            `Pressable` lồng nhau trong RN không cho sự kiện nổi lên như DOM, nên nút ✓ không
+            kéo theo một lượt mở ngăn. Cùng cách màn 'Duyệt tin' đang làm.
+          */
+          <AdminListingRow item={item} onPress={() => setSheet(item)}>
             {canReroute && (
               <RowAction glyph="⇄" onPress={() => setMoving({ id: item.id, title: item.title })} />
+            )}
+            {/*
+              Không gác bằng grant ở đây: hàng đợi này ĐÃ được BE thu về đúng ô của người gọi,
+              nên mọi tin họ thấy đều nằm trong phạm vi họ phụ trách — khác `admin/listings`,
+              nơi một staff nhóm cũng mở được màn.
+            */}
+            {item.status === 'active' && (
+              <RowAction
+                glyph="🔝"
+                onPress={() => bump.mutate(item.id, act(`Đã đẩy "${item.title}" lên đầu bảng`))}
+              />
             )}
             {item.status !== 'active' && (
               <RowAction
@@ -98,6 +127,37 @@ export default function PublicQueue() {
             <EmptyState icon="✅" text="Không có tin nào trong ô bạn phụ trách" />
           )
         }
+      />
+
+      {/*
+        Ngăn chi tiết ĐÓNG sau mọi hành động, khác màn 'Duyệt tin' vốn để nó mở.
+
+        `sheet` giữ một BẢN CHỤP của tin. Đổi trạng thái xong thì bản chụp đó sai ngay: nhãn
+        vẫn ghi 'chờ duyệt' và footer vẫn mời ghim lại một tin vừa ghim. Tệ hơn, tin thường
+        rời khỏi tab đang xem — ngăn còn mở là còn hiện một tin không còn trong danh sách phía
+        sau. Toast đã nói kết quả nên không mất thông tin nào khi đóng.
+      */}
+      <AdminListingSheet
+        item={sheet}
+        onClose={() => setSheet(null)}
+        onApprove={(l) => {
+          setSheet(null);
+          setStatus.mutate(
+            { id: l.id, status: 'active' },
+            act(`📌 Đã duyệt "${l.title}" lên bảng công khai`),
+          );
+        }}
+        onToggleHide={(l) => {
+          setSheet(null);
+          setStatus.mutate(
+            { id: l.id, status: l.status === 'hidden' ? 'active' : 'hidden' },
+            act(l.status === 'hidden' ? 'Tin đã hiện lại trên bảng' : 'Đã ẩn tin khỏi bảng'),
+          );
+        }}
+        onRemove={(l) => {
+          setSheet(null);
+          remove.mutate(l.id, act(`Đã gỡ "${l.title}" khỏi bảng`));
+        }}
       />
 
       <RerouteSheet

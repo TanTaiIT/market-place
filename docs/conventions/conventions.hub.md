@@ -41,7 +41,8 @@ Index **duy nhất** cho convention của repo này. Quy tắc dùng: tra ở đ
 - Query key: luôn `qk.xxx()` từ `src/queries/keys.ts`.
 - State: server → TanStack · sống lâu hơn màn hình → Zustand `src/stores/**` · còn lại → `useState`.
 - Route mới cần đăng nhập → thêm `<Stack.Screen>` vào khối `guard={isAuthenticated}` trong `app/_layout.tsx`.
-- Màu: `C.pin`, `C.ink`… từ `@/theme`. Font: `F.uiBold`, `F.hand`… Shadow: `shadow` / `shadowSoft`.
+- Màu: `C.pin`, `C.ink`… từ `@/theme`. Font: `F.uiBold`, `F.hand`… Shadow: `shadow` / `shadowLift`.
+- Gradient: `G.brand` / `G.hero` / `G.auth` / `G.glow` — không ghép `colors={[C.a, C.b]}` tại call-site.
 - Lỗi hiện ra bằng `useToast()` từ `@/components/Toast`.
 - **Không secret nào được nằm trong repo này** — upload ảnh chỉ qua Cloudinary unsigned preset.
 - Comment tiếng Việt, WHY-only.

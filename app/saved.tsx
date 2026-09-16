@@ -3,13 +3,13 @@ import { FlatList, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NoteCard } from '@/components/NoteCard';
-import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
+import { EmptyState, Loading, PagedFooter, ScreenHeader } from '@/components/ui';
 import { useSavedListings } from '@/queries/listings';
 import { C } from '@/theme';
 
 export default function Saved() {
   const router = useRouter();
-  const { data, error, isLoading } = useSavedListings();
+  const { data, error, isLoading, loadMore, isFetchingNextPage } = useSavedListings();
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -17,6 +17,9 @@ export default function Saved() {
       <FlatList
         data={data ?? []}
         keyExtractor={(l) => String(l.id)}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={<PagedFooter loading={isFetchingNextPage} />}
         numColumns={2}
         columnWrapperStyle={{ gap: 14 }}
         contentContainerStyle={{ padding: 16, gap: 14 }}

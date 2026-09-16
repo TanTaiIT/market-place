@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -7,8 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Field, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useRegister } from '@/queries/auth';
-import { useSignIn } from '@/stores/auth';
-import { C, F, shadow } from '@/theme';
+import { useMarkPendingEmailVerify, useSignIn } from '@/stores/auth';
+import { C, F, G, shadow } from '@/theme';
 
 export default function Register() {
   const router = useRouter();
@@ -16,6 +16,7 @@ export default function Register() {
   const insets = useSafeAreaInsets();
   const register = useRegister();
   const signIn = useSignIn();
+  const markPendingVerify = useMarkPendingEmailVerify();
 
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '' });
   const set = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -30,19 +31,27 @@ export default function Register() {
       },
       {
         // Xem ghi chú ở login.tsx: bật phiên xong để Stack.Protected tự đổi route
-        onSuccess: (session) => signIn(session),
+        onSuccess: (session) => {
+          // Bật cờ TRƯỚC khi đổi phiên: `(tabs)/_layout` đọc nó ngay lượt mount đầu tiên,
+          // và lượt đó do chính `signIn` kích hoạt. Bật sau là màn tabs đã dựng xong.
+          markPendingVerify();
+          signIn(session);
+        },
         onError: (e: Error) => toast(e.message),
       },
     );
 
   return (
-    <LinearGradient colors={[C.cork, C.corkDark]} style={{ flex: 1 }}>
+    <LinearGradient colors={G.auth} style={{ flex: 1 }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView
           contentContainerStyle={[styles.wrap, { paddingTop: insets.top + 30, paddingBottom: 40 }]}
           keyboardShouldPersistTaps="handled"
         >
-          <Animated.View entering={FadeInDown.duration(420).springify()} style={styles.card}>
+          {/* `entering` và `transform` (góc nghiêng trong styles.card) phải ở hai lớp khác nhau,
+              không thì layout animation ghi đè transform — Reanimated 4 cảnh báo lúc chạy. */}
+          <Animated.View entering={FadeInDown.duration(420).springify()}>
+          <View style={styles.card}>
             <Text style={styles.brand}>Tạo tài khoản</Text>
             <Text style={styles.tagline}>Tham gia bảng tin trường bạn</Text>
 
@@ -77,6 +86,7 @@ export default function Register() {
                 Đăng nhập
               </Text>
             </Text>
+          </View>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>

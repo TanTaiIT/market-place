@@ -4,7 +4,7 @@ import { RowAction } from '@/components/AdminListingRow';
 import { AdminFilter, AdminScreen } from '@/components/AdminScreen';
 import { UserActionSheet } from '@/components/UserActionSheet';
 import type { UserAction, UserActionInput } from '@/components/UserActionSheet';
-import { Avatar, EmptyState, Loading } from '@/components/ui';
+import { Avatar, EmptyState, Loading, PagedFooter } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import {
   useAdjustWallet,
@@ -48,7 +48,7 @@ export default function AdminUsers() {
   const [term, setTerm] = useState('');
   const [tab, setTab] = useState('all');
 
-  const { data, error, isPending } = useAdminUsers({
+  const { data, error, isPending, loadMore, isFetchingNextPage } = useAdminUsers({
     q: term,
     status: tab === 'all' ? undefined : (tab as 'active' | 'locked'),
   });
@@ -121,6 +121,9 @@ export default function AdminUsers() {
       <FlatList
         data={rows}
         keyExtractor={(u) => u.id}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={<PagedFooter loading={isFetchingNextPage} onDark />}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => {
@@ -128,7 +131,13 @@ export default function AdminUsers() {
           const locked = item.status === 'locked';
           return (
             <View style={styles.row}>
-              <Avatar text={item.avatar} size={38} color={colorOf(item.name)} textColor={C.desk} />
+              <Avatar
+                text={item.avatar}
+                url={item.avatarUrl}
+                size={38}
+                color={colorOf(item.name)}
+                textColor={C.desk}
+              />
 
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text numberOfLines={1} style={styles.name}>

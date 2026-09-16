@@ -213,6 +213,7 @@ export function ListingForm({
           {!!categoryId && (
             <>
               <FormSection
+                step={1}
                 title="Hình ảnh sản phẩm"
                 hint={`Thêm tối đa ${MAX_PHOTOS} ảnh — ảnh đầu tiên là ảnh bìa`}
               />
@@ -223,7 +224,11 @@ export function ListingForm({
                 onRetry={photos.retryPhoto}
               />
 
-              <FormSection title="Chi tiết tin đăng" />
+              <FormSection
+                step={2}
+                title="Chi tiết tin đăng"
+                hint="Điền càng đúng, người mua càng dễ tìm thấy tin."
+              />
               <BoxField
                 label="Tiêu đề tin đăng"
                 value={title}
@@ -242,7 +247,7 @@ export function ListingForm({
               {/* Field động của đúng danh mục vừa chọn — vẫn trong nhóm "Chi tiết". */}
               <AttrFields fields={attrFields} values={attributes} onChange={setAttributes} />
 
-              <FormSection title="Mô tả" />
+              <FormSection step={3} title="Mô tả" />
               <BoxField
                 label="Nói thêm về món đồ"
                 value={desc}
@@ -252,7 +257,7 @@ export function ListingForm({
                 style={styles.descInput}
               />
 
-              <FormSection title={toGroup ? 'Khu vực' : 'Khu vực & hiển thị'} />
+              <FormSection step={4} title={toGroup ? 'Khu vực' : 'Khu vực & hiển thị'} />
               {toGroup ? (
                 <View style={styles.toGroup}>
                   <Text style={styles.toGroupLabel}>ĐĂNG VÀO NHÓM</Text>

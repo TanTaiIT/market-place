@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAdminListings, useAdminReports, useMyGrants } from '@/queries/admin';
 import { canModerateOrg, canModeratePublicAxis, isMaster, topRole } from '@/api/admin';
 import { useJoinRequestQueue, useMyOrgs } from '@/queries/org';
 import { useOrgSlug } from '@/stores/auth';
 import { useProfile } from '@/queries/listings';
 import { Avatar } from './ui';
+import { AdminOrgPicker } from './AdminOrgPicker';
 import { C, F, shadow } from '@/theme';
 
 /**
@@ -27,7 +28,7 @@ type NavItem = {
   label: string;
   badge?: 'queue' | 'reports' | 'joins';
   /** Quyền BE đòi ở màn đó. Hiện mục mà người dùng chỉ có thể ăn 403 là hứa suông. */
-  gate?: 'master' | 'publicAxis' | 'anyAxis';
+  gate?: 'master' | 'publicAxis';
 };
 
 /**
@@ -41,12 +42,47 @@ type NavItem = {
  *
  * `org: true` = màn đọc `X-Org-Slug`, tức nội dung đổi theo tổ chức đang chọn.
  *
- * Nhóm 'Quyền' là ngoại lệ có chủ ý — nó cắt ngang cả hai trục, xem gate `anyAxis`.
+ * Nhóm 'Quyền' chỉ master thấy: hệ thống không còn cấp phó, quản trị nhóm không cấp quyền cho ai.
  */
-const GROUPS: { label: string; org?: boolean; items: NavItem[] }[] = [
+type NavGroup = {
+  label: string;
+  /** Màn trong nhóm đọc `X-Org-Slug` — nội dung đổi theo tổ chức đang chọn. */
+  org?: boolean;
+  /** Quyền tối thiểu để cả nhóm hiện ra. Hẹp hơn thì gác từng mục bằng `NavItem.gate`. */
+  gate?: NavItem['gate'];
+  /**
+   * Nhóm này KHÔNG phải việc của master — dù họ CÓ quyền.
+   *
+   * Đây là chỗ duy nhất trong app phân biệt 'được phép' với 'là việc của mình', nên nói rõ:
+   * `policy.ts` bên BE cho master short-circuit ở cả bảy hàm phân quyền, và ẩn mục menu không
+   * thu hồi một quyền nào. Master vẫn duyệt được mọi tin của mọi nhóm bằng một lệnh `curl`.
+   * Cờ này là quyết định về VAI TRÒ — master lo trục hệ thống, không làm bàn duyệt hằng ngày
+   * — chứ không phải một chốt bảo mật. Đừng đọc menu như đọc mô hình quyền.
+   */
+  notMaster?: boolean;
+  items: NavItem[];
+};
+
+const GROUPS: NavGroup[] = [
+  {
+    /*
+     * `/admin` là cùng một route với mục 'Tổng quan' của nhóm org bên dưới — nó rẽ theo vai
+     * ở trong màn. Hai nhóm không bao giờ cùng hiện (`notMaster` loại nhóm org khỏi master),
+     * nên không có ca nào ngăn kéo hiện hai lối vào cùng một trang.
+     */
+    label: 'Tổng quan',
+    gate: 'master',
+    items: [
+      { href: '/admin', icon: '▦', label: 'Toàn hệ thống' },
+      // Báo cáo về tin trục công khai rơi về master khi ô chưa có người phụ trách — cùng luật với
+      // hàng đợi duyệt. Nhóm 'Tổ chức' bên dưới cũng có mục này, nhưng master không thấy nhóm đó.
+      { href: '/admin/reports', icon: '⚑', label: 'Báo cáo', badge: 'reports' },
+    ],
+  },
   {
     label: 'Tổ chức',
     org: true,
+    notMaster: true,
     items: [
       { href: '/admin', icon: '▦', label: 'Tổng quan' },
       { href: '/admin/moderation', icon: '📌', label: 'Duyệt tin', badge: 'queue' },
@@ -54,31 +90,39 @@ const GROUPS: { label: string; org?: boolean; items: NavItem[] }[] = [
       { href: '/admin/listings', icon: '▤', label: 'Tin đăng' },
       { href: '/admin/notice', icon: '◈', label: 'Gửi thông báo' },
       { href: '/admin/join-requests', icon: '✋', label: 'Đơn xin gia nhập', badge: 'joins' },
-      { href: '/admin/org-units', icon: '🗂', label: 'Nhóm con' },
-      { href: '/admin/org-display', icon: '▦', label: 'Cách bày bảng tin' },
+      { href: '/admin/members', icon: '👥', label: 'Thành viên' },
+      // Cùng màn Thống kê của master; BE scope theo `X-Org-Slug` nên quản trị nhóm chỉ thấy tin
+      // và thành viên của nhóm mình — không có gì của sàn lọt ra.
+      { href: '/admin/analytics', icon: '📊', label: 'Thống kê' },
     ],
   },
   {
     // Trục danh mục: hàng đợi riêng, không gộp vào 'Duyệt tin' — hai trục không giao nhau, và
     // tin ở đây không thuộc tổ chức nào nên nó KHÔNG nằm trong nhóm trên.
     label: 'Trục công khai',
+    gate: 'publicAxis',
+    notMaster: true,
+    /*
+     * Master bị loại khỏi nhóm này, nhưng HAI MÀN VẪN SỐNG và route vẫn vào được — có chủ ý.
+     *
+     * Ô (danh mục × tỉnh) chưa có ai phụ trách thì tin rơi về master (`routeListing`), nên nếu
+     * xoá luôn màn thì tồn đọng đó thành vô hình. Đường vào bây giờ là panel 'Cần chú ý' ở bàn
+     * tổng quan hệ thống: nó chỉ hiện khi CÓ tồn đọng, và trỏ thẳng vào đây. Master ghé khi cần
+     * dọn, không phải mỗi ngày — còn manager danh mục thì vẫn thấy nhóm này như cũ.
+     */
     items: [
-      { href: '/admin/public-overview', icon: '▦', label: 'Tổng quan trục', gate: 'publicAxis' },
-      {
-        href: '/admin/public-queue',
-        icon: '🌐',
-        label: 'Hàng đợi công khai',
-        gate: 'publicAxis',
-      },
+      { href: '/admin/public-overview', icon: '▦', label: 'Tổng quan trục' },
+      { href: '/admin/public-queue', icon: '🌐', label: 'Hàng đợi công khai' },
+      // Báo cáo đóng dấu trục của TIN: người phụ trách ô thấy báo cáo về tin trong ô mình, ở cùng
+      // màn `/admin/reports` — BE tự dựng ô từ grant, không cần chọn tổ chức.
+      { href: '/admin/reports', icon: '⚑', label: 'Báo cáo', badge: 'reports' },
     ],
   },
   {
-    // Phân quyền cắt ngang cả hai trục: `canGrant` cho manager cấp staff TRONG scope của chính
-    // mình, kể cả scope (danh mục × tỉnh), còn `/role-grants/mine` thì ai có grant cũng đọc được.
-    // Treo nó trong nhóm org như trước là khoá manager danh mục ra khỏi màn duy nhất họ chia
-    // tải được — họ không thuộc tổ chức nào nên cả nhóm đó bị cắt.
+    // Chỉ master: hệ thống không còn cấp phó, quản trị nhóm không cấp được quyền cho ai nữa.
+    // Ở đây master đặt người phụ trách các ô trục công khai; quản trị NHÓM đặt ở màn Tổ chức.
     label: 'Quyền',
-    items: [{ href: '/admin/role-grants', icon: '🔑', label: 'Phân quyền', gate: 'anyAxis' }],
+    items: [{ href: '/admin/role-grants', icon: '🔑', label: 'Phân quyền', gate: 'master' }],
   },
   {
     // Không mục nào ở đây đọc `X-Org-Slug`: đổi tổ chức đang chọn không đổi một dòng nào.
@@ -94,27 +138,43 @@ const GROUPS: { label: string; org?: boolean; items: NavItem[] }[] = [
       // từ điển CHẶN, áp trước cả phép tính uy tín.
       { href: '/admin/banned-phrases', icon: '🚫', label: 'Cụm từ cấm', gate: 'master' },
       { href: '/admin/listing-products', icon: '🎟', label: 'Gói tin', gate: 'master' },
+      // Cụm TẠM THỜI (gỡ theo `@/api/legal`). Master vì đây là nghĩa vụ của PHÁP NHÂN vận hành
+      // sàn, không của tổ chức nào — nên không phải `publicAxis`.
+      { href: '/admin/social-feedback', icon: '⚖', label: 'Ý kiến tổ chức XH', gate: 'master' },
       { href: '/admin/posting-stats', icon: '📈', label: 'Số liệu đăng tin', gate: 'master' },
+      /*
+       * 'Thống kê' chứ không 'Báo cáo': nhóm Nội dung đã có mục 'Báo cáo' cho ĐƠN TỐ CÁO của
+       * người dùng, và hai mục cùng tên trong một menu là một cú bấm nhầm chờ sẵn.
+       *
+       * Đứng ngay dưới 'Số liệu đăng tin' vì cùng đọc một nguồn, nhưng trả lời câu khác: cái
+       * trên là ảnh chụp để chốt giá gói, cái này là xu hướng theo ngày/tháng/năm.
+       */
+      { href: '/admin/analytics', icon: '📊', label: 'Thống kê', gate: 'master' },
     ],
   },
 ];
 
 export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void }) {
+  /*
+   * `useSafeAreaInsets()` chứ KHÔNG `<SafeAreaView>` — bên trong `<Modal>` thì component đó
+   * không chừa được lề an toàn (xem ghi chú ở chỗ dùng bên dưới).
+   */
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const pathname = usePathname();
-  const { data: queue } = useAdminListings('pending');
-  const { data: reports } = useAdminReports();
+  // `total` của BE, không phải `data.length`: danh sách giờ tải 10 dòng một trang, đếm phần đã
+  // tải là badge dừng ở 10 trong khi hàng đợi có 40.
+  const { total: queueTotal } = useAdminListings('pending');
+  const { total: reportsTotal } = useAdminReports();
   const { data: profile } = useProfile();
   const { data: grants } = useMyGrants();
-  const { data: joins } = useJoinRequestQueue('pending');
+  const { total: joinsTotal } = useJoinRequestQueue('pending');
   const { data: myOrgs } = useMyOrgs();
   const activeSlug = useOrgSlug();
+  /** Ngăn chọn tổ chức mở từ dòng mồi của nhóm TỔ CHỨC — chỉ có ý nghĩa khi đã thuộc ≥2 nhóm. */
+  const [pickOrg, setPickOrg] = useState(false);
 
-  const counts = {
-    queue: queue?.length ?? 0,
-    reports: reports?.length ?? 0,
-    joins: joins?.length ?? 0,
-  };
+  const counts = { queue: queueTotal, reports: reportsTotal, joins: joinsTotal };
 
   const orgModerator = canModerateOrg(grants);
   const publicAxis = canModeratePublicAxis(grants);
@@ -123,8 +183,6 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
     master: isMaster(grants),
     publicAxis,
     orgModerator,
-    // Cửa của mục Phân quyền — xem nhóm 'Quyền' ở GROUPS: nó không thuộc riêng trục nào.
-    anyAxis: orgModerator || publicAxis,
   };
 
   /*
@@ -133,8 +191,10 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
    * này bằng riêng `activeSlug` sẽ giấu mất cả bàn quản trị của đúng nhóm phổ biến nhất:
    * thành viên của một trường duy nhất, người chưa từng mở bộ chuyển tổ chức lần nào.
    *
-   * Master rơi vào nhánh cuối: họ không là thành viên ở đâu nên `mine` rỗng, và thứ duy nhất
-   * nhận diện được tổ chức đang thao tác là chính cái slug họ đã chọn.
+   * Master KHÔNG còn đi qua đây: nhóm org mang `notMaster` nên nó không hiện với họ, và bàn
+   * của họ không đọc `X-Org-Slug` một dòng nào. Trước đây họ rơi vào nhánh cuối (`mine` rỗng
+   * vì không là thành viên ở đâu, chỉ còn cái slug tự chọn để nhận diện) — nhánh đó vẫn đúng
+   * cho người thuộc nhiều nhóm mà chưa bấm chọn.
    */
   const mine = myOrgs ?? [];
   const orgName =
@@ -142,10 +202,17 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
     (mine.length === 1 ? mine[0].name : activeSlug);
 
   // Cắt cả nhóm khi nó rỗng, không để lại cái tiêu đề nhóm treo lơ lửng không có mục nào.
-  const visibleGroups = GROUPS.map((g) => ({
-    ...g,
-    items: g.org && !allowed.orgModerator ? [] : g.items.filter((i) => !i.gate || allowed[i.gate]),
-  })).filter((g) => g.items.length > 0);
+  const visibleGroups = GROUPS.filter(
+    (g) => !(g.notMaster && allowed.master) && (!g.gate || allowed[g.gate]),
+  )
+    .map((g) => ({
+      ...g,
+      items:
+        g.org && !allowed.orgModerator
+          ? []
+          : g.items.filter((i) => !i.gate || allowed[i.gate]),
+    }))
+    .filter((g) => g.items.length > 0);
 
   const go = (href: string) => {
     onClose();
@@ -158,7 +225,7 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.scrim} onPress={onClose} />
 
-      <SafeAreaView style={styles.panel} edges={['top', 'bottom']}>
+      <View style={[styles.panel, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <View style={styles.brand}>
           <View style={styles.brandPin} />
           <View>
@@ -178,17 +245,41 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
 
               {/*
                 Chưa xác định được tổ chức thì cả tám mục dưới đây chỉ trả 403. Thay vì để người
-                dùng bấm từng cái để phát hiện ra điều đó, nói thẳng một dòng và đưa họ tới đúng
-                chỗ chọn — master chọn ở bàn tổ chức, người thường thì đi xin vào một nhóm.
+                dùng bấm từng cái để phát hiện ra điều đó, nói thẳng một dòng — và dòng đó phải
+                nói ĐÚNG ca đang gặp, vì có hai ca khác hẳn nhau:
+
+                - Thuộc ≥2 nhóm mà chưa chọn (quản trị hai trường, hoặc quản trị một trường và
+                  là thành viên trường khác): BE không tự suy ra được, họ cần CHỌN. Mở thẳng bộ
+                  chọn ngay trong ngăn kéo — chọn xong là tám mục hiện ra tại chỗ.
+                - Không thuộc nhóm nào: họ cần XIN VÀO một nhóm.
+
+                Bản trước gộp hai ca vào một dòng 'Chọn tổ chức để mở →' dẫn tới `/join-org` —
+                tức bảo một người đang quản trị hai trường đi xin mã tham gia. Đo trên tài khoản
+                thật: thành viên 3 nhóm, quản lý 2, và bàn quản trị của họ chỉ còn đúng hai mục.
               */}
               {group.org && !orgName ? (
-                <Pressable
-                  onPress={() => go(allowed.master ? '/admin/organizations' : '/join-org')}
-                  style={({ pressed }) => [styles.item, pressed && { opacity: 0.7 }]}
-                >
-                  <Text style={styles.itemIcon}>◇</Text>
-                  <Text style={[styles.itemLabel, { color: C.pin }]}>Chọn tổ chức để mở →</Text>
-                </Pressable>
+                /* `myOrgs` chưa về thì `mine` rỗng và nhánh dưới sẽ nói 'Tham gia một nhóm' với
+                   một người có ba nhóm — chờ một nhịp, đừng nói sai rồi sửa lại. */
+                myOrgs === undefined ? null : mine.length > 0 ? (
+                  <View style={styles.item}>
+                    <Text style={styles.itemIcon}>◇</Text>
+                    {/* Chip của bộ chọn LÀ dòng mồi: bấm vào mở ngăn chọn; chọn xong thì `orgName`
+                        có giá trị và nhánh này biến mất, nhường chỗ cho tám mục. */}
+                    <AdminOrgPicker
+                      open={pickOrg}
+                      onOpen={() => setPickOrg(true)}
+                      onClose={() => setPickOrg(false)}
+                    />
+                  </View>
+                ) : (
+                  <Pressable
+                    onPress={() => go('/join-org')}
+                    style={({ pressed }) => [styles.item, pressed && { opacity: 0.7 }]}
+                  >
+                    <Text style={styles.itemIcon}>◇</Text>
+                    <Text style={[styles.itemLabel, { color: C.pin }]}>Tham gia một nhóm →</Text>
+                  </Pressable>
+                )
               ) : (
                 group.items.map((item) => {
                   const on = item.href === pathname;
@@ -242,13 +333,13 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
           </View>
           <Text style={styles.exit}>Thoát ›</Text>
         </Pressable>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: C.scrim },
+  scrim: { ...StyleSheet.absoluteFill, backgroundColor: C.scrim },
   panel: {
     position: 'absolute',
     left: 0,

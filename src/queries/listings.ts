@@ -5,9 +5,10 @@ import {
   keepPreviousData,
 } from '@tanstack/react-query';
 import { api } from '@/api/client';
-import { hasSearchCriteria } from '@/api/db';
 import type { Listing, Profile, SearchFilter } from '@/api/db';
+import { useIsAuthenticated } from '@/stores/auth';
 import { qk } from './keys';
+import { mapPages, usePagedList, type PagedCache } from './paged';
 
 /**
  * Từ điển danh mục. `staleTime` dài vì nó gần như không đổi — mỗi lần mở bảng tin lại gọi
@@ -31,11 +32,30 @@ export function useListings(categoryId = '') {
   });
 }
 
-export function useListing(id: string) {
+/**
+ * `viaModeration`: mở tin qua cửa bàn duyệt — từ hàng đợi báo cáo, để xem tin bị tố kể cả khi nó đã
+ * ẩn / chờ duyệt hoặc thuộc org mình không đứng trong. Người thường không có cờ này (BE trả 403).
+ */
+export function useListing(id: string, viaModeration = false) {
   return useQuery({
-    queryKey: qk.listing(id),
-    queryFn: () => api.getListing(id),
+    queryKey: viaModeration ? qk.modListing(id) : qk.listing(id),
+    queryFn: () => (viaModeration ? api.getListingForModeration(id) : api.getListing(id)),
     // Route param có thể rỗng lúc màn hình mới mount, và ObjectId của BE là 24 hex.
+    enabled: id.length > 0,
+  });
+}
+
+/**
+ * MỘT tin của chính mình — nguồn của form sửa.
+ *
+ * Khoá cache RIÊNG (`myListing`), không dùng chung `listing(id)`: cùng một id nhưng hai
+ * endpoint khác nhau và hai phạm vi khác nhau. Dùng chung khoá là bản đọc rộng (mọi trạng
+ * thái) ghi đè lên bản công khai mà trang chi tiết đang hiện, và ngược lại.
+ */
+export function useMyListing(id: string) {
+  return useQuery({
+    queryKey: qk.myListing(id),
+    queryFn: () => api.getMyListing(id),
     enabled: id.length > 0,
   });
 }
@@ -66,29 +86,49 @@ export function useListingSuggestions(current: Listing | undefined) {
  * Chỉ chọn danh mục mà không gõ từ khoá cũng là một lượt tìm hợp lệ; `hasSearchCriteria` là
  * nơi duy nhất định nghĩa "đã có ràng buộc chưa", dùng chung với màn hình.
  */
+/**
+ * Kết quả tìm. KHÔNG có `enabled`: bộ lọc rỗng là một lượt tìm HỢP LỆ — nó trả về tất cả tin.
+ *
+ * Bản trước tắt query khi chưa có tiêu chí nào, và đó là bậc chặn thứ ba của cùng một luật (hai
+ * bậc kia ở `openSearch` của bảng tin và trong `api.searchListings`). Ba chỗ cùng nói một điều
+ * thì sửa luật phải sửa cả ba, và bỏ sót một chỗ là query bị tắt trong khi màn đã điều hướng
+ * tới — người dùng thấy màn kết quả trống vĩnh viễn mà không có lỗi nào.
+ */
 export function useSearch(filter: SearchFilter) {
-  return useQuery({
-    queryKey: qk.search(filter),
-    queryFn: () => api.searchListings(filter),
-    enabled: hasSearchCriteria(filter),
-    placeholderData: keepPreviousData,
+  return usePagedList(qk.search(filter), (page) => api.searchListings(filter, page), {
+    keepPrevious: true,
   });
 }
 
 export function useMyListings() {
-  return useQuery({ queryKey: qk.myListings(), queryFn: api.getMyListings });
+  return usePagedList(qk.myListings(), api.getMyListings);
 }
 
+/**
+ * Chỉ chạy khi đã đăng nhập. Khách xem bảng tin không có "tin đã lưu" — để query bay là mỗi lần
+ * mở app một cú 401 và một dòng lỗi đỏ, trong khi thứ đúng để hiện là trái tim rỗng.
+ */
 export function useSavedIds() {
-  return useQuery({ queryKey: qk.savedIds(), queryFn: api.getSavedIds });
+  const isAuthenticated = useIsAuthenticated();
+  return useQuery({
+    queryKey: qk.savedIds(),
+    queryFn: api.getSavedIds,
+    enabled: isAuthenticated,
+  });
 }
 
 export function useSavedListings() {
-  return useQuery({ queryKey: qk.savedListings(), queryFn: api.getSavedListings });
+  const isAuthenticated = useIsAuthenticated();
+  return usePagedList(qk.savedListings(), api.getSavedListings, { enabled: isAuthenticated });
 }
 
 export function useProfile() {
-  return useQuery({ queryKey: qk.profile(), queryFn: api.getProfile });
+  const isAuthenticated = useIsAuthenticated();
+  return useQuery({
+    queryKey: qk.profile(),
+    queryFn: api.getProfile,
+    enabled: isAuthenticated,
+  });
 }
 
 /* --------------------------- mutations --------------------------- */
@@ -135,6 +175,9 @@ export function useUpdateListing() {
     mutationFn: api.updateListing,
     onSuccess: (data) => {
       qc.setQueryData(qk.listing(data.id), data);
+      // Cả bản chính chủ: form sửa đọc từ khoá đó, và với tin `pending` thì bản công khai ở
+      // dòng trên vốn không đọc được (BE lọc theo `PUBLIC_LISTING_STATUSES`).
+      qc.setQueryData(qk.myListing(data.id), data);
       qc.invalidateQueries({ queryKey: qk.listings() });
       qc.invalidateQueries({ queryKey: qk.savedRoot() });
     },
@@ -181,8 +224,10 @@ export function useDeleteListing() {
     mutationFn: (id: string) => api.deleteListing(id),
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: qk.myListings() });
-      const prev = qc.getQueryData<Listing[]>(qk.myListings());
-      qc.setQueryData<Listing[]>(qk.myListings(), (old) => (old ?? []).filter((l) => l.id !== id));
+      const prev = qc.getQueryData<PagedCache<Listing>>(qk.myListings());
+      qc.setQueryData<PagedCache<Listing>>(qk.myListings(), (old) =>
+        mapPages(old, (items) => items.filter((l) => l.id !== id)),
+      );
       return { prev };
     },
     onError: (_e, _id, ctx) => {
@@ -190,6 +235,42 @@ export function useDeleteListing() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: qk.listings() });
+      qc.invalidateQueries({ queryKey: qk.savedRoot() });
+    },
+  });
+}
+
+/**
+ * "Vẫn còn" — gia hạn tin.
+ *
+ * Refetch contract: `qk.listings()` (bao cả `listingQuota()` vì key quota nằm dưới prefix đó —
+ * chính danh sách `needsReconcile` phải rụng dòng vừa trả lời, nếu không màn chặn hỏi lại đúng
+ * tin đó), `qk.listing(id)` cho trang chi tiết, `savedRoot()` vì tin đã lưu được cache thành
+ * `Listing` đầy đủ dưới nhánh riêng và sẽ còn treo badge "Hết hạn" cũ.
+ *
+ * KHÔNG optimistic: BE có thể từ chối (tin `hidden`/`pending`), mà vẽ trước là hứa với người
+ * bán rằng tin đã trở lại bảng trong khi nó chưa.
+ */
+export function useRenewListing() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.renewListing(id),
+    onSettled: (_d, _e, id) => {
+      qc.invalidateQueries({ queryKey: qk.listings() });
+      qc.invalidateQueries({ queryKey: qk.listing(id) });
+      qc.invalidateQueries({ queryKey: qk.savedRoot() });
+    },
+  });
+}
+
+/** "Đã bán" — cùng refetch contract với `useRenewListing`. */
+export function useMarkListingSold() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.markListingSold(id),
+    onSettled: (_d, _e, id) => {
+      qc.invalidateQueries({ queryKey: qk.listings() });
+      qc.invalidateQueries({ queryKey: qk.listing(id) });
       qc.invalidateQueries({ queryKey: qk.savedRoot() });
     },
   });

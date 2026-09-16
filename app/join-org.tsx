@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
 import { OrgRowCard } from '@/components/OrgRowCard';
 import { useToast } from '@/components/Toast';
@@ -55,13 +56,20 @@ export default function JoinOrg() {
     join.mutate(
       { slug: org.slug, claimedName: profile?.name ?? '' },
       {
-        onSuccess: () => toast(`✓ Đã gửi đơn vào ${org.name}`),
+        // Nhóm công khai vào ngay, nhóm riêng tư mới có đơn chờ — xem `orgApi.requestJoin`.
+        onSuccess: (res) =>
+          toast(
+            res.status === 'approved'
+              ? `✓ Đã tham gia ${org.name}`
+              : `✓ Đã gửi đơn vào ${org.name}`,
+          ),
         onError: (e: Error) => toast(`⚠️ ${e.message}`),
       },
     );
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.cork }}>
+    // `SafeAreaView` chứ không `View`: `ScreenHeader` không tự chừa lề trên — xem docblock của nó.
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.cork }} edges={['top']}>
       <ScreenHeader title="Nhóm" />
 
       <View style={styles.search}>
@@ -100,6 +108,10 @@ export default function JoinOrg() {
                   key={o.id}
                   slug={o.slug}
                   name={o.name}
+                  // Thiếu hai dòng này là nhóm CỦA MÌNH hiện dải màu trơn, trong khi nhóm
+                  // người lạ ngay dưới lại có ảnh — nhìn như nhóm mình bị lỗi.
+                  avatarUrl={o.avatarUrl}
+                  coverUrl={o.coverUrl}
                   meta={`${o.role === 'admin' ? 'Quản trị nhóm' : 'Thành viên'} · /${o.slug}`}
                   action="joined"
                   onPress={() => open(o.slug)}
@@ -117,6 +129,7 @@ export default function JoinOrg() {
             slug={item.slug}
             name={item.name}
             avatarUrl={item.avatarUrl}
+            coverUrl={item.coverUrl}
             meta={metaOf(item)}
             action={item.allowJoinRequests ? 'join' : 'closed'}
             onPress={() => open(item.slug)}
@@ -140,7 +153,7 @@ export default function JoinOrg() {
           )
         }
       />
-    </View>
+    </SafeAreaView>
   );
 }
 

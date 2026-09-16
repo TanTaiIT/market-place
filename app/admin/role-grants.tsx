@@ -7,7 +7,8 @@ import { EmptyState, Loading } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useMyGrants } from '@/queries/admin';
 import { useGrantRole, useRevokeGrant } from '@/queries/org-admin';
-import { ROLE_LABEL, SCOPE_LABEL, rolesGrantableBy, type RoleGrant } from '@/api/org-admin';
+import { ROLE_LABEL, SCOPE_LABEL, type RoleGrant } from '@/api/org-admin';
+import { isMaster } from '@/api/admin';
 import { C, F } from '@/theme';
 
 /**
@@ -20,9 +21,9 @@ import { C, F } from '@/theme';
 export default function AdminRoleGrants() {
   const toast = useToast();
   const { data, error, isLoading } = useMyGrants();
-  // Cấp được cho ai không là câu hỏi về grant của CHÍNH mình (`canGrant`): staff mở được màn
-  // này để xem quyền của bản thân, nhưng không cấp được cho ai.
-  const grantable = rolesGrantableBy(data);
+  // Chỉ master cấp được quyền — hệ thống không còn cấp phó. Người khác mở màn này (qua link cũ)
+  // chỉ để xem và thu hồi quyền của chính mình.
+  const master = isMaster(data);
   const grant = useGrantRole();
   const revoke = useRevokeGrant();
 
@@ -48,9 +49,8 @@ export default function AdminRoleGrants() {
       ],
     );
 
-  // `org="optional"` chứ không phải `org`: chỉ phạm vi `org` mới cần slug, còn manager trục
-  // (danh mục × tỉnh) không thuộc tổ chức nào mà vẫn cấp được staff trong ô của mình — bắt họ
-  // chọn tổ chức là dựng tường trước màn duy nhất họ dùng được.
+  // `org="optional"`: màn này không cần tổ chức — phạm vi cấp ở đây là ô trục công khai, còn
+  // quản trị NHÓM thì master đặt ở màn Tổ chức.
   return (
     <AdminScreen title="Phân quyền" note="ai cầm chìa khoá nào" org="optional">
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
@@ -92,10 +92,9 @@ export default function AdminRoleGrants() {
 
         {!isLoading && !error && (
           <View style={{ marginTop: 18 }}>
-            {grantable.length > 0 ? (
+            {master ? (
               <AdminPanel title="Cấp quyền" note="không ai tự cấp cho chính mình">
                 <RoleGrantForm
-                  grants={data}
                   busy={grant.isPending}
                   onSubmit={(values, reset) =>
                     grant.mutate(values, {
@@ -111,8 +110,8 @@ export default function AdminRoleGrants() {
             ) : (
               <AdminPanel title="Cấp quyền" note="ngoài phạm vi của bạn">
                 <Text style={adminFormStyles.limit}>
-                  Chỉ master cấp được Quản lý, và Quản lý cấp được Nhân sự trong đúng phạm vi của
-                  mình — quyền hiện tại của bạn không cấp được cho ai.
+                  Chỉ master cấp được quyền. Hệ thống không còn cấp phó — quản trị nhóm không cấp
+                  được cho ai.
                 </Text>
               </AdminPanel>
             )}

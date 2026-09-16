@@ -10,10 +10,10 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Avatar, EmptyState, Loading } from '@/components/ui';
+import { Avatar, EmptyState, Loading, PagedFooter } from '@/components/ui';
+import { ListingPhoto } from '@/components/ListingPhoto';
 import { chatColor } from '@/api/client';
 import {
   useConversation,
@@ -34,7 +34,7 @@ export default function Chat() {
   const [text, setText] = useState('');
 
   const { data: conversation, error, isLoading } = useConversation(conversationId);
-  const { data: messages } = useMessages(conversationId);
+  const { data: messages, loadMore, isFetchingNextPage } = useMessages(conversationId);
   // Vào phòng để nhận tin của người kia ngay, không chờ lượt refetch nào.
   useConversationRoom(conversationId);
   // Chuỗi rỗng = chưa có hội thoại -> `useListing` tự tắt qua `enabled`.
@@ -54,6 +54,19 @@ export default function Chat() {
   // của FlatList đã phủ hết các nhịp cần cuộn — không cần effect theo dõi riêng.
   const scrollToEnd = () =>
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 60);
+
+  /*
+   * TRỪ một nhịp: tải trang CŨ hơn nối lên ĐẦU danh sách (`useMessages`, `olderPagesFirst`). Lúc
+   * đó người dùng đang đọc tin cũ, kéo họ về đáy là giật họ khỏi đúng thứ họ vừa kéo lên xem.
+   * Nhận ra "nối lên đầu" bằng việc tin CŨ NHẤT đổi — tin mới, bong bóng đang nhập không đổi nó.
+   */
+  const oldestKey = messages?.[0]?.id;
+  const oldestSeen = useRef(oldestKey);
+  const onContentSizeChange = () => {
+    const prepended = oldestSeen.current !== undefined && oldestKey !== oldestSeen.current;
+    oldestSeen.current = oldestKey;
+    if (!prepended) scrollToEnd();
+  };
 
   const onSend = () => {
     const t = text.trim();
@@ -93,11 +106,19 @@ export default function Chat() {
             onPress={() => router.push(`/listing/${listing.id}`)}
             style={({ pressed }) => [styles.context, pressed && { opacity: 0.8 }]}
           >
-            <LinearGradient
-              colors={listing.photo}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+            {/*
+              Ảnh THẬT của tin, không phải dải màu.
+
+              Chỗ này vốn vẽ thẳng `LinearGradient` — tức là luôn hiện bậc cuối cùng, dù
+              `useListing` ở trên đã tải về đủ `photoUrls`. Người dùng mở chat về một món đồ có
+              ảnh hẳn hoi mà thấy một ô màu trơn. `ListingPhoto` giữ nguyên nhánh dải màu cho
+              tin không ảnh, nên đổi sang nó không mất gì.
+            */}
+            <ListingPhoto
+              photo={listing.photo}
+              photoUrl={listing.photoUrls?.[0]}
               style={styles.contextPhoto}
+              imageStyle={styles.contextPhotoRadius}
             />
             <View style={{ flex: 1 }}>
               <Text numberOfLines={1} style={styles.contextTitle}>
@@ -118,7 +139,13 @@ export default function Chat() {
           // đã ổn định.
           keyExtractor={(m) => m.clientMsgId ?? m.id}
           contentContainerStyle={{ padding: 16, gap: 12, flexGrow: 1 }}
-          onContentSizeChange={scrollToEnd}
+          onContentSizeChange={onContentSizeChange}
+          // Kéo lên ĐẦU là tải trang cũ hơn; `maintainVisibleContentPosition` giữ đúng tin đang đọc
+          // đứng yên khi 10 tin cũ chèn vào phía trên.
+          onStartReached={loadMore}
+          onStartReachedThreshold={0.4}
+          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+          ListHeaderComponent={<PagedFooter loading={isFetchingNextPage} />}
           keyboardShouldPersistTaps="handled"
           renderItem={({ item, index }) => {
             const mine = item.from === 'me';
@@ -193,7 +220,9 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     ...shadow,
   },
-  contextPhoto: { width: 38, height: 38, borderRadius: 6 },
+  contextPhoto: { width: 38, height: 38, borderRadius: 6, overflow: 'hidden' },
+  /** `ListingPhoto` đặt ảnh bằng `absoluteFill` nên View cha không bo góc hộ được. */
+  contextPhotoRadius: { borderRadius: 6 },
   contextTitle: { fontFamily: F.uiBold, fontSize: 11.5, color: C.ink },
   contextPrice: { fontFamily: F.monoBold, fontSize: 11, color: C.moss },
   msgRow: { alignItems: 'flex-start' },

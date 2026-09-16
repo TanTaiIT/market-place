@@ -98,8 +98,28 @@ function refreshOnce(): Promise<string | null> {
  * KHÔNG còn gộp "không thuộc org này" vào đây như bản v1: ở v2 quan hệ thành viên là thứ đổi
  * được trong lúc dùng (bị gỡ khỏi tổ chức), mà PHIÊN ĐĂNG NHẬP thì vẫn tốt nguyên. Đăng xuất
  * người ta vì lý do đó là phản ứng sai — đúng ra chỉ cần bỏ chọn org.
+ *
+ * Chính lý lẽ đó áp cho org BỊ KHOÁ, nên nó cũng không còn là một đường đăng xuất: xem
+ * `isOrgGone` và nhánh xử nó trong `withAuthRetry`.
  */
 const ORG_GONE_ERRORS = ['Organization đã bị khoá', 'Organization không tồn tại'];
+
+/**
+ * Bỏ chọn org đang thao tác. Do `queries/auth` đẩy vào — `src/api/**` không được import
+ * `stores/**` (folder.convention §6), cùng cách `setSessionRefresher` làm.
+ */
+let orgGoneHandler: (() => void) | null = null;
+
+export function setOrgGoneHandler(next: (() => void) | null): void {
+  orgGoneHandler = next;
+}
+
+/** Org đang chọn đã bị khoá/xoá — LỰA CHỌN cũ, không phải phiên chết. */
+function isOrgGone(outcome: SdkOutcome): boolean {
+  if (outcome.response?.status !== 403) return false;
+  const message = errorMessage(outcome);
+  return ORG_GONE_ERRORS.some((s) => message.includes(s));
+}
 
 /**
  * Endpoint DUY NHẤT mà 404 mang nghĩa "phiên trỏ tới một user không còn tồn tại". Ở mọi đường
@@ -115,29 +135,24 @@ function errorMessage(outcome: SdkOutcome): string {
 }
 
 /**
- * Phiên không còn dùng được nữa — hoặc vì token hết hạn (cứu được bằng refresh), hoặc vì thứ
- * đứng sau token đã biến mất (user/org bị xoá; chỉ còn đường đăng xuất). Gộp chung vì cả hai
- * đi qua đúng một lối: thử refresh một lần, refresh hỏng thì `refreshSession` dọn phiên.
+ * Phiên KHÔNG còn dùng được: token hết hạn (cứu được bằng refresh), hoặc danh tính đứng sau
+ * token đã biến mất (chỉ còn đường đăng xuất). Gộp hai ca vì chúng đi cùng một lối: thử refresh
+ * một lần, refresh hỏng thì `refreshSession` dọn phiên.
  *
- * BE trả bốn dạng khác nhau, phải nhận đủ:
+ * Đúng hai dạng, và cả hai đều nói về NGƯỜI DÙNG:
  *  - **401** — route có `authenticate`, hoặc `/auth/refresh` khi user đã bị xoá
  *    (`User no longer valid`).
- *  - **400** `Missing tenant context` — route đọc collection có tenant mà `resolveTenant`
- *    không mở được scope; `tenantPlugin` fail-closed ném trước khi tới `authenticate` nào cả.
- *  - **403** — org trong token đã bị xoá/khoá, hoặc token thuộc org khác.
- *  - **404 trên `/users/me`** — user bị xoá khỏi DB **nhưng org vẫn còn**. Đây là trường hợp
- *    duy nhất không có mã 4xx nào khác báo hiệu: `authenticate` dựng `req.user` thẳng từ JWT
- *    mà không tra DB, nên `GET /listings` vẫn trả **200** như thường và app không hề hay biết
- *    mình đang chạy bằng danh tính của một người không còn tồn tại.
+ *  - **404 trên `/users/me`** — user bị xoá khỏi DB. Đây là trường hợp duy nhất không có mã
+ *    4xx nào khác báo hiệu: `authenticate` dựng `req.user` thẳng từ JWT mà không tra DB, nên
+ *    `GET /listings` vẫn trả **200** như thường và app không hề hay biết mình đang chạy bằng
+ *    danh tính của một người không còn tồn tại.
+ *
+ * 403 org-bị-khoá KHÔNG nằm ở đây — đó là lựa chọn org cũ, không phải phiên chết (`isOrgGone`).
+ * 400 `Missing tenant context` cũng không: chưa chọn org là trạng thái hợp lệ, không phải lỗi phiên.
  */
 function isDeadSession(outcome: SdkOutcome): boolean {
   const status = outcome.response?.status;
   if (status === 401) return true;
-
-  if (status === 403) {
-    const message = errorMessage(outcome);
-    return ORG_GONE_ERRORS.some((s) => message.includes(s));
-  }
 
   // `response.url` là URL tuyệt đối đã resolve, nên so bằng `includes` chứ không phải `===`.
   if (status === 404) return (outcome.response?.url ?? '').includes(ME_ENDPOINT);
@@ -156,7 +171,24 @@ function isDeadSession(outcome: SdkOutcome): boolean {
 export async function withAuthRetry<T extends SdkOutcome>(call: () => Promise<T>): Promise<T> {
   const sentWith = generation;
   const first = await call();
-  // Chưa đăng nhập thì 401/403/404 là lỗi thật của request, không phải phiên hỏng.
+
+  /*
+   * Org đang chọn đã bị khoá: bỏ chọn nó rồi trả lỗi về cho call-site, KHÔNG refresh.
+   *
+   * Refresh ở đây vừa vô nghĩa vừa tự sát: `auth.service.refresh` bên BE không đọc org, mà
+   * request refresh thì cũng mang đúng cái `X-Org-Slug` đó nên nó hỏng y hệt — rồi
+   * `refreshSession` dọn phiên và app đăng xuất người dùng vì một lý do không liên quan gì
+   * tới phiên của họ. (BE giờ cũng miễn tenant cho `/auth/*`; đây là chốt thứ hai.)
+   *
+   * Không gọi lại ngay: header org đọc từ `activeOrgSlug` của module này, mà giá trị đó chỉ
+   * đổi sau khi store re-render đẩy xuống — gọi lại lập tức là gửi đúng slug vừa bị từ chối.
+   */
+  if (isOrgGone(first)) {
+    orgGoneHandler?.();
+    return first;
+  }
+
+  // Chưa đăng nhập thì 401/404 là lỗi thật của request, không phải phiên hỏng.
   if (!session || !isDeadSession(first)) return first;
 
   // Phiên đã được làm mới trong lúc request này đang bay: nó chỉ hỏng vì mang token cũ, gọi lại
@@ -165,6 +197,29 @@ export async function withAuthRetry<T extends SdkOutcome>(call: () => Promise<T>
   if (generation !== sentWith) return call();
 
   return (await refreshOnce()) ? call() : first;
+}
+
+/**
+ * Câu người dùng đọc khi request KHÔNG tới được server.
+ *
+ * Đây là chỗ duy nhất dịch nhóm lỗi đó, vì `fetch` bên dưới là điểm nghẽn mà MỌI lượt gọi SDK
+ * đi qua — cả đường có token lẫn đường công khai (`categoryList`, `organizationLookup`…). Hơn
+ * hai chục màn đang in thẳng `error.message` vào `EmptyState`, nên không dịch ở đây thì người
+ * dùng đọc nguyên văn thứ mà tầng native ném ra: *"fetch failed: UnexpectedException: Could
+ * not connect to server. (at ExpoModulesCore/Promise.swift:56)"*.
+ *
+ * Nhận diện bằng "fetch có NÉM hay không", không so chuỗi: lỗi HTTP (4xx/5xx) không ném — nó
+ * về dưới dạng response và đã có `unwrap` xử. Fetch mà ném thì chắc chắn là tầng vận chuyển,
+ * và chuỗi báo lỗi khác nhau giữa `expo/fetch` (SDK 52+, WinterCG) và fetch cũ của RN
+ * (`TypeError: Network request failed`) — so chuỗi là hẹn một ngày đổi SDK là hỏng lặng.
+ *
+ * `__DEV__` thì kèm URL đang gọi. Ca hay gặp nhất khi dev là `EXPO_PUBLIC_API_URL` còn trỏ vào
+ * LAN IP cũ sau khi DHCP cấp lại — biết ngay nó đang gọi đâu thì hết phải đoán. Bản release
+ * không hiện: người dùng không cần biết địa chỉ nội bộ, và nó chỉ làm câu thông báo rối.
+ */
+function networkMessage(): string {
+  const base = 'Không kết nối được tới server. Kiểm tra Wi-Fi hoặc 4G rồi thử lại.';
+  return __DEV__ ? `${base}\n(đang gọi ${API_BASE_URL})` : base;
 }
 
 export const createClientConfig: CreateClientConfig = (config) => ({
@@ -189,7 +244,7 @@ export const createClientConfig: CreateClientConfig = (config) => ({
    * chức) nên phải đọc đúng lúc gửi. Đây cũng là chỗ duy nhất làm được việc đó mà không phải
    * import `client.gen.ts` vào đây: file đó import ngược lại chính `http.ts` làm runtime config.
    */
-  fetch: (request) => {
+  fetch: async (request) => {
     // Kiểu khai của hey-api rộng hơn thực tế (`string | URL | Request`), nhưng client-fetch
     // luôn dựng sẵn `Request` trước khi gọi. Thu hẹp bằng `instanceof` thay vì ép kiểu: nếu
     // một bản sau đổi cách gọi, header chỉ đơn giản không được gắn thay vì nổ lúc chạy.
@@ -203,6 +258,19 @@ export const createClientConfig: CreateClientConfig = (config) => ({
     if (activeOrgSlug && request instanceof Request && !request.headers.has(ORG_HEADER)) {
       request.headers.set(ORG_HEADER, activeOrgSlug);
     }
-    return globalThis.fetch(request);
+
+    try {
+      return await globalThis.fetch(request);
+    } catch (err) {
+      /*
+       * Request bị HUỶ không phải lỗi mạng: TanStack cancel khi component unmount hoặc khi
+       * query key đổi giữa lúc đang bay. Đổi nó thành lỗi mạng là hiện "mất kết nối" cho một
+       * lượt gọi mà chính app vừa chủ động bỏ.
+       */
+      if (err instanceof Error && err.name === 'AbortError') throw err;
+      // `cause` giữ nguyên lỗi gốc của tầng native: giao diện đọc `message` đã dịch, còn log
+      // và màn ErrorScreen vẫn lần được về đúng chuỗi mà `expo/fetch` ném ra.
+      throw new Error(networkMessage(), { cause: err });
+    }
   },
 });

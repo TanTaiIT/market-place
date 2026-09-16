@@ -1,7 +1,12 @@
 import { useEffect } from 'react';
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
-import { setActiveOrgSlug, setHttpSession, setSessionRefresher } from '@/api/http';
+import {
+  setActiveOrgSlug,
+  setHttpSession,
+  setOrgGoneHandler,
+  setSessionRefresher,
+} from '@/api/http';
 import { useAuthStore } from '@/stores/auth';
 import { qk } from './keys';
 
@@ -23,6 +28,26 @@ export function useRegister() {
   });
 }
 
+/**
+ * Xin mã xác thực email.
+ *
+ * Không tham số: BE lấy địa chỉ từ token (chốt chống dò tài khoản), nên app không chọn được
+ * hộp thư nhận. Không invalidate gì — gửi mã không đổi trạng thái nào mà UI đang đọc.
+ */
+export function useSendEmailCode() {
+  return useMutation({ mutationFn: () => api.sendEmailCode() });
+}
+
+export function useVerifyEmail() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => api.verifyEmail(code),
+    // `isEmailVerified` sống trong hồ sơ, và BE cố tình không trả hồ sơ ở đường này để không
+    // có hai nguồn cho cùng một dữ liệu — nên phải đọc lại.
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.profile() }),
+  });
+}
+
 /* --------------------------- session lifecycle --------------------------- */
 
 /**
@@ -34,6 +59,15 @@ export function useSignOut() {
   const qc = useQueryClient();
 
   return () => {
+    /*
+     * Báo server TRƯỚC, nhưng không chờ và không chặn.
+     *
+     * Dọn phiên cục bộ phải xảy ra dù mạng có hỏng — bắt người dùng ở lại màn đã đăng nhập vì
+     * một request thất bại là tệ hơn hẳn việc thu hồi token muộn một nhịp. Lỗi nuốt có chủ ý:
+     * người bấm "đăng xuất" không có gì để làm với thông báo lỗi ở đây.
+     */
+    void api.signOut().catch(() => undefined);
+
     useAuthStore.getState().signOut();
     qc.clear();
   };
@@ -58,7 +92,7 @@ function refreshSession(qc: QueryClient): Promise<string | null> {
       return renewed.accessToken;
     })
     .catch(() => {
-      // Refresh token cũng hết hạn / bị thu hồi / org bị khoá -> hết đường tự cứu. Dọn phiên như
+      // Refresh token cũng hết hạn / bị thu hồi -> hết đường tự cứu. Dọn phiên như
       // `useSignOut` (kể cả cache) để `Stack.Protected` đưa về màn login thay vì treo ở màn lỗi.
       useAuthStore.getState().signOut();
       setHttpSession(null);
@@ -90,6 +124,9 @@ export function useSyncAccessToken(qc: QueryClient): void {
   setHttpSession(session ? { accessToken: session.accessToken, userId: session.userId } : null);
   setActiveOrgSlug(activeOrgSlug);
   setSessionRefresher(() => refreshSession(qc));
+  // Org bị khoá giữa lúc dùng: bỏ chọn nó, đừng đăng xuất. Phiên vẫn tốt nguyên — người dùng
+  // chỉ mất tổ chức đang thao tác, và vẫn xem được nội dung công khai như lúc chưa chọn org.
+  setOrgGoneHandler(() => useAuthStore.getState().setActiveOrg(null));
 }
 
 /**

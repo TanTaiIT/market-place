@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import { templateApi } from '@/api/templates';
-import type { CategoryTemplate } from '@/api/templates';
+import type { CategoryTemplate, TemplateTarget } from '@/api/templates';
 import { qk } from './keys';
 
 /**
@@ -35,6 +35,31 @@ export function useCategoryTemplate(categoryId: string, version?: number) {
 
 /* ------------------------- soạn template (admin) -------------------------- */
 
+/** Hai mục tiêu, hai dãy version rời nhau — nên cũng là hai nhánh key. */
+const keyOf = (target: TemplateTarget, version?: number) =>
+  target.kind === 'default'
+    ? qk.defaultTemplate(version)
+    : qk.categoryTemplate(target.categoryId, version);
+
+/**
+ * Key cho lúc CHƯA chọn mục tiêu nào.
+ *
+ * Vẫn đi qua factory (HARD#3) và cố tình là `categoryTemplate` với id rỗng: nó không đụng key
+ * thật nào. Trỏ vào `defaultTemplate()` thì query đang tắt sẽ dùng chung ô cache với mẫu mặc
+ * định, và `published.data` có dữ liệu trong khi người soạn chưa chọn gì.
+ */
+const idleKey = (version?: number) => qk.categoryTemplate('', version);
+
+/** Bản đang phục vụ của mục tiêu đang soạn. `null` = chưa chọn gì. */
+export function useTemplatePublished(target: TemplateTarget | null) {
+  return useQuery({
+    queryKey: target ? keyOf(target) : idleKey(),
+    queryFn: () => templateApi.get(target as TemplateTarget),
+    enabled: target != null,
+    staleTime: TEMPLATE_STALE_MS,
+  });
+}
+
 /** Từ điển field. Đổi rất ít, mà mỗi lần mở bộ chọn field lại gọi thì phí. */
 export function useFieldDefinitions() {
   return useQuery({
@@ -59,15 +84,29 @@ export function useFieldDefinitions() {
  * Danh mục đang xài bản chung (`isFallback`) thì chưa có template riêng nào, nháp đầu tiên sẽ
  * là version 1 — không phải "version của bản chung + 1", vì hai dãy version đó rời nhau.
  */
-export function useTemplateDraft(published: CategoryTemplate | undefined, categoryId: string) {
-  const probe = published == null ? undefined : published.isFallback ? 1 : published.version + 1;
+export function useTemplateDraft(
+  published: CategoryTemplate | undefined,
+  target: TemplateTarget | null,
+) {
+  /*
+   * Mẫu mặc định thì `isFallback` LUÔN đúng, nên không suy ra được "chưa có bản riêng" từ nó
+   * như đường của danh mục — dãy version của nó là dãy duy nhất, và nháp kế tiếp bao giờ cũng
+   * là bản đang phục vụ + 1.
+   */
+  const probe =
+    published == null
+      ? undefined
+      : target?.kind === 'default' || !published.isFallback
+        ? published.version + 1
+        : 1;
   return useQuery({
-    queryKey: qk.categoryTemplate(categoryId, probe),
+    queryKey: target ? keyOf(target, probe) : idleKey(probe),
     queryFn: async () => {
-      const got = await api.getCategoryTemplate(categoryId, probe);
-      return got.version === probe && !got.isFallback ? got : null;
+      const got = await templateApi.get(target as TemplateTarget, probe);
+      const isDraft = target?.kind === 'default' ? true : !got.isFallback;
+      return got.version === probe && isDraft ? got : null;
     },
-    enabled: categoryId.length > 0 && probe != null,
+    enabled: target != null && probe != null,
     staleTime: 0,
   });
 }

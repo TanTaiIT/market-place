@@ -5,26 +5,44 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, EmptyState, Loading } from '@/components/ui';
+import { GuestGate } from '@/components/GuestGate';
+import { useIsAuthenticated } from '@/stores/auth';
 import { OrgSwitcher } from '@/components/OrgSwitcher';
 import { useToast } from '@/components/Toast';
 import { useSignOut } from '@/queries/auth';
 import { useProfile } from '@/queries/listings';
 import { useMyGrants } from '@/queries/admin';
 import { canOpenAdmin, isMaster, topRole } from '@/api/admin';
-import { C, F, shadow } from '@/theme';
+import { C, F, G, shadow } from '@/theme';
 
 export default function Profile() {
   const router = useRouter();
   const toast = useToast();
   const insets = useSafeAreaInsets();
-  const { data: profile, error, isLoading } = useProfile();
+  const { data: profile, error, isLoading, refetch } = useProfile();
   const { data: grants } = useMyGrants();
   const master = isMaster(grants);
   const signOut = useSignOut();
 
+  const isAuthenticated = useIsAuthenticated();
+
+  if (!isAuthenticated) {
+    return (
+      <GuestGate
+        title="Cá nhân"
+        message="Trang cá nhân giữ tin bạn đăng, tin đã lưu và đánh giá từ người mua. Đăng nhập để mở."
+      />
+    );
+  }
   if (isLoading) return <Loading />;
   if (error || !profile) {
-    return <EmptyState icon="📡" text={(error as Error | null)?.message ?? 'Không tải được hồ sơ'} />;
+    return (
+      <EmptyState
+        icon="📡"
+        text={(error as Error | null)?.message ?? 'Không tải được hồ sơ'}
+        onRetry={() => void refetch()}
+      />
+    );
   }
 
   const menu = [
@@ -41,7 +59,7 @@ export default function Profile() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 24 }}>
-      <LinearGradient colors={[C.cork, C.paper]} style={[styles.hero, { paddingTop: insets.top + 24 }]}>
+      <LinearGradient colors={G.hero} style={[styles.hero, { paddingTop: insets.top + 24 }]}>
         <Avatar text={profile.avatar} url={profile.avatarUrl} size={76} ring />
         <Text style={styles.name}>{profile.name}</Text>
         <Text style={styles.org}>{profile.org}</Text>
@@ -66,6 +84,24 @@ export default function Profile() {
         <View style={styles.orgBlock}>
           <OrgSwitcher />
         </View>
+      )}
+
+      {/*
+        Lối vào THỨ HAI của màn nhập mã — lối thứ nhất là lời mời tự bật ngay sau khi đăng ký
+        (`(tabs)/_layout`). Có chỗ này thì nút "Để sau" ở màn đó mới là hoãn chứ không phải mất
+        đường quay lại. Tài khoản Google luôn đã xác thực nên dải này không bao giờ hiện với họ.
+      */}
+      {!profile.emailVerified && (
+        <Pressable style={styles.verifyBanner} onPress={() => router.push('/verify-email')}>
+          <Text style={styles.verifyIcon}>✉️</Text>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.verifyTitle}>Email chưa được xác thực</Text>
+            <Text style={styles.verifyNote} numberOfLines={1}>
+              {profile.email} · chạm để nhập mã
+            </Text>
+          </View>
+          <Text style={styles.verifyGo}>›</Text>
+        </Pressable>
       )}
 
       <View style={styles.menu}>
@@ -117,6 +153,26 @@ const styles = StyleSheet.create({
   statNum: { fontFamily: F.monoBold, fontSize: 18, color: C.ink },
   statLabel: { fontFamily: F.ui, fontSize: 10.5, color: C.inkSoft, marginTop: 2 },
   orgBlock: { paddingHorizontal: 16, marginTop: 14 },
+
+  /* Nền vàng `tape` + viền trái: cùng ngôn ngữ "cần bạn để mắt" với các dải nhắc việc khác,
+     không phải `danger` — chưa xác thực là việc chưa làm, không phải lỗi. */
+  verifyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 16,
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: C.orangeLt,
+    borderLeftWidth: 3,
+    borderLeftColor: C.orange,
+  },
+  verifyIcon: { fontSize: 18 },
+  verifyTitle: { fontFamily: F.uiBold, fontSize: 13, color: C.ink },
+  verifyNote: { fontFamily: F.ui, fontSize: 11, color: C.inkSoft, marginTop: 2 },
+  verifyGo: { fontFamily: F.uiBold, fontSize: 18, color: C.orange },
   menu: { padding: 20, gap: 10 },
   row: {
     flexDirection: 'row',

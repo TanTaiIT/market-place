@@ -6,22 +6,32 @@ SoT cho: theme token, `StyleSheet.create`, style động, cách port CSS của p
 
 ## 1. Token là nguồn duy nhất (HARD#8)
 
-[`src/theme/index.ts`](../../src/theme/index.ts) giữ ba nhóm, port thẳng từ `:root` của prototype:
+[`src/theme/index.ts`](../../src/theme/index.ts) giữ các nhóm sau, port thẳng từ `:root` của prototype:
 
 | Export        | Dùng cho                                                                     |
 | ------------- | ---------------------------------------------------------------------------- |
 | `C`           | Màu: `ink`, `inkSoft`, `paper`, `paperWarm`, `cork`, `pin`, `tape`, `moss`, … |
 | `F`           | Tên font sau khi `useFonts` load: `hand`, `ui`, `uiBold`, `mono`, …           |
-| `shadow` / `shadowSoft` | Đổ bóng cross-platform (`Platform.select`)                          |
+| `shadow` / `shadowLift` | Đổ bóng cross-platform (`Platform.select`)                          |
 | `Grad`        | Type cặp màu gradient thay `linear-gradient` của web                          |
+| `G`           | Dải màu cho `<LinearGradient>`: `brand`, `hero`, `auth`, `glow`, `sheen`     |
 
 Quy tắc:
 
+- Gradient **luôn** `G.*`. Ghép tay `colors={[C.a, C.b]}` tại call-site là cách sinh dải phẳng lúc palette
+  đổi (hero `profile` từng chết vì `cork` và `paper` cùng về một sắc). Chặng tắt dần là alpha-0 của chính
+  màu đó, **không** `'transparent'` — Android nội suy qua sắc đen.
+- Mặt kính trên nền thương hiệu/ảnh dùng `C.glass*` (`glass`, `glassRaise`, `glassLine`, `glassTx`,
+  `glassLift`), không viết `rgba(255,255,255,…)` rời.
+- Kính là **ba lớp**, không phải một màu: trộn `glassFace` vào style của khối rồi đặt `<GlassSheen />`
+  làm con ĐẦU TIÊN (`GlassSurface.tsx`). Chỉ đặt `backgroundColor: C.glassRaise` thì ra "màu nhạt
+  hơn", không ra vật liệu. Repo KHÔNG có `expo-blur`, và blur cũng vô dụng ở đây — nền phía sau các
+  mặt này là gradient đặc.
 - Màu mới **phải** thêm vào `C` rồi mới dùng. Không hardcode hex tại call-site.
 - Font **luôn** qua `F.*`. Không viết `fontFamily: 'Manrope_700Bold'` trực tiếp; không dùng `fontWeight` để giả
   đậm — RN cần đúng family đã load. Font mới: thêm vào `useFonts` ở
   [app/\_layout.tsx:38-48](../../app/_layout.tsx#L38-L48) **và** vào `F` cùng lúc.
-- Đổ bóng **luôn** `...shadow` / `...shadowSoft`. Không tự viết `shadowColor + elevation` trừ khi bóng có màu
+- Đổ bóng **luôn** `...shadow` / `...shadowLift`. Không tự viết `shadowColor + elevation` trừ khi bóng có màu
   riêng — ngoại lệ hợp lệ duy nhất: FAB đổ bóng đỏ theo màu `C.pin`
   ([TabBar.tsx:100-104](../../src/components/TabBar.tsx#L100-L104)).
 
@@ -58,7 +68,7 @@ style={[styles.chip, active && { backgroundColor: C.pin }, { transform: [{ rotat
 
 | CSS gốc                             | Cách làm trong repo                                                        |
 | ----------------------------------- | -------------------------------------------------------------------------- |
-| `linear-gradient(135deg, …)`        | `<LinearGradient colors={grad} start={{x:0,y:0}} end={{x:1,y:1}} />`        |
+| `linear-gradient(135deg, …)`        | `<LinearGradient colors={G.x} start={{x:0,y:0}} end={{x:1,y:1}} />`        |
 | `repeating-radial-gradient` (vân bần) | Lưới chấm tính sẵn **deterministic** trong `Corkboard.tsx` — không random |
 | `box-shadow: 0 6px 0 <color>`       | Lớp `View` nền tối cố định + mặt nút `translateY` khi nhấn (`PinButton`)    |
 | `box-shadow` mờ thường              | `...shadow` từ theme                                                       |
@@ -95,6 +105,5 @@ Các hex rời còn sót lại, chấp nhận ở hiện trạng; **nhưng code 
 | `mylistings.tsx:45`, `notif.tsx:9`             | `'#FDEFD9'` (lặp ở 2 file)           |
 | `mylistings.tsx:63`                            | `'#FCE4E1'`                          |
 | `ui.tsx` (`ghostBtn`)                          | `'#C9BE9F'`                          |
-| `listing/[id].tsx`  (`circleBtn`)              | `'rgba(250,248,240,0.92)'`           |
 
 Chạm vào một trong các dòng trên vì lý do khác → nhân tiện nâng lên token `C`. Không mở PR riêng chỉ để dọn.

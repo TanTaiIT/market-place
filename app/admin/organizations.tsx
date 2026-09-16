@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AdminFilter, AdminPanel, AdminScreen } from '@/components/AdminScreen';
 import { AdminSmallBtn, adminFormStyles } from '@/components/AdminPicker';
+import { AdminOrgSheet } from '@/components/AdminOrgSheet';
 import { OrgCreateForm } from '@/components/OrgCreateForm';
 import { SlugField } from '@/components/SlugField';
-import { EmptyState, Loading, PinButton } from '@/components/ui';
+import { EmptyState, Loading, PagedFooter, PinButton, nearEnd } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import {
   useAllOrgs,
@@ -34,7 +35,7 @@ export default function AdminOrganizations() {
   const [term, setTerm] = useState('');
   const [status, setStatus] = useState('all');
 
-  const { data, error, isPending } = useAllOrgs({
+  const { data, error, isPending, loadMore, isFetchingNextPage } = useAllOrgs({
     q: term,
     status: status === 'all' ? undefined : (status as OrgStatus),
   });
@@ -48,6 +49,8 @@ export default function AdminOrganizations() {
 
   /** Tổ chức đang đổi slug; `null` = panel dưới đang ở chế độ tạo mới. */
   const [editing, setEditing] = useState<Organization | null>(null);
+  /** Tổ chức đang mở ngăn chi tiết. Giữ cả object: ngăn dựng phần đầu từ nó, không gọi lại BE. */
+  const [detail, setDetail] = useState<Organization | null>(null);
   const [slug, setSlug] = useState('');
 
   const fail = (e: Error) => toast(`⚠️ ${e.message}`);
@@ -120,7 +123,13 @@ export default function AdminOrganizations() {
 
       <AdminFilter options={STATUS_FILTER} value={status} onChange={setStatus} />
 
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.body}
+        keyboardShouldPersistTaps="handled"
+        // Danh sách vẽ bằng `map` trong ScrollView (có ô tìm phía trên), nên tự dò đáy để tải trang sau.
+        onScroll={(e) => nearEnd(e) && loadMore()}
+        scrollEventThrottle={160}
+      >
         {isPending ? (
           <Loading onDark />
         ) : error ? (
@@ -132,7 +141,20 @@ export default function AdminOrganizations() {
             {rows.map((org) => {
               const acting = org.slug === activeSlug;
               return (
-                <View key={org.id} style={[styles.row, acting && styles.rowActing]}>
+                /*
+                  Bấm vào HÀNG mở chi tiết (danh bạ + người phụ trách thật). Bốn nút bên trong
+                  vẫn ăn cú chạm của riêng chúng — `Pressable` lồng nhau trong RN không cho sự
+                  kiện nổi lên như DOM, nên bấm 'Khoá' không kéo theo một lượt mở ngăn.
+                */
+                <Pressable
+                  key={org.id}
+                  onPress={() => setDetail(org)}
+                  style={({ pressed }) => [
+                    styles.row,
+                    acting && styles.rowActing,
+                    pressed && { opacity: 0.85 },
+                  ]}
+                >
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={styles.name}>{org.name}</Text>
                     {/* Chỉ nói khi RIÊNG TƯ: công khai là mặc định, ghi ra chỉ làm loãng dòng. */}
@@ -176,7 +198,7 @@ export default function AdminOrganizations() {
                       onPress={() => toggleStatus(org)}
                     />
                   </View>
-                </View>
+                </Pressable>
               );
             })}
           </View>
@@ -235,7 +257,11 @@ export default function AdminOrganizations() {
             </AdminPanel>
           )}
         </View>
+        <PagedFooter loading={isFetchingNextPage} onDark />
       </ScrollView>
+
+      {/* Ngoài `ScrollView`: Modal tự phủ toàn màn, nằm trong danh sách cuộn chỉ làm rối cây. */}
+      <AdminOrgSheet org={detail} onClose={() => setDetail(null)} />
     </AdminScreen>
   );
 }

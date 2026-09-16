@@ -1,11 +1,12 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { orgApi } from '@/api/org';
 import type { JoinRequestStatus } from '@/api/org';
 import { useEffect } from 'react';
-import { useOrgSlug, useSetActiveOrg } from '@/stores/auth';
+import { useIsAuthenticated, useOrgSlug, useSetActiveOrg } from '@/stores/auth';
 import { canModerateOrg } from '@/api/admin';
 import { useMyGrants } from './admin';
 import { qk } from './keys';
+import { usePagedList } from './paged';
 
 /** Độ dài tối thiểu của mã tham gia theo schema BE — gõ ngắn hơn thì chắc chắn 400. */
 const MIN_CODE_CHARS = 4;
@@ -45,17 +46,25 @@ export function useOrgByCode(code: string) {
  *
  * Chỉ ghi khi CHƯA có lựa chọn nào: người đã tự chọn (hoặc master mượn slug nhóm khác) thì
  * không bị ghi đè. Có từ hai nhóm trở lên thì im lặng — lúc đó phải để họ chọn.
+ *
+ * Và chỉ tự chọn org đang ACTIVE: org bị khoá vẫn nằm trong danh sách, tự chọn nó là mọi
+ * request mang một slug BE chắc chắn ném 403 — người dùng không hề bấm gì mà app tự đưa mình
+ * vào trạng thái không dùng được.
  */
 export function useMyOrgs() {
+  const isAuthenticated = useIsAuthenticated();
   const query = useQuery({
     queryKey: qk.myOrgs(),
     queryFn: orgApi.myOrgs,
+    // Khách chưa đăng nhập không thuộc tổ chức nào — hỏi BE là một cú 401 mỗi lần mở app.
+    enabled: isAuthenticated,
     staleTime: 5 * 60_000,
   });
 
   const activeSlug = useOrgSlug();
   const setActiveOrg = useSetActiveOrg();
-  const only = query.data?.length === 1 ? query.data[0].slug : undefined;
+  const single = query.data?.length === 1 ? query.data[0] : undefined;
+  const only = single?.status === 'active' ? single.slug : undefined;
 
   useEffect(() => {
     if (!activeSlug && only) setActiveOrg(only);
@@ -108,25 +117,35 @@ export function useJoinRequestQueue(status?: JoinRequestStatus) {
   const orgSlug = useOrgSlug();
   const { data: grants } = useMyGrants();
 
-  return useQuery({
-    queryKey: qk.joinRequestQueue(orgSlug ?? '-', status ?? 'all'),
-    queryFn: () => orgApi.joinRequests(status),
-    // Chặn bằng grant chứ không chỉ bằng org: `AdminNav` gọi hook này để lấy con số badge cho
-    // MỌI người mở ngăn kéo, mà manager danh mục (grant `category_province`) tuy là thành viên
-    // org vẫn ăn 403 ở endpoint này — một request hỏng mỗi lần mở ngăn kéo.
-    enabled: Boolean(orgSlug) && canModerateOrg(grants),
-    placeholderData: keepPreviousData,
-  });
+  return usePagedList(
+    qk.joinRequestQueue(orgSlug ?? '-', status ?? 'all'),
+    (page) => orgApi.joinRequests(status, page),
+    {
+      // Chặn bằng grant chứ không chỉ bằng org: `AdminNav` gọi hook này để lấy con số badge cho
+      // MỌI người mở ngăn kéo, mà manager danh mục (grant `category_province`) tuy là thành viên
+      // org vẫn ăn 403 ở endpoint này — một request hỏng mỗi lần mở ngăn kéo.
+      enabled: Boolean(orgSlug) && canModerateOrg(grants),
+      keepPrevious: true,
+    },
+  );
 }
 
-/** Nhóm con để duyệt kèm xếp nhóm. Đổi rất ít nên cache lâu, cùng lý do với `useMyOrgs`. */
-export function useOrgUnits() {
+/**
+ * Gỡ thành viên / chuyển nhóm con.
+ *
+ * Refetch contract: cả hai quét `orgMembers(slug)` — danh bạ là chỗ duy nhất hiện thay đổi.
+ * Gỡ người còn quét `joinRequestsRoot()`: người bị gỡ có thể xin vào lại, và hàng đợi đơn
+ * đang cache trạng thái "đã là thành viên" của họ.
+ */
+export function useRemoveMember() {
+  const qc = useQueryClient();
   const orgSlug = useOrgSlug();
-  return useQuery({
-    queryKey: qk.orgUnits(orgSlug ?? '-'),
-    queryFn: orgApi.orgUnits,
-    enabled: Boolean(orgSlug),
-    staleTime: 5 * 60_000,
+  return useMutation({
+    mutationFn: (userId: string) => orgApi.removeMember(userId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.orgMembers(orgSlug ?? '-') });
+      void qc.invalidateQueries({ queryKey: qk.joinRequestsRoot() });
+    },
   });
 }
 
@@ -144,40 +163,14 @@ export function useOrgRoster() {
   const orgSlug = useOrgSlug();
   const { data: grants } = useMyGrants();
 
-  const query = useQuery({
-    queryKey: qk.orgMembers(orgSlug ?? '-'),
-    queryFn: orgApi.members,
+  const query = usePagedList(qk.orgMembers(orgSlug ?? '-'), orgApi.members, {
     enabled: Boolean(orgSlug) && canModerateOrg(grants),
     staleTime: 5 * 60_000,
+    // Danh bạ không có `id` — khoá là `userId`.
+    keyOf: (m) => m.userId,
   });
 
   return { ...query, members: query.data ?? [] };
-}
-
-/**
- * Refetch contract của ba mutation nhóm con: invalidate đúng key nhóm con của tổ chức đang hoạt
- * động. Không quét `['orgs']`: `myOrgs` và `orgLookup` cũng nằm dưới prefix đó và không hề lệch
- * khi thêm một nhóm.
- */
-function useOrgUnitMutation<TVars, TData>(fn: (v: TVars) => Promise<TData>) {
-  const qc = useQueryClient();
-  const orgSlug = useOrgSlug();
-  return useMutation({
-    mutationFn: fn,
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.orgUnits(orgSlug ?? '-') }),
-  });
-}
-
-export function useCreateOrgUnit() {
-  return useOrgUnitMutation(orgApi.createUnit);
-}
-
-export function useUpdateOrgUnit() {
-  return useOrgUnitMutation(orgApi.updateUnit);
-}
-
-export function useDeleteOrgUnit() {
-  return useOrgUnitMutation(orgApi.deleteUnit);
 }
 
 /**

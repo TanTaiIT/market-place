@@ -54,22 +54,10 @@ type Session = {
 
 type AuthState = {
   session: Session | null;
-  /**
-   * Tổ chức đang thao tác — KHÔNG còn nằm trong phiên đăng nhập.
-   *
-   * BE v2 bỏ `organizationId` khỏi token: một tài khoản thuộc nhiều org, và org của mỗi request
-   * do chính request chỉ ra (header `X-Org-Slug`) rồi được đối chiếu `memberships` ngay lúc đó.
-   * Vì vậy nó là lựa chọn của người dùng, đổi được giữa phiên, và phải sống lâu hơn màn hình —
-   * đúng chỗ của Zustand chứ không phải TanStack (store.convention §1).
-   *
-   * `null` = chưa chọn org: vẫn xem được tin công khai, chỉ không thao tác trong org nào.
-   */
-  activeOrgSlug: string | null;
   /** false cho tới khi đọc xong kho bảo mật — giữ splash để guard không nháy qua màn login */
   hydrated: boolean;
   signIn: (session: Session) => void;
   signOut: () => void;
-  setActiveOrg: (slug: string | null) => void;
   /**
    * Vừa đăng ký xong và chưa được mời xác thực email — cờ MỘT LẦN, đọc rồi xoá.
    *
@@ -90,14 +78,10 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       session: null,
-      activeOrgSlug: null,
       hydrated: false,
       pendingEmailVerify: false,
       signIn: (session) => set({ session }),
-      // Đăng xuất dọn luôn org đang chọn: người kế tiếp đăng nhập trên cùng máy không được
-      // thừa hưởng tổ chức của người trước.
-      signOut: () => set({ session: null, activeOrgSlug: null, pendingEmailVerify: false }),
-      setActiveOrg: (activeOrgSlug) => set({ activeOrgSlug }),
+      signOut: () => set({ session: null, pendingEmailVerify: false }),
       markPendingEmailVerify: () => set({ pendingEmailVerify: true }),
       clearPendingEmailVerify: () => set({ pendingEmailVerify: false }),
     }),
@@ -105,7 +89,7 @@ export const useAuthStore = create<AuthState>()(
       name: 'ghim-auth',
       storage: createJSONStorage(() => secureStorage),
       // `hydrated` là cờ runtime; ghi xuống đĩa thì lần mở sau sẽ đọc lại đúng giá trị cũ (false)
-      partialize: (s) => ({ session: s.session, activeOrgSlug: s.activeOrgSlug }),
+      partialize: (s) => ({ session: s.session }),
       // Callback này chạy cả khi đọc đĩa lỗi — luôn mở khoá splash, đừng để app treo ở màn boot.
       //
       // Bản ghi thiếu field thì vứt luôn thay vì mang vào phiên chạy: `useIsAuthenticated` chỉ
@@ -128,6 +112,3 @@ export const useAuthHydrated = () => useAuthStore((s) => s.hydrated);
 export const useSignIn = () => useAuthStore((s) => s.signIn);
 export const usePendingEmailVerify = () => useAuthStore((s) => s.pendingEmailVerify);
 export const useMarkPendingEmailVerify = () => useAuthStore((s) => s.markPendingEmailVerify);
-/** Tổ chức đang thao tác. `null` = chưa chọn org, chỉ xem được nội dung công khai. */
-export const useOrgSlug = () => useAuthStore((s) => s.activeOrgSlug ?? undefined);
-export const useSetActiveOrg = () => useAuthStore((s) => s.setActiveOrg);

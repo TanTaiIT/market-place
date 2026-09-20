@@ -6,8 +6,8 @@ import { AdminNav } from './AdminNav';
 import { AdminOrgPicker } from './AdminOrgPicker';
 import { useToast } from './Toast';
 import { PinButton } from './ui';
-import { useOrgSlug } from '@/stores/auth';
-import { useMyOrgs } from '@/queries/org';
+import { useAdminOrgId, useSetAdminOrgId } from './AdminOrgScope';
+import { useAdminOrgs } from '@/queries/org';
 import { useMyGrants } from '@/queries/admin';
 import { isMaster } from '@/api/admin';
 import { C, F } from '@/theme';
@@ -24,57 +24,47 @@ export function AdminScreen({
   title,
   note,
   org,
-  masterReadsAll,
   children,
 }: {
   title: string;
   /** Câu viết tay trên tiêu đề, giữ đúng giọng của prototype. */
   note: string;
   /**
-   * Màn này đọc `X-Org-Slug` — khớp đúng cờ `org: true` của `AdminNav.GROUPS`.
+   * Màn này đọc `X-Org-Id` — khớp đúng cờ `org: true` của `AdminNav.GROUPS`.
    *
-   * Bật thì khi chưa chọn tổ chức, màn hiện lối đi tiếp thay vì ruột của nó. Master cố ý không
-   * thuộc tổ chức nào, nên đây là trạng thái BÌNH THƯỜNG của họ lúc mới vào, không phải lỗi:
-   * trước đó mọi màn trong nhóm này ném nguyên văn câu của `requireOrg` — "gửi header
-   * X-Org-Slug hoặc truy cập qua subdomain" — cho người vừa bấm một mục menu.
+   * Bật thì khi chưa xác định được tổ chức, màn hiện lối đi tiếp thay vì ruột của nó: trước
+   * đó mọi màn trong nhóm này ném nguyên văn câu của `requireOrg` — "gửi header X-Org-Id
+   * hoặc truy cập qua subdomain" — cho người vừa bấm một mục menu.
    *
-   * `'optional'` = có đọc slug nhưng KHÔNG đòi (màn Phân quyền): bộ chọn của master vẫn còn,
-   * còn người không thuộc tổ chức nào vẫn vào được ruột màn thay vì gặp bức tường.
+   * Với MASTER, `org: true` luôn hiện lối đi tiếp, kể cả khi BE tự suy được một org cho họ: đây
+   * là màn của bàn quản trị NHÓM; master nhìn vào một nhóm ở Tổ chức › ngăn chi tiết (xem `AdminOrgPicker`).
+   *
+   * `'optional'` = có đọc id nhưng KHÔNG đòi (Phân quyền, Báo cáo cho người phụ trách ô):
+   * người không thuộc tổ chức nào vẫn vào được ruột màn thay vì gặp bức tường.
    */
   org?: boolean | 'optional';
-  /**
-   * Màn CHỈ ĐỌC mà BE đã mở xuyên tổ chức cho master (`requireOrgReadOrMaster`).
-   *
-   * Bật thì master không phải chọn org mới được nhìn — họ thấy mọi tổ chức, và bộ chọn
-   * trên tiêu đề chuyển thành bộ LỌC. Màn ghi (gửi thông báo, phân quyền) không bật được:
-   * ghi thì phải biết ghi vào đâu.
-   */
-  masterReadsAll?: boolean;
   children: React.ReactNode;
 }) {
   const toast = useToast();
   const router = useRouter();
-  const orgSlug = useOrgSlug();
+  const orgId = useAdminOrgId();
+  const setOrgId = useSetAdminOrgId();
   const [navOpen, setNavOpen] = useState(false);
   const [pickOrg, setPickOrg] = useState(false);
   const grants = useMyGrants();
   const master = isMaster(grants.data);
-  const { data: myOrgs } = useMyOrgs();
+  // Nhóm QUẢN TRỊ được, không phải nhóm tham gia — bộ chọn chỉ có nghĩa trên tập này.
+  const { rows: adminOrgs } = useAdminOrgs();
 
-  /*
-   * BE tự suy ra tổ chức khi người dùng có ĐÚNG MỘT membership (`tenant.middleware`), nên
-   * "chưa bấm chọn" KHÔNG đồng nghĩa "chưa có tổ chức". Chặn bằng riêng `orgSlug` sẽ dựng
-   * một bức tường trước mặt đúng nhóm dùng bàn quản trị nhiều nhất: quản trị của một
-   * trường duy nhất, người chưa từng mở bộ chuyển tổ chức lần nào.
-   */
-  const needsOrg =
-    org === true && !orgSlug && (myOrgs ?? []).length !== 1 && !(master && masterReadsAll);
+  // `AdminOrgScope` đã áp luật "một nhóm thì khỏi bấm chọn", và đã loại master ra khỏi luật
+  // đó — nên ở đây chỉ còn đúng một câu hỏi: có nhóm nào đang mở không.
+  const needsOrg = org === true && !orgId;
 
   /*
    * Chưa biết người này có phải master thì CHƯA vẽ lối thoát: `isMaster(undefined)` là
-   * `false`, nên vẽ sớm là đưa master cái nút dẫn sang `/join-org` — màn đòi mã tham gia,
+   * `false`, nên vẽ sớm là đưa master cái nút dẫn sang `/find-org` — màn tìm nhóm và gõ mã tham gia,
    * không phải chỗ họ cần tới. Chờ thêm một nhịp rẻ hơn nhiều so với một người bấm nhầm
-   * rồi ngồi gõ slug vào ô mã.
+   * rồi ngồi gõ id vào ô mã.
    */
   const decided = !grants.isLoading;
 
@@ -90,20 +80,15 @@ export function AdminScreen({
         </Pressable>
 
         <View style={{ flex: 1, minWidth: 0 }}>
-          {/*
-            Bộ chọn phạm vi hiện cho master, VÀ cho người quản trị từ hai nhóm trở lên.
-
-            Vế thứ hai là bắt buộc từ khi bộ chuyển ở trang cá nhân thành master-only: thiếu
-            nó, người quản trị hai nhóm mà không phải master không còn đường nào đặt
-            `X-Org-Slug` — tức là không quản trị được nhóm nào cả.
-
-            Thuộc đúng một nhóm thì không dựng: BE tự suy ra org trong ca đó, không có gì để chọn.
-          */}
-          {org && (master || (myOrgs ?? []).length > 1) ? (
+          {/* Bộ chọn chỉ có nghĩa với người quản trị ≥2 nhóm. Master không có nó: chỗ duy nhất
+              họ lọc theo nhóm là Thống kê, và bộ lọc ở đó sống trong màn. */}
+          {org && !master && adminOrgs.length > 1 ? (
             <AdminOrgPicker
               open={pickOrg}
               onOpen={() => setPickOrg(true)}
               onClose={() => setPickOrg(false)}
+              value={orgId ?? null}
+              onChange={setOrgId}
             />
           ) : (
             <Text style={styles.note}>{note}</Text>
@@ -124,9 +109,13 @@ export function AdminScreen({
       {needsOrg && decided ? (
         <NoOrgPicked
           master={master}
-          hasOrgs={(myOrgs ?? []).length > 1}
-          // Cùng luật với dòng mồi trong ngăn kéo: có nhóm rồi thì CHỌN, chưa có thì mới đi XIN.
-          onPick={() => (master || (myOrgs ?? []).length > 1 ? setPickOrg(true) : router.push('/join-org'))}
+          hasOrgs={adminOrgs.length > 1}
+          // Master → bảng Tổ chức (ngăn chi tiết từng nhóm). Người khác: có nhóm thì CHỌN, chưa
+          // có thì đi XIN — cùng luật với dòng mồi trong ngăn kéo.
+          onPick={() => {
+            if (master) return router.replace('/admin/organizations');
+            return adminOrgs.length > 1 ? setPickOrg(true) : router.push('/find-org');
+          }}
         />
       ) : needsOrg ? null : (
         children
@@ -141,7 +130,7 @@ export function AdminScreen({
  * Màn org-scoped nhưng chưa có tổ chức nào được chọn.
  *
  * Nói bằng lời của người dùng và chỉ ra đúng một việc phải làm. Không gọi API nào — các hook
- * query đã tự tắt bằng `enabled` khi thiếu slug (`queries/admin.ts`), nên tới đây là im lặng
+ * query đã tự tắt bằng `enabled` khi thiếu id (`queries/admin.ts`), nên tới đây là im lặng
  * hoàn toàn chứ không phải hiện lối thoát trong lúc vẫn bắn request hỏng phía sau.
  */
 function NoOrgPicked({
@@ -157,16 +146,18 @@ function NoOrgPicked({
   return (
     <View style={styles.noOrg}>
       <Text style={styles.noOrgIcon}>🏫</Text>
-      <Text style={styles.noOrgTitle}>Chưa chọn tổ chức nào</Text>
+      <Text style={styles.noOrgTitle}>
+        {master ? 'Màn của bàn quản trị nhóm' : 'Chưa chọn tổ chức nào'}
+      </Text>
       <Text style={styles.noOrgText}>
         {master
-          ? 'Màn này hiện dữ liệu của MỘT tổ chức — quyền của bạn không giới hạn, nhưng hàng đợi thì luôn thuộc về một nơi cụ thể. Chọn nơi bạn muốn xem; đổi lại bất cứ lúc nào ở dòng trên tiêu đề.'
+          ? 'Master không đứng trong nhóm nào — việc của bạn là trục hệ thống. Muốn xem thành viên, tin đăng hay người phụ trách của một nhóm, mở Tổ chức rồi chọn nhóm đó.'
           : hasOrgs
             ? 'Bạn thuộc nhiều tổ chức, mà màn này hiện dữ liệu của MỘT tổ chức. Chọn nơi bạn muốn quản trị — đổi lại bất cứ lúc nào ở dòng trên tiêu đề.'
             : 'Màn này hiện dữ liệu của một tổ chức cụ thể. Bạn cần thuộc về một tổ chức trước đã.'}
       </Text>
       <PinButton
-        label={master || hasOrgs ? 'Chọn tổ chức' : 'Tìm tổ chức'}
+        label={master ? 'Mở Tổ chức' : hasOrgs ? 'Chọn tổ chức' : 'Tìm tổ chức'}
         onPress={onPick}
         style={{ marginTop: 18 }}
       />

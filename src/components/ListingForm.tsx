@@ -11,7 +11,14 @@ import { AttrFields, visibleAttrFields } from './AttrFields';
 import { PhotoPicker } from './PhotoPicker';
 import { EMPTY_LOCATION, LocationFields, type ListingLocation } from './LocationFields';
 import { listingDraftGaps } from './listingDraft';
-import { VisibilityPicker, type PostVisibility } from './VisibilityPicker';
+import {
+  ListingReachField,
+  defaultPick,
+  usePostGroups,
+  type ListingReach,
+  type PostGroup,
+  type ReachPick,
+} from './ListingReach';
 import { BoxField, FormSection } from './FormSection';
 import { CategoryField } from './CategoryField';
 import { useToast } from './Toast';
@@ -19,7 +26,6 @@ import { useCategoryTemplate } from '@/queries/templates';
 import { useProfile } from '@/queries/listings';
 import { MAX_PHOTOS, type ListingPhotosController } from '@/queries/upload';
 import type { Listing, ListingAttributes } from '@/api/db';
-import { useOrgSlug } from '@/stores/auth';
 import { C, F, S, shadow } from '@/theme';
 
 /**
@@ -38,7 +44,9 @@ type ListingFormValues = {
   price: string;
   desc: string;
   categoryId: string;
-  visibility: PostVisibility;
+  /** Bậc phủ sóng + nhóm đích. Chỉ có nghĩa lúc TẠO — BE không cho sửa cả hai sau khi đăng. */
+  reach: ListingReach;
+  orgId: string | null;
   location: ListingLocation;
   /** Thuộc tính động theo template của danh mục — rỗng khi danh mục chưa có field nào. */
   attributes: ListingAttributes;
@@ -61,7 +69,8 @@ export function listingToFormValues(listing: Listing): ListingFormValues {
     price: String(listing.priceValue),
     desc: listing.desc,
     categoryId: listing.categoryId,
-    visibility: listing.visibility,
+    reach: listing.reach,
+    orgId: null,
     attributes: listing.attributes ?? {},
     templateVersion: listing.templateVersion,
     location: {
@@ -90,19 +99,11 @@ export function ListingForm({
   submitLabel: string;
   busyLabel: string;
   busy: boolean;
-  /**
-   * Đăng thẳng vào MỘT nhóm — người dùng đi từ trang hồ sơ nhóm, không phải từ nút đăng chung.
-   *
-   * Có nó thì hiển thị bị KHOÁ ở `org_internal` và bộ chọn hiển thị biến mất. Đây không phải
-   * để cho gọn: `public` sẽ đưa tin sang hàng đợi của người phụ trách DANH MỤC, và quản trị
-   * nhóm không có lấy một lượt duyệt nào (`routeListing`). Người bấm "Đăng tin" trên trang
-   * một nhóm đang nói "gửi cho nhóm này duyệt" — để hở lựa chọn kia là phản bội đúng câu đó.
-   */
-  toGroup?: { slug: string; name: string };
+  /** Đăng thẳng vào MỘT nhóm — đi từ hồ sơ nhóm. Khoá NHÓM, không khoá bậc (`usePostGroups`). */
+  toGroup?: PostGroup;
   onSubmit: (values: ListingFormValues) => void;
 }) {
   const toast = useToast();
-  const activeOrg = useOrgSlug();
   const { data: profile } = useProfile();
 
   const [title, setTitle] = useState(initial?.title ?? '');
@@ -111,11 +112,17 @@ export function ListingForm({
   // Giữ id chứ không giữ tên: BE nhận `categoryId` là ObjectId. Rỗng cho tới khi danh mục
   // tải xong hoặc người dùng chọn.
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? '');
-  // Mặc định nội bộ: tin ở lại trong tổ chức cho tới khi người đăng chủ động đưa ra công khai.
-  // Không thuộc tổ chức nào thì chỉ còn một lựa chọn, và nó đã đúng.
-  const [visibility, setVisibility] = useState<PostVisibility>(
-    toGroup ? 'org_internal' : (initial?.visibility ?? (activeOrg ? 'org_internal' : 'public')),
-  );
+  /**
+   * Bậc phủ sóng: SUY RA cho tới khi người dùng chạm vào, chứ không giữ trong state ngay.
+   *
+   * Mặc định phụ thuộc danh sách nhóm, mà danh sách đó về sau lúc mount. Giữ state rồi đồng bộ
+   * bằng `useEffect` là đúng cái `set-state-in-effect` oxlint chặn — và tệ hơn, nó có thể ghi
+   * đè lựa chọn người dùng vừa bấm. `null` nghĩa là "chưa chạm", nên giá trị hiện ra tự đúng
+   * lên khi nhóm về. Bấm gửi trước lúc đó thì tin lên sàn — phía an toàn, không lộ nhóm nào.
+   */
+  const groups = usePostGroups(toGroup);
+  const [picked, setPicked] = useState<ReachPick | null>(null);
+  const pick: ReachPick = picked ?? defaultPick(groups);
   /**
    * Tên tỉnh/xã, không phải mã — BE lưu và lọc bằng chính chuỗi này.
    *
@@ -181,6 +188,7 @@ export function ListingForm({
     // Chỉ field ĐANG HIỆN mới bị đòi: field bị `showIf` ẩn không phải là thứ người dùng bỏ sót.
     attrFields: visibleAttrFields(attrFields, attributes),
     attributes,
+    needsGroup: pick.reach !== 'marketplace' && !pick.orgId,
   });
 
   const submit = () => {
@@ -200,7 +208,9 @@ export function ListingForm({
     const error = gaps[0]?.message ?? null;
     if (error) return toast(error);
 
-    onSubmit({ title, price, desc, categoryId, visibility, location, attributes });
+    // `...pick` rải đúng hai khoá `reach` + `orgId` — chúng đi liền nhau nên tách ra hai
+    // dòng chỉ mở chỗ cho một bên được cập nhật mà bên kia quên.
+    onSubmit({ title, price, desc, categoryId, ...pick, location, attributes });
   };
 
   return (
@@ -293,17 +303,16 @@ export function ListingForm({
               </View>
 
               <View style={styles.card}>
-              <FormSection flush step={4} title={toGroup ? 'Khu vực' : 'Khu vực & hiển thị'} />
-              {toGroup ? (
-                <View style={styles.toGroup}>
-                  <Text style={styles.toGroupLabel}>ĐĂNG VÀO NHÓM</Text>
-                  <Text style={styles.toGroupName}>{toGroup.name}</Text>
-                  <Text style={styles.toGroupHint}>
-                    Quản trị nhóm sẽ duyệt tin này. Tin chỉ hiện trong nhóm.
-                  </Text>
-                </View>
-              ) : (
-                <VisibilityPicker value={visibility} onChange={setVisibility} />
+              <FormSection flush step={4} title="Khu vực & hiển thị" />
+              {/* Form SỬA không bày thang: BE từ chối `reach` ở `PATCH` (nâng bậc = đổi bàn
+                  duyệt), nên một ô chọn ở đây chỉ hứa suông rồi nuốt lựa chọn của người dùng. */}
+              {initial ? null : (
+                <ListingReachField
+                  value={pick}
+                  groups={groups}
+                  locked={toGroup}
+                  onChange={setPicked}
+                />
               )}
               <LocationFields value={location} onChange={setLocation} />
               </View>
@@ -383,17 +392,6 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   descInput: { minHeight: 96, textAlignVertical: 'top', lineHeight: 22, fontFamily: F.ui },
-  toGroup: {
-    backgroundColor: C.mossLight,
-    borderRadius: 8,
-    padding: S.lg,
-    borderWidth: 1,
-    borderColor: C.moss,
-    marginBottom: S.lg,
-  },
-  toGroupLabel: { fontFamily: F.mono, fontSize: 9.5, letterSpacing: 1.2, color: C.moss },
-  toGroupName: { fontFamily: F.uiBold, fontSize: 15, color: C.ink, marginTop: S.xs },
-  toGroupHint: { fontFamily: F.ui, fontSize: 12, lineHeight: 18, color: C.inkSoft, marginTop: S.xs },
   // Nền đục + viền trên: nội dung cuộn qua bên dưới phải bị che hẳn, nếu không chữ sẽ chạy
   // lẫn vào nút và trông như lỗi render.
   /** Nhắc việc còn thiếu — canh giữa, ngay trên nút, cùng nhịp với `missing` của bản dựng. */

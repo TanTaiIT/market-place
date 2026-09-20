@@ -1,4 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { CategoryLogo } from './CategoryLogo';
 import type { AdminCategory } from '@/api/admin-content';
 import type { TemplateTarget } from '@/api/templates';
 import { C, F, R } from '@/theme';
@@ -74,9 +75,8 @@ export function TemplateCategoryBar({
                 pressed && { opacity: 0.7 },
               ]}
             >
-              <Text style={[styles.chipText, on && styles.chipTextOn]}>
-                {cat.icon ? `${cat.icon} ${cat.name}` : cat.name}
-              </Text>
+              <CategoryLogo category={cat} size="sm" />
+              <Text style={[styles.chipText, on && styles.chipTextOn]}>{cat.name}</Text>
             </Pressable>
           );
         })}
@@ -108,6 +108,9 @@ const styles = StyleSheet.create({
   divider: { width: 1, alignSelf: 'stretch', marginHorizontal: 2, backgroundColor: C.line },
   dividerDark: { backgroundColor: C.deskLineStrong },
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
     borderRadius: R.sm,
     paddingHorizontal: 14,
     paddingVertical: 9,

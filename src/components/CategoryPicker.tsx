@@ -10,36 +10,28 @@ import Animated, {
 import { scheduleOnRN } from 'react-native-worklets';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GlassSheen, glassFace } from './GlassSurface';
 import { Surface } from './Surface';
+import { CategoryLogo, categoryTint } from './CategoryLogo';
 import { EmptyState, Loading, ScreenHeader } from './ui';
 import type { Category } from '@/api/db';
-import { C, F, R, type Grad } from '@/theme';
+import { C, F, R } from '@/theme';
 
 /** Danh mục tạo trước khi icon thành bắt buộc: ô vẫn phải có hình, không để trơ một chỗ trống. */
 const NO_ICON = '▩';
 
-/**
- * Màu thẻ, lấy theo THỨ TỰ danh mục.
+/*
+ * Màu thẻ đã chuyển sang `CATEGORY_TINTS[…].strong`, tra bằng `categoryTint(cat.slug)`.
  *
- * Không sinh màu từ tên hay từ `id`: hash một chuỗi ObjectId ra màu nghĩa là thêm một danh mục ở
- * giữa danh sách thì cả bảng đổi màu, mà người dùng nhớ danh mục theo màu trước khi đọc chữ. Theo
- * index thì màu chỉ dịch khi master đổi `order` — đúng lúc đáng đổi. Cùng luật với `TILTS`:
- * biến thể thị giác suy ra từ index qua mảng hằng, không random trong render.
+ * Bảng cũ (`CATEGORY_GRADS`) tra bằng `[i % length]`, và chú thích của nó bác hash với lý do
+ * "thêm một danh mục ở giữa danh sách thì cả bảng đổi màu". Lý do đó đúng với INDEX chứ không
+ * đúng với hash: hash của mỗi slug độc lập nhau, chèn một danh mục vào giữa không đụng tới danh
+ * mục nào khác — còn theo index thì mọi danh mục đứng sau đều đổi màu. Điều mà chú thích cũ
+ * muốn bảo vệ ("người dùng nhớ danh mục theo màu trước khi đọc chữ") chính là lý do phải bỏ
+ * index.
  *
- * Dải chạy DỌC (chặng sáng ở trên, chặng tối ở dưới) và tên nằm ở đáy thẻ: chữ trắng đặt trên
- * chặng tối đạt ≥4.5:1 ở cả tám cặp, còn nếu để dải chạy chéo thì bốn cặp rơi xuống ~3:1.
+ * Ràng buộc tương phản của nó thì GIỮ NGUYÊN và đã kiểm lại: dải chạy DỌC, tên nằm ở đáy thẻ,
+ * chữ trắng trên chặng tối đạt ≥4.5:1 ở cả mười cặp.
  */
-const CATEGORY_GRADS: readonly Grad[] = [
-  ['#2FB56D', '#177F4C'],
-  ['#4A7FE0', '#2A55B0'],
-  ['#F2683C', '#C7461F'],
-  ['#7C5CE0', '#5533B5'],
-  ['#2BAFA8', '#127E79'],
-  ['#E85D8A', '#B93463'],
-  ['#B07A4B', '#85552C'],
-  ['#5A6A80', '#374559'],
-];
 
 /** Nhịp bấm: đủ để thấy thẻ nảy lên rồi mới rời màn, chưa đủ để cảm thấy máy treo. */
 const POP_MS = 130;
@@ -144,7 +136,6 @@ export function CategoryPicker({
                     key={cat.id}
                     cat={cat}
                     index={i}
-                    grad={CATEGORY_GRADS[i % CATEGORY_GRADS.length]}
                     selected={cat.id === value}
                     claim={claim}
                     onDone={onSelect}
@@ -166,14 +157,12 @@ export function CategoryPicker({
 function CategoryTile({
   cat,
   index,
-  grad,
   selected,
   claim,
   onDone,
 }: {
   cat: Category;
   index: number;
-  grad: Grad;
   selected: boolean;
   claim: () => boolean;
   onDone: (categoryId: string) => void;
@@ -219,7 +208,12 @@ function CategoryTile({
         onPress={press}
         style={({ pressed }) => [styles.hit, { transform: [{ scale: pressed ? 0.96 : 1 }] }]}
       >
-        <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={styles.tile}>
+        <LinearGradient
+          colors={categoryTint(cat.slug).strong}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.tile}
+        >
           {/* Quầng gương ở góc trên — cùng thủ pháp với hero bảng tin, để mặt thẻ không phẳng. */}
           <View pointerEvents="none" style={styles.gloss} />
 
@@ -227,10 +221,8 @@ function CategoryTile({
               thẻ thì nó ăn vào hộp nội dung, icon và tên dịch 2px mỗi lần mở lại màn. */}
           {selected && <View pointerEvents="none" style={styles.ring} />}
 
-          <View style={styles.disc}>
-            <GlassSheen />
-            <Text style={styles.glyph}>{cat.icon || NO_ICON}</Text>
-          </View>
+          {/* Kính chứ không phải nền màu: mặt thẻ ĐÃ mang sắc của chính danh mục này. */}
+          <CategoryLogo category={cat} size="md" tone="glass" />
 
           <Text style={styles.name} numberOfLines={2}>
             {cat.name}
@@ -295,16 +287,6 @@ const styles = StyleSheet.create({
     borderRadius: 48,
     backgroundColor: C.glass,
   },
-  disc: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    ...glassFace,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // Emoji không ăn `fontFamily`, nên ô này cố ý chỉ đặt cỡ chữ.
-  glyph: { fontSize: 23 },
   name: { fontFamily: F.uiBold, fontSize: 14, lineHeight: 18, color: '#fff' },
   badge: {
     position: 'absolute',

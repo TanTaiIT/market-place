@@ -1,22 +1,19 @@
 import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AdminFilter, AdminPanel, AdminScreen } from '@/components/AdminScreen';
-import { AdminSmallBtn, adminFormStyles } from '@/components/AdminPicker';
+import { AdminSmallBtn } from '@/components/AdminPicker';
 import { AdminOrgSheet } from '@/components/AdminOrgSheet';
 import { OrgCreateForm } from '@/components/OrgCreateForm';
-import { SlugField } from '@/components/SlugField';
-import { EmptyState, Loading, PagedFooter, PinButton, nearEnd } from '@/components/ui';
+import { EmptyState, Loading, PagedFooter, nearEnd } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import {
   useAllOrgs,
-  useChangeOrganizationSlug,
   useCreateOrganization,
   useSetOrgVisibility,
   useSetOrganizationStatus,
 } from '@/queries/org-admin';
 import { STATUS_FILTER, STATUS_LABEL } from '@/api/org-admin';
 import type { Organization, OrgStatus } from '@/api/org-admin';
-import { useOrgSlug, useSetActiveOrg } from '@/stores/auth';
 import { C, F } from '@/theme';
 
 /**
@@ -26,8 +23,8 @@ import { C, F } from '@/theme';
  * trước đọc `/organizations/mine` vì đó là route duy nhất trả `id`, mà master cố ý KHÔNG là
  * thành viên của org nào, nên bảng gần như luôn rỗng.
  *
- * Vì thế màn này cũng là nơi master CHỌN tổ chức đang thao tác: mọi màn org-scoped đọc
- * `X-Org-Slug`, mà `OrgSwitcher` trên hồ sơ thì dựng từ danh bạ thành viên.
+ * Bấm một dòng là mở ngăn chi tiết (`AdminOrgSheet`): danh bạ, người phụ trách, mã tham gia —
+ * gắn org vào từng lượt gọi, không đổi trạng thái app.
  */
 
 export default function AdminOrganizations() {
@@ -42,16 +39,9 @@ export default function AdminOrganizations() {
   const create = useCreateOrganization();
   const setOrgStatus = useSetOrganizationStatus();
   const setVisibility = useSetOrgVisibility();
-  const changeSlug = useChangeOrganizationSlug();
 
-  const activeSlug = useOrgSlug();
-  const setActiveOrg = useSetActiveOrg();
-
-  /** Tổ chức đang đổi slug; `null` = panel dưới đang ở chế độ tạo mới. */
-  const [editing, setEditing] = useState<Organization | null>(null);
   /** Tổ chức đang mở ngăn chi tiết. Giữ cả object: ngăn dựng phần đầu từ nó, không gọi lại BE. */
   const [detail, setDetail] = useState<Organization | null>(null);
-  const [slug, setSlug] = useState('');
 
   const fail = (e: Error) => toast(`⚠️ ${e.message}`);
   const rows = data ?? [];
@@ -113,7 +103,7 @@ export default function AdminOrganizations() {
         <TextInput
           value={term}
           onChangeText={setTerm}
-          placeholder="Tìm theo tên hoặc slug…"
+          placeholder="Tìm theo tên…"
           placeholderTextColor={C.deskTxtDim}
           style={styles.searchInput}
           returnKeyType="search"
@@ -139,7 +129,6 @@ export default function AdminOrganizations() {
         ) : (
           <View style={{ gap: 10 }}>
             {rows.map((org) => {
-              const acting = org.slug === activeSlug;
               return (
                 /*
                   Bấm vào HÀNG mở chi tiết (danh bạ + người phụ trách thật). Bốn nút bên trong
@@ -149,20 +138,16 @@ export default function AdminOrganizations() {
                 <Pressable
                   key={org.id}
                   onPress={() => setDetail(org)}
-                  style={({ pressed }) => [
-                    styles.row,
-                    acting && styles.rowActing,
-                    pressed && { opacity: 0.85 },
-                  ]}
+                  style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}
                 >
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={styles.name}>{org.name}</Text>
                     {/* Chỉ nói khi RIÊNG TƯ: công khai là mặc định, ghi ra chỉ làm loãng dòng. */}
                     <Text style={styles.meta}>
-                      /{org.slug} · {STATUS_LABEL[org.status]}
+                      {STATUS_LABEL[org.status]}
                       {org.isPublic ? '' : ' · 🙈 RIÊNG TƯ'}
                     </Text>
-                    {/* Mã để phát cho người xin vào (`/join-org`). `selectable` thay vì nút
+                    {/* Mã để phát cho người xin vào (`/find-org`). `selectable` thay vì nút
                         Copy: repo không có `expo-clipboard`, thêm native module cho sáu ký tự
                         là không đáng. */}
                     <Text selectable style={styles.code}>
@@ -170,21 +155,11 @@ export default function AdminOrganizations() {
                     </Text>
                   </View>
                   <View style={styles.acts}>
-                    {/* Đổi nhanh từ bảng; bộ chọn trên tiêu đề mọi màn org-scoped làm việc
-                        tương tự (`AdminOrgPicker`). */}
-                    <AdminSmallBtn
-                      label={acting ? '✓ Đang thao tác' : 'Thao tác trong'}
-                      onPress={() => setActiveOrg(acting ? null : org.slug)}
-                    />
-                    <AdminSmallBtn
-                      label="Đổi slug"
-                      onPress={() => {
-                        setEditing(org);
-                        // Mở ra ô TRỐNG chứ không nạp slug hiện tại: nạp vào thì lượt kiểm tra
-                        // đầu tiên báo "đã có tổ chức dùng slug này" — mà tổ chức đó chính là nó.
-                        setSlug('');
-                      }}
-                    />
+                    {/*
+                      Không còn nút "Thao tác trong": master không giữ "org đang thao tác" nữa
+                      (xem `AdminOrgPicker`). Nhìn vào một nhóm = bấm cả dòng → ngăn chi tiết
+                      (`AdminOrgSheet`), nơi gắn org vào từng lượt gọi chứ không vào trạng thái app.
+                    */}
                     {/*
                      * Một nút phản ánh trạng thái THẬT, không còn là cặp Khoá/Mở đoán mò:
                      * `GET /organizations` trả `status`, thứ `/organizations/mine` không có.
@@ -205,57 +180,20 @@ export default function AdminOrganizations() {
         )}
 
         <View style={{ marginTop: 18 }}>
-          {editing ? (
-            <AdminPanel
-              title={`Đổi slug cho ${editing.name}`}
-              note={`/${editing.slug} sẽ thành redirect 301`}
-            >
-              <SlugField value={slug} onChange={setSlug} />
-              <View style={adminFormStyles.formActs}>
-                <PinButton
-                  label="Lưu slug mới"
-                  loading={changeSlug.isPending}
-                  style={{ flex: 1 }}
-                  onPress={() =>
-                    changeSlug.mutate(
-                      { id: editing.id, slug: slug.trim() },
-                      {
-                        onSuccess: (o) => {
-                          // Tổ chức đang thao tác vừa đổi địa chỉ: giữ slug cũ trong store là
-                          // mọi request sau đó mang một `X-Org-Slug` không còn tồn tại.
-                          if (editing.slug === activeSlug) setActiveOrg(o.slug);
-                          setEditing(null);
-                          toast(`✓ ${o.name} giờ ở /${o.slug}`);
-                        },
-                        onError: fail,
-                      },
-                    )
-                  }
-                />
-                <Pressable
-                  onPress={() => setEditing(null)}
-                  style={({ pressed }) => [adminFormStyles.cancel, pressed && { opacity: 0.7 }]}
-                >
-                  <Text style={adminFormStyles.smallText}>Huỷ</Text>
-                </Pressable>
-              </View>
-            </AdminPanel>
-          ) : (
-            <AdminPanel title="Tạo tổ chức mới" note="người chủ phải có tài khoản trước">
-              <OrgCreateForm
-                busy={create.isPending}
-                onSubmit={(values, reset) =>
-                  create.mutate(values, {
-                    onSuccess: (o) => {
-                      reset();
-                      toast(`✓ Đã tạo ${o.name} (/${o.slug})`);
-                    },
-                    onError: fail,
-                  })
-                }
-              />
-            </AdminPanel>
-          )}
+          <AdminPanel title="Tạo tổ chức mới" note="người chủ phải có tài khoản trước">
+            <OrgCreateForm
+              busy={create.isPending}
+              onSubmit={(values, reset) =>
+                create.mutate(values, {
+                  onSuccess: (o) => {
+                    reset();
+                    toast(`✓ Đã tạo ${o.name}`);
+                  },
+                  onError: fail,
+                })
+              }
+            />
+          </AdminPanel>
         </View>
         <PagedFooter loading={isFetchingNextPage} onDark />
       </ScrollView>
@@ -291,7 +229,6 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 11,
   },
-  rowActing: { borderColor: C.pin, borderWidth: 1.5 },
   name: { fontFamily: F.uiBold, fontSize: 14, color: C.paper },
   code: {
     fontFamily: F.monoBold,

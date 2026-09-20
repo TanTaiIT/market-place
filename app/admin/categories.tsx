@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AdminPanel, AdminScreen } from '@/components/AdminScreen';
 import { AdminSmallBtn, adminFormStyles } from '@/components/AdminPicker';
 import { CategoryIconPicker } from '@/components/CategoryIconPicker';
+import { CategoryLogo } from '@/components/CategoryLogo';
 import { EmptyState, Field, Loading, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useAddCategory, useAdminCategories, useEditCategory } from '@/queries/admin-content';
@@ -87,12 +88,13 @@ export default function AdminCategories() {
             {rows.map((cat, i) => (
               <View key={cat.id} style={[styles.card, !cat.isActive && { opacity: 0.55 }]}>
                 <View style={styles.cardTop}>
+                  {/* Logo thật, cùng sắc mà danh mục này mang ở mọi màn người dùng — đây là chỗ
+                      quản trị đặt icon, nên cũng phải là chỗ họ thấy đúng kết quả. */}
+                  <CategoryLogo category={cat} size="sm" />
                   <View
                     style={[styles.chip, { transform: [{ rotate: i % 2 ? '1.3deg' : '-1.4deg' }] }]}
                   >
-                    <Text style={styles.chipText}>
-                      {cat.icon ? `${cat.icon} ${cat.name}` : cat.name}
-                    </Text>
+                    <Text style={styles.chipText}>{cat.name}</Text>
                   </View>
                 </View>
                 <Text style={styles.meta}>

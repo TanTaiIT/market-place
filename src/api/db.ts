@@ -35,10 +35,15 @@ export type Listing = {
   ward?: string;
   address?: string;
   /**
-   * Nơi tin hiển thị, và qua đó là AI DUYỆT nó. Form sửa tin phải nạp lại đúng lựa chọn cũ:
-   * để nó rơi về mặc định là lặng lẽ đẩy tin sang một hàng đợi khác chỉ vì người dùng sửa tiêu đề.
+   * Bậc phủ sóng — ai đọc được tin, và qua đó là AI DUYỆT nó.
+   *
+   * Thang bao nhau: `members` ⊂ `group_open` ⊂ `marketplace`. Tin `marketplace` VẪN nằm trong
+   * bảng tin nhóm của nó, nên đây không phải "chọn một trong hai bảng".
+   *
+   * Form sửa tin phải nạp lại đúng bậc cũ để hiển thị — BE KHÔNG cho sửa bậc sau khi đăng
+   * (`updateListingSchema` không nhận `reach`), vì nâng bậc là đổi bàn duyệt.
    */
-  visibility: 'org_internal' | 'public';
+  reach: 'members' | 'group_open' | 'marketplace';
   meta: string;
   /** Cặp màu dựng ảnh giả — dùng khi tin chưa có ảnh thật */
   photo: Grad;
@@ -199,7 +204,6 @@ export type Notif = {
 export type AuthSession = {
   userId: string;
   email: string;
-  orgSlug?: string;
   accessToken: string;
   refreshToken: string;
 };
@@ -336,14 +340,14 @@ export type SearchFilter = {
    */
   ward: string | null;
   /**
-   * Thu hẹp về tin NỘI BỘ của một nhóm mình đã tham gia. Giữ slug chứ không id: `X-Org-Slug`
-   * nhận slug, và URL kết quả đọc được bằng mắt.
+   * Thu hẹp về tin NỘI BỘ của một nhóm mình đã tham gia — `X-Org-Id` nhận đúng id này, nên
+   * URL kết quả mở lại được ở máy khác mà không phải tra gì thêm.
    *
    * Cùng luật với `ward`: chỉ có nghĩa khi có `province`. Danh sách nhóm để chọn được bày theo
    * tỉnh đang lọc (nhóm có địa bàn), nên bỏ hay đổi tỉnh là nhóm về `null` cùng lúc — không có
    * bộ lọc nào đang bật mà ngăn lọc lại không bày ra được.
    */
-  orgSlug: string | null;
+  orgId: string | null;
   categoryId: string | null;
   minPrice: number | null;
   maxPrice: number | null;
@@ -367,7 +371,7 @@ export const EMPTY_SEARCH: SearchFilter = {
   q: '',
   province: null,
   ward: null,
-  orgSlug: null,
+  orgId: null,
   categoryId: null,
   minPrice: null,
   maxPrice: null,
@@ -383,7 +387,7 @@ export const hasSearchCriteria = (f: SearchFilter): boolean =>
   f.q.trim().length > 0 ||
   f.province !== null ||
   f.ward !== null ||
-  f.orgSlug !== null ||
+  f.orgId !== null ||
   f.categoryId !== null ||
   f.minPrice !== null ||
   f.maxPrice !== null ||
@@ -393,19 +397,19 @@ export const hasSearchCriteria = (f: SearchFilter): boolean =>
  * Đã chọn nhóm thì tỉnh/xã KHÔNG lọc lên tin — chúng chỉ còn là ngữ cảnh để bày danh sách nhóm.
  *
  * Tin trong nhóm nằm ở tỉnh của NGƯỜI ĐĂNG, không phải tỉnh của nhóm: nhóm "kings" đặt ở Lâm
- * Đồng nhưng tin của nó đăng từ Hồ Chí Minh. Gửi cả `province` của nhóm lẫn `X-Org-Slug` là
+ * Đồng nhưng tin của nó đăng từ Hồ Chí Minh. Gửi cả `province` của nhóm lẫn `X-Org-Id` là
  * lấy giao của hai tập gần như rời nhau — đúng ca "chọn nhóm rồi tìm mà không ra tin nào".
  *
  * Ba nơi cùng hỏi hàm này — request, số bộ lọc đang bật, hàng chip ở trang kết quả — để thứ
  * hiện ra luôn đúng là thứ đã lọc, không có chip "📍 Lâm Đồng" đứng cạnh một kết quả toàn HCM.
  */
-export const locationApplies = (f: SearchFilter): boolean => f.orgSlug === null;
+export const locationApplies = (f: SearchFilter): boolean => f.orgId === null;
 
 /** Số bộ lọc đang bật, KHÔNG tính từ khoá — nó có ô riêng, không nằm trong ngăn lọc. */
 export const activeFilterCount = (f: SearchFilter): number => {
   const location = locationApplies(f) ? [f.province, f.ward] : [];
   return (
-    [...location, f.orgSlug, f.categoryId, f.minPrice, f.maxPrice].filter((v) => v !== null).length +
+    [...location, f.orgId, f.categoryId, f.minPrice, f.maxPrice].filter((v) => v !== null).length +
     Object.keys(f.attrs).length
   );
 };
@@ -453,7 +457,7 @@ export function searchToParams(f: SearchFilter): Record<string, string> {
   if (f.q.trim()) p.q = f.q.trim();
   if (f.province) p.province = f.province;
   if (f.province && f.ward) p.ward = f.ward;
-  if (f.province && f.orgSlug) p.org = f.orgSlug;
+  if (f.province && f.orgId) p.org = f.orgId;
   if (f.categoryId) p.categoryId = f.categoryId;
   if (f.minPrice !== null) p.minPrice = String(f.minPrice);
   if (f.maxPrice !== null) p.maxPrice = String(f.maxPrice);
@@ -495,7 +499,7 @@ export function paramsToSearch(p: Record<string, string | string[] | undefined>)
     // Xã trần (URL dán tay, thiếu tỉnh) bị bỏ: BE trả 400 cho nó, mà trang kết quả trắng vì một
     // param lẻ thì không ai đoán được vì sao — phần còn lại của bộ lọc vẫn dùng được.
     ward: province ? (oneParam(p.ward) ?? null) : null,
-    orgSlug: province ? (oneParam(p.org) ?? null) : null,
+    orgId: province ? (oneParam(p.org) ?? null) : null,
     categoryId: oneParam(p.categoryId) ?? null,
     minPrice: num(p.minPrice),
     maxPrice: num(p.maxPrice),

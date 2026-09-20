@@ -1,11 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminSystemApi, type ReportQuery } from '@/api/admin-system';
-import { useOrgSlug } from '@/stores/auth';
-import { qk } from './keys';
+import { ALL_ORGS, qk } from './keys';
 
 /**
  * Nhóm "Hệ thống": cụm từ cấm, catalog gói tin, số liệu định giá. Không mục nào đọc
- * `X-Org-Slug` — đổi tổ chức đang chọn không đổi một dòng nào ở đây.
+ * `X-Org-Id` — đổi tổ chức đang chọn không đổi một dòng nào ở đây.
  */
 
 /* ------------------------------- cụm cấm -------------------------------- */
@@ -91,12 +90,18 @@ export function useRemoveProduct() {
  * không cần tươi tới từng giây — đổi độ mịn qua lại sẽ đọc cache thay vì bắn lại một aggregate
  * quét cả bảng.
  */
-export function useListingReport(query: ReportQuery, enabled = true) {
-  // BE scope theo `X-Org-Slug` mà `http.ts` gắn sẵn: có org là bản của nhóm, không có là toàn sàn.
-  const orgSlug = useOrgSlug();
+/**
+ * Phạm vi báo cáo đến TỪ MÀN GỌI, không từ một "org đang thao tác" nào.
+ *
+ * `null` = toàn sàn (chỉ master đọc được). Chuỗi = một nhóm. Bản trước còn một nhánh
+ * `undefined` nghĩa là "đi theo org toàn cục" — nhánh đó biến mất cùng với chính cái org toàn
+ * cục. Khoá cache mang `ALL_ORGS` cho ca toàn sàn để nó không dùng chung ô với "chưa chọn".
+ */
+export function useListingReport(query: ReportQuery, enabled = true, orgId: string | null = null) {
   return useQuery({
-    queryKey: qk.adminListingReport(orgSlug ?? '-', query.granularity, query.from, query.to),
-    queryFn: () => adminSystemApi.getListingReport(query),
+    queryKey: qk.adminListingReport(orgId ?? ALL_ORGS, query.granularity, query.from, query.to),
+    // `null` (toàn sàn) ra `undefined` = không gắn header, đúng nhánh master của BE.
+    queryFn: () => adminSystemApi.getListingReport(query, orgId ?? undefined),
     staleTime: 5 * 60_000,
     enabled,
   });
@@ -109,11 +114,10 @@ export function useListingReport(query: ReportQuery, enabled = true) {
  * nhưng chỉ một tab đang mở. Thiếu cờ này thì mỗi lần đổi độ mịn là hai aggregate quét cả bảng
  * chạy song song, một trong hai không ai nhìn.
  */
-export function useUserReport(query: ReportQuery, enabled = true) {
-  const orgSlug = useOrgSlug();
+export function useUserReport(query: ReportQuery, enabled = true, orgId: string | null = null) {
   return useQuery({
-    queryKey: qk.adminUserReport(orgSlug ?? '-', query.granularity, query.from, query.to),
-    queryFn: () => adminSystemApi.getUserReport(query),
+    queryKey: qk.adminUserReport(orgId ?? ALL_ORGS, query.granularity, query.from, query.to),
+    queryFn: () => adminSystemApi.getUserReport(query, orgId ?? undefined),
     staleTime: 5 * 60_000,
     enabled,
   });

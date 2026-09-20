@@ -7,12 +7,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, EmptyState, Loading } from '@/components/ui';
 import { GuestGate } from '@/components/GuestGate';
 import { useIsAuthenticated } from '@/stores/auth';
-import { OrgSwitcher } from '@/components/OrgSwitcher';
 import { useToast } from '@/components/Toast';
 import { useSignOut } from '@/queries/auth';
 import { useProfile } from '@/queries/listings';
 import { useMyGrants } from '@/queries/admin';
-import { canOpenAdmin, isMaster, topRole } from '@/api/admin';
+import { canOpenAdmin, topRole } from '@/api/admin';
 import { C, F, G, shadow } from '@/theme';
 
 export default function Profile() {
@@ -21,7 +20,6 @@ export default function Profile() {
   const insets = useSafeAreaInsets();
   const { data: profile, error, isLoading, refetch } = useProfile();
   const { data: grants } = useMyGrants();
-  const master = isMaster(grants);
   const signOut = useSignOut();
 
   const isAuthenticated = useIsAuthenticated();
@@ -70,21 +68,6 @@ export default function Profile() {
           <Stat num={profile.rating} label="Đánh giá" />
         </View>
       </LinearGradient>
-
-      {/*
-        CHỈ master. Với người thường, "nhóm đang thao tác" không còn là thứ họ phải nghĩ tới:
-        đọc tin của nhóm và đăng tin vào nhóm đều làm ngay trên trang hồ sơ nhóm
-        (`/org/[slug]`), nên một cái công tắc toàn cục ở trang cá nhân chỉ tạo ra một trạng
-        thái ẩn mà họ đổi nhầm rồi không hiểu vì sao bảng tin đổi theo.
-
-        Master thì ngược lại: họ không thuộc nhóm nào, và phạm vi thao tác là thứ họ PHẢI
-        chỉ ra. Quản trị nhóm chọn phạm vi ngay trong bàn quản trị (`AdminOrgPicker`).
-      */}
-      {master && (
-        <View style={styles.orgBlock}>
-          <OrgSwitcher />
-        </View>
-      )}
 
       {/*
         Lối vào THỨ HAI của màn nhập mã — lối thứ nhất là lời mời tự bật ngay sau khi đăng ký
@@ -152,7 +135,6 @@ const styles = StyleSheet.create({
   stats: { flexDirection: 'row', gap: 28, marginTop: 18 },
   statNum: { fontFamily: F.monoBold, fontSize: 18, color: C.ink },
   statLabel: { fontFamily: F.ui, fontSize: 10.5, color: C.inkSoft, marginTop: 2 },
-  orgBlock: { paddingHorizontal: 16, marginTop: 14 },
 
   /* Nền vàng `tape` + viền trái: cùng ngôn ngữ "cần bạn để mắt" với các dải nhắc việc khác,
      không phải `danger` — chưa xác thực là việc chưa làm, không phải lỗi. */

@@ -26,26 +26,10 @@ type HttpSession = {
  * Cố tình KHÔNG giữ refresh token ở đây: nó chỉ cần cho đúng một lời gọi và store đã là SoT,
  * nhân bản thêm một bản nữa chỉ tăng chỗ có thể lệch.
  */
-/** Tên header org, dùng chung để chỗ ghi đè và chỗ mặc định không lệch nhau. */
-export const ORG_HEADER = 'X-Org-Slug';
+/** Tên header org. Mỗi lượt gọi tự gắn — xem `adminApi`/`orgApi`, tầng này không gắn hộ. */
+export const ORG_HEADER = 'X-Org-Id';
 
 let session: HttpSession | null = null;
-
-/**
- * Tổ chức đang thao tác, gắn vào MỌI request dưới dạng header `X-Org-Slug`.
- *
- * BE v2 không còn đọc org từ token: nó lấy theo subdomain (web) hoặc header này (app), rồi đối
- * chiếu `memberships` ngay tại request đó. Hệ quả cần nhớ khi đọc code này: rời tổ chức là mất
- * quyền NGAY, không phải chờ token hết hạn.
- *
- * `null` = chưa chọn org. Không gửi header rỗng: BE sẽ coi chuỗi rỗng là "không chỉ ra org" và
- * tự suy ra khi người dùng chỉ thuộc đúng một org — gửi `''` chỉ làm nhiễu log.
- */
-let activeOrgSlug: string | null = null;
-
-export function setActiveOrgSlug(next: string | null): void {
-  activeOrgSlug = next;
-}
 
 /**
  * Tăng mỗi khi access token đổi. `withAuthRetry` chụp mốc này TRƯỚC khi gửi để phân biệt hai
@@ -104,21 +88,23 @@ function refreshOnce(): Promise<string | null> {
  */
 const ORG_GONE_ERRORS = ['Organization đã bị khoá', 'Organization không tồn tại'];
 
-/**
- * Bỏ chọn org đang thao tác. Do `queries/auth` đẩy vào — `src/api/**` không được import
- * `stores/**` (folder.convention §6), cùng cách `setSessionRefresher` làm.
- */
-let orgGoneHandler: (() => void) | null = null;
-
-export function setOrgGoneHandler(next: (() => void) | null): void {
-  orgGoneHandler = next;
-}
-
 /** Org đang chọn đã bị khoá/xoá — LỰA CHỌN cũ, không phải phiên chết. */
 function isOrgGone(outcome: SdkOutcome): boolean {
   if (outcome.response?.status !== 403) return false;
   const message = errorMessage(outcome);
   return ORG_GONE_ERRORS.some((s) => message.includes(s));
+}
+
+/**
+ * Cùng phán quyết, nhưng đọc từ `Error` mà tầng query nhận được.
+ *
+ * PREDICATE chứ không phải callback đăng ký: bản trước là `setOrgGoneHandler`, một hàm toàn cục
+ * do `queries/auth` bơm vào để bỏ chọn "org đang thao tác". Không còn org toàn cục nào để bỏ
+ * chọn — phạm vi giờ sống trong `AdminOrgScope`, và nó tự hỏi câu này khi thấy lỗi, thay vì
+ * tầng HTTP với tay vào state của màn hình.
+ */
+export function isOrgGoneError(error: unknown): boolean {
+  return error instanceof Error && ORG_GONE_ERRORS.some((s) => error.message.includes(s));
 }
 
 /**
@@ -176,17 +162,14 @@ export async function withAuthRetry<T extends SdkOutcome>(call: () => Promise<T>
    * Org đang chọn đã bị khoá: bỏ chọn nó rồi trả lỗi về cho call-site, KHÔNG refresh.
    *
    * Refresh ở đây vừa vô nghĩa vừa tự sát: `auth.service.refresh` bên BE không đọc org, mà
-   * request refresh thì cũng mang đúng cái `X-Org-Slug` đó nên nó hỏng y hệt — rồi
+   * request refresh thì cũng mang đúng cái `X-Org-Id` đó nên nó hỏng y hệt — rồi
    * `refreshSession` dọn phiên và app đăng xuất người dùng vì một lý do không liên quan gì
    * tới phiên của họ. (BE giờ cũng miễn tenant cho `/auth/*`; đây là chốt thứ hai.)
    *
-   * Không gọi lại ngay: header org đọc từ `activeOrgSlug` của module này, mà giá trị đó chỉ
-   * đổi sau khi store re-render đẩy xuống — gọi lại lập tức là gửi đúng slug vừa bị từ chối.
+   * Không gọi lại ngay: id org nằm trong chính lượt gọi vừa hỏng, nên gọi lại là gửi đúng cái
+   * id vừa bị từ chối. Call-site phải bỏ chọn nhóm rồi mới thử lại.
    */
-  if (isOrgGone(first)) {
-    orgGoneHandler?.();
-    return first;
-  }
+  if (isOrgGone(first)) return first;
 
   // Chưa đăng nhập thì 401/404 là lỗi thật của request, không phải phiên hỏng.
   if (!session || !isDeadSession(first)) return first;
@@ -239,26 +222,15 @@ export const createClientConfig: CreateClientConfig = (config) => ({
   // Hàm chứ không phải giá trị: token đổi giữa các request, phải đọc lúc gửi mới đúng.
   auth: () => session?.accessToken,
   /**
-   * Gắn org đang chọn qua `fetch` chứ không qua `headers` của config: `headers` chỉ nhận giá
-   * trị TĨNH, đọc một lần lúc dựng client — mà org thì đổi giữa phiên (người dùng chuyển tổ
-   * chức) nên phải đọc đúng lúc gửi. Đây cũng là chỗ duy nhất làm được việc đó mà không phải
-   * import `client.gen.ts` vào đây: file đó import ngược lại chính `http.ts` làm runtime config.
+   * Chỉ còn gánh lỗi mạng. Header org KHÔNG gắn ở đây nữa: mỗi hàm api tự đặt `X-Org-Id` cho
+   * lượt gọi của nó.
+   *
+   * Cái mặc định cũ tiện nhưng nói dối — nó biến "nhóm tôi đang đứng" thành một BỘ LỌC ĐỌC ngầm
+   * trên mọi request, nên người thuộc hai nhóm chỉ bao giờ thấy được tin của một nhóm, và chẳng
+   * có chữ ký hàm nào cho thấy điều đó. Muốn thu hẹp theo nhóm thì dùng `?orgId=`, một tham số
+   * nhìn thấy được.
    */
   fetch: async (request) => {
-    // Kiểu khai của hey-api rộng hơn thực tế (`string | URL | Request`), nhưng client-fetch
-    // luôn dựng sẵn `Request` trước khi gọi. Thu hẹp bằng `instanceof` thay vì ép kiểu: nếu
-    // một bản sau đổi cách gọi, header chỉ đơn giản không được gắn thay vì nổ lúc chạy.
-    /*
-     * KHÔNG ghi đè header người gọi đã tự đặt. Org hoạt động là mặc định của cả app, nhưng
-     * vài chỗ cần đọc dữ liệu của MỘT tổ chức khác mà không kéo cả app sang đó — hồ sơ nhóm
-     * hiện danh bạ và tin của chính nhóm đang mở, trong khi người dùng vẫn đang thao tác ở
-     * nhóm khác. BE vẫn đối chiếu membership với slug nhận được, nên đây không phải lối vòng
-     * qua phân quyền: gửi slug của nhóm mình không thuộc về thì vẫn 403 như thường.
-     */
-    if (activeOrgSlug && request instanceof Request && !request.headers.has(ORG_HEADER)) {
-      request.headers.set(ORG_HEADER, activeOrgSlug);
-    }
-
     try {
       return await globalThis.fetch(request);
     } catch (err) {

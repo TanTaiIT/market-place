@@ -24,10 +24,10 @@ export type UserReportPoint = UserReport['points'][number];
  */
 export type ReportQuery = { granularity: ReportGranularity; from?: string; to?: string };
 import { relativeTime, unwrap } from './client';
-import { withAuthRetry } from './http';
+import { ORG_HEADER, withAuthRetry } from './http';
 
 /**
- * Nhóm "Hệ thống" của bàn quản trị — phần CHỈ master chạm được và KHÔNG đọc `X-Org-Slug`:
+ * Nhóm "Hệ thống" của bàn quản trị — phần CHỈ master chạm được và KHÔNG đọc `X-Org-Id`:
  * cụm từ cấm, catalog gói tin, số liệu định giá.
  *
  * Ba thứ này từng nằm cứng trong BE (`DEFAULT_BANNED_PHRASES`, `DEFAULT_LISTING_PRODUCTS`) và
@@ -193,15 +193,22 @@ export const adminSystemApi = {
 
   /**
    * Báo cáo đăng tin theo thời gian — chuỗi số theo ngày/tháng/năm. Master không kèm org: cả
-   * sàn; kèm `X-Org-Slug` (quản trị nhóm): tin mang dấu nhóm — nội bộ lẫn công khai do thành
+   * sàn; kèm `X-Org-Id` (quản trị nhóm): tin mang dấu nhóm — nội bộ lẫn công khai do thành
    * viên đăng trong ngữ cảnh nhóm.
    *
    * Khác `getPostingStats` ở câu hỏi: cái kia là ẢNH CHỤP một cửa sổ để chốt giá gói tin,
    * cái này là XU HƯỚNG. BE gộp cột theo múi giờ Việt Nam và trả kèm `timezone` — hiện nó
    * ra, đừng để người đọc tưởng "ngày" là ngày theo máy họ.
    */
-  async getListingReport(query: ReportQuery): Promise<ListingReport> {
-    const res = await withAuthRetry(() => listingReport({ query }));
+  /**
+   * `orgId` gắn `X-Org-Id` cho RIÊNG lượt gọi này — bộ lọc nhóm của master ở Thống kê không
+   * đổi "org đang thao tác" của cả app (xem `AdminOrgPicker`). Bỏ trống thì đi theo header toàn
+   * cục như mọi request khác — đường của quản trị nhóm.
+   */
+  async getListingReport(query: ReportQuery, orgId?: string): Promise<ListingReport> {
+    const res = await withAuthRetry(() =>
+      listingReport({ query, ...(orgId ? { headers: { [ORG_HEADER]: orgId } } : {}) }),
+    );
     return unwrap(res, 'Không tải được báo cáo đăng tin');
   },
 
@@ -214,8 +221,11 @@ export const adminSystemApi = {
    * Đọc `users` một mình là dễ mừng hụt — 1000 tài khoản mới mà 3 người đăng tin thì con
    * số đó là ảo.
    */
-  async getUserReport(query: ReportQuery): Promise<UserReport> {
-    const res = await withAuthRetry(() => userReport({ query }));
+  /** Cùng hợp đồng `orgId` với `getListingReport`. */
+  async getUserReport(query: ReportQuery, orgId?: string): Promise<UserReport> {
+    const res = await withAuthRetry(() =>
+      userReport({ query, ...(orgId ? { headers: { [ORG_HEADER]: orgId } } : {}) }),
+    );
     return unwrap(res, 'Không tải được báo cáo người dùng');
   },
 };

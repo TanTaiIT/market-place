@@ -36,14 +36,12 @@ import { ORG_HEADER, withAuthRetry } from './http';
 
 /**
  * Tổ chức + đơn xin tham gia. Tách khỏi `client.ts` vì file đó đã sát trần và cụm này có vòng
- * đời riêng: nó chạy TRƯỚC khi người dùng thuộc tổ chức nào, tức là trước khi có `X-Org-Slug`.
+ * đời riêng: nó chạy TRƯỚC khi người dùng thuộc tổ chức nào, tức là trước khi có `X-Org-Id`.
  */
 
 /**
- * Thẻ xem trước tổ chức, tra bằng mã tham gia.
- *
- * Thay cho `OrgSuggestion` của dropdown tra-theo-tên cũ: BE đã bỏ `orgSlug` khỏi đơn xin gia
- * nhập, nên tra theo tên không còn đường dẫn tới việc gửi đơn nữa.
+ * Thẻ xem trước tổ chức, tra bằng mã tham gia — cho người cầm mã nhận ra đúng nhóm trước khi
+ * bấm xin vào.
  */
 export type OrgCard = {
   name: string;
@@ -89,7 +87,7 @@ function untilText(iso: string): string {
  *
  * Ghi chú giữ lại từ bản cũ, vì nó là thứ không đọc ra được từ type: org bị KHOÁ vẫn nằm trong
  * danh sách này (BE cố ý giữ, để phân biệt "khoá" với "không còn"). Đọc `status` trước khi
- * chọn — gửi slug của một org không ACTIVE là ăn 403 ở mọi request.
+ * chọn — gửi id của một org không ACTIVE là ăn 403 ở mọi request.
  */
 export type MyOrg = MyOrganization;
 
@@ -108,26 +106,37 @@ export type JoinRequestRow = JoinRequest & {
 };
 
 export const orgApi = {
-  /** Một trang danh bạ của tổ chức đang hoạt động — màn Thành viên cuộn tới đâu tải tới đó. */
-  async members(page: number): Promise<Page<Member>> {
-    const res = await withAuthRetry(() => membershipList({ query: { page, limit: PAGE_SIZE } }));
+  /** Một trang danh bạ của MỘT nhóm — màn Thành viên cuộn tới đâu tải tới đó. */
+  async members(orgId: string, page: number): Promise<Page<Member>> {
+    const res = await withAuthRetry(() =>
+      membershipList({ query: { page, limit: PAGE_SIZE }, headers: { [ORG_HEADER]: orgId } }),
+    );
     return unwrapPage(res, 'Không tải được danh bạ thành viên', (m) => m);
   },
 
   /**
-   * Gỡ một người khỏi tổ chức đang thao tác.
+   * Gỡ một người khỏi nhóm `orgId`.
    *
    * BE lưu trữ chứ không xoá bản ghi — danh bạ cũ là dữ liệu của tổ chức. Hai chốt bên đó:
    * không tự gỡ mình (400), và không gỡ người cũng đang giữ quyền quản trị (403, cần master).
    */
-  async removeMember(userId: string): Promise<void> {
-    const res = await withAuthRetry(() => membershipRemove({ path: { userId } }));
+  async removeMember(orgId: string, userId: string): Promise<void> {
+    const res = await withAuthRetry(() =>
+      membershipRemove({ path: { userId }, headers: { [ORG_HEADER]: orgId } }),
+    );
     unwrap(res, 'Không gỡ được thành viên');
   },
 
-  async joinRequests(status: JoinRequestStatus | undefined, page: number): Promise<Page<JoinRequestRow>> {
+  async joinRequests(
+    orgId: string,
+    status: JoinRequestStatus | undefined,
+    page: number,
+  ): Promise<Page<JoinRequestRow>> {
     const res = await withAuthRetry(() =>
-      listJoinRequests({ query: { ...(status ? { status } : {}), page, limit: PAGE_SIZE } }),
+      listJoinRequests({
+        query: { ...(status ? { status } : {}), page, limit: PAGE_SIZE },
+        headers: { [ORG_HEADER]: orgId },
+      }),
     );
     return unwrapPage(res, 'Không đọc được hàng đợi đơn', (r) => ({
       ...r,
@@ -137,16 +146,24 @@ export const orgApi = {
   },
 
   /** `unitId` bỏ trống = vào tổ chức phẳng, không thuộc nhóm con nào. */
-  async approveRequest(id: string, unitId?: string | null): Promise<JoinRequest> {
+  async approveRequest(orgId: string, id: string, unitId?: string | null): Promise<JoinRequest> {
     const res = await withAuthRetry(() =>
-      approveJoinRequest({ path: { id }, body: { unitId: unitId ?? null } }),
+      approveJoinRequest({
+        path: { id },
+        body: { unitId: unitId ?? null },
+        headers: { [ORG_HEADER]: orgId },
+      }),
     );
     return unwrap(res, 'Không duyệt được đơn');
   },
 
-  async rejectRequest(id: string, reason?: string): Promise<JoinRequest> {
+  async rejectRequest(orgId: string, id: string, reason?: string): Promise<JoinRequest> {
     const res = await withAuthRetry(() =>
-      rejectJoinRequest({ path: { id }, body: { reason: reason || undefined } }),
+      rejectJoinRequest({
+        path: { id },
+        body: { reason: reason || undefined },
+        headers: { [ORG_HEADER]: orgId },
+      }),
     );
     return unwrap(res, 'Không từ chối được đơn');
   },
@@ -155,9 +172,12 @@ export const orgApi = {
    * Duyệt hàng loạt. BE duyệt từng đơn một và trả về số thành công/thất bại thay vì hỏng cả
    * lô — mùa nhập học một đơn hết hạn không được phép chặn 199 đơn còn lại.
    */
-  async bulkApprove(ids: string[], unitId?: string | null) {
+  async bulkApprove(orgId: string, ids: string[], unitId?: string | null) {
     const res = await withAuthRetry(() =>
-      bulkApproveJoinRequests({ body: { items: ids.map((id) => ({ id, unitId: unitId ?? null })) } }),
+      bulkApproveJoinRequests({
+        body: { items: ids.map((id) => ({ id, unitId: unitId ?? null })) },
+        headers: { [ORG_HEADER]: orgId },
+      }),
     );
     return unwrap(res, 'Không duyệt được lô đơn');
   },
@@ -174,17 +194,17 @@ export const orgApi = {
     return unwrap(res, 'Không tìm được nhóm nào');
   },
 
-  /** Hồ sơ nhóm công khai. Nhóm riêng tư trả 404 — không phân biệt được với slug không có thật. */
-  async profile(slug: string): Promise<OrgProfile> {
-    const res = await organizationPublicProfile({ path: { slug } });
+  /** Hồ sơ nhóm công khai. Nhóm riêng tư trả 404 — không phân biệt được với id không có thật. */
+  async profile(orgId: string): Promise<OrgProfile> {
+    const res = await organizationPublicProfile({ path: { organizationId: orgId } });
     return unwrap(res, 'Không tìm thấy nhóm này');
   },
 
   /**
    * Sửa hồ sơ nhóm — ảnh bìa, mô tả, nội quy.
    *
-   * BE lấy nhóm từ header `X-Org-Slug` chứ không từ đường dẫn (`PATCH /organizations/current`),
-   * nên phải gắn slug cho RIÊNG lượt gọi này: người đang sửa nhóm B không có nghĩa là họ muốn
+   * BE lấy nhóm từ header `X-Org-Id` chứ không từ đường dẫn (`PATCH /organizations/current`),
+   * nên phải gắn id cho RIÊNG lượt gọi này: người đang sửa nhóm B không có nghĩa là họ muốn
    * chuyển org đang thao tác của cả app sang B. Cùng lập luận với `memberPreview` ngay dưới.
    *
    * `requireOrgAdmin` của BE đứng nguyên — không phải thành viên quản trị thì nhận 403, phần
@@ -192,9 +212,9 @@ export const orgApi = {
    *
    * Field không gửi = giữ nguyên. `rules: []` là XOÁ HẾT nội quy, khác hẳn với không gửi.
    */
-  async update(slug: string, patch: UpdateOrganization): Promise<void> {
+  async update(orgId: string, patch: UpdateOrganization): Promise<void> {
     const res = await withAuthRetry(() =>
-      organizationUpdate({ body: patch, headers: { [ORG_HEADER]: slug } }),
+      organizationUpdate({ body: patch, headers: { [ORG_HEADER]: orgId } }),
     );
     unwrap(res, 'Không lưu được thông tin nhóm');
   },
@@ -202,26 +222,26 @@ export const orgApi = {
   /**
    * Vài thành viên đầu của MỘT nhóm cụ thể — hàng avatar trên hồ sơ nhóm.
    *
-   * Gắn `X-Org-Slug` cho riêng lượt gọi này thay vì đổi org đang thao tác của cả app: người
+   * Gắn `X-Org-Id` cho riêng lượt gọi này thay vì đổi org đang thao tác của cả app: người
    * dùng mở hồ sơ một nhóm khác không có nghĩa là họ muốn chuyển sang làm việc ở đó.
    *
-   * `requireMembership` của BE vẫn đứng nguyên — gửi slug của nhóm mình không thuộc về thì
+   * `requireMembership` của BE vẫn đứng nguyên — gửi id của nhóm mình không thuộc về thì
    * nhận 403, nên chỉ gọi khi hồ sơ trả `joined: true`.
    */
-  async memberPreview(slug: string, take: number): Promise<Member[]> {
+  async memberPreview(orgId: string, take: number): Promise<Member[]> {
     const res = await withAuthRetry(() =>
-      membershipList({ query: { limit: take }, headers: { [ORG_HEADER]: slug } }),
+      membershipList({ query: { limit: take }, headers: { [ORG_HEADER]: orgId } }),
     );
     return unwrap(res, 'Không đọc được danh bạ nhóm');
   },
 
   /**
-   * Một trang danh bạ của MỘT nhóm theo slug — ngăn chi tiết tổ chức của master. Cùng cách gắn
-   * `X-Org-Slug` riêng cho lượt gọi như `memberPreview`, nhưng phân trang thay vì lấy `take` dòng.
+   * Một trang danh bạ của MỘT nhóm theo id — ngăn chi tiết tổ chức của master. Cùng cách gắn
+   * `X-Org-Id` riêng cho lượt gọi như `memberPreview`, nhưng phân trang thay vì lấy `take` dòng.
    */
-  async memberPage(slug: string, page: number): Promise<Page<Member>> {
+  async memberPage(orgId: string, page: number): Promise<Page<Member>> {
     const res = await withAuthRetry(() =>
-      membershipList({ query: { page, limit: PAGE_SIZE }, headers: { [ORG_HEADER]: slug } }),
+      membershipList({ query: { page, limit: PAGE_SIZE }, headers: { [ORG_HEADER]: orgId } }),
     );
     return unwrapPage(res, 'Không đọc được danh bạ nhóm', (m) => m);
   },
@@ -234,7 +254,7 @@ export const orgApi = {
   /**
    * Xem trước tổ chức đứng sau một MÃ THAM GIA, trước khi gửi đơn.
    *
-   * Không cần đăng nhập và cố tình không trả `id`/`slug`: mã là thứ người ta dán cho nhau, nên
+   * Không cần đăng nhập và cố tình không trả `id`: mã là thứ người ta dán cho nhau, nên
    * endpoint này phải cho xem đủ để nhận ra đúng nơi mình định vào (tên, địa bàn, số thành
    * viên) mà không biến thành đường tra ngược ra định danh tổ chức.
    */
@@ -255,11 +275,11 @@ export const orgApi = {
   },
 
   /**
-   * Gửi đơn bằng MÃ THAM GIA, không còn bằng slug.
+   * Gửi đơn bằng MÃ THAM GIA (mọi nhóm) hoặc bằng `orgId` (chỉ nhóm công khai).
    *
-   * BE đổi khoá tra sang `joinCode` vì slug là địa chỉ công khai: ai đoán ra slug cũng gửi được
-   * đơn, và hàng đợi duyệt trở thành bề mặt spam mở. Mã do tổ chức phát ra và xoay được
-   * (`organizationRotateJoinCode`), nên phát nhầm thì thu lại được — slug thì không.
+   * Mã là cổng của nhóm kín: do tổ chức phát ra và xoay được (`organizationRotateJoinCode`),
+   * nên phát nhầm thì thu lại được. Id thì nằm trong mọi link chia sẻ và không đổi được — ai
+   * cầm link cũng gửi được đơn, nên BE chỉ nhận id cho nhóm vốn đã công khai.
    *
    * Muốn xem trước tên tổ chức trước khi gửi thì gọi `orgApi.byCode` — cùng mã, không cần đăng nhập.
    */
@@ -273,7 +293,7 @@ export const orgApi = {
    */
   async requestJoin(input: {
     code?: string;
-    slug?: string;
+    orgId?: string;
     claimedName: string;
     claimedUnit?: string;
     note?: string;
@@ -282,7 +302,7 @@ export const orgApi = {
       createJoinRequest({
         body: {
           // Đúng MỘT trong hai — BE `.refine()` từ chối nếu gửi cả hai hoặc không gửi gì.
-          ...(input.code ? { code: input.code.trim() } : { slug: input.slug }),
+          ...(input.code ? { code: input.code.trim() } : { orgId: input.orgId }),
           claimedName: input.claimedName,
           claimedUnit: input.claimedUnit || undefined,
           note: input.note || undefined,

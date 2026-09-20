@@ -1,4 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { CategoryLogo } from './CategoryLogo';
 import { ProvinceField, WardField } from './LocationPicker';
 import { AttrFilters } from './AttrFilters';
 import { PriceField } from './PriceField';
@@ -6,7 +7,7 @@ import { useCategories } from '@/queries/listings';
 import { useCategoryTemplate } from '@/queries/templates';
 import { useMyOrgs } from '@/queries/org';
 import type { ProvinceName } from '@/api/location';
-import type { SearchFilter } from '@/api/db';
+import type { Category, SearchFilter } from '@/api/db';
 import { C, F } from '@/theme';
 
 /**
@@ -51,7 +52,7 @@ export function SearchFilterPanel({
           // Đổi tỉnh là bỏ xã và nhóm NGAY tại đây, không đợi `WardField` tự dọn: nó chỉ dọn sau
           // khi danh sách xã mới tải xong, còn nút "Tìm kiếm" thì bấm được ngay — kịp lọt một xã
           // của tỉnh cũ xuống BE và ăn 400. Nhóm thì bày theo tỉnh, đổi tỉnh là danh sách khác.
-          patch({ province, ward: null, orgSlug: null });
+          patch({ province, ward: null, orgId: null });
         }}
         allowAll
       />
@@ -63,16 +64,16 @@ export function SearchFilterPanel({
         // Có nhóm thì tỉnh/xã không lọc lên tin (`locationApplies`): ô xã khoá và nói thẳng vì sao,
         // thay vì nhận một lựa chọn rồi lặng lẽ không dùng.
         disabledReason={
-          filter.orgSlug ? 'Đang lọc theo nhóm — bỏ chọn nhóm để lọc theo phường / xã' : undefined
+          filter.orgId ? 'Đang lọc theo nhóm — bỏ chọn nhóm để lọc theo phường / xã' : undefined
         }
       />
       {/* Chỉ sau khi đã chọn tỉnh — nhóm có địa bàn, chưa có tỉnh thì chưa biết bày nhóm nào. */}
       {filter.province ? (
         <OrgChips
           province={filter.province}
-          value={filter.orgSlug}
+          value={filter.orgId}
           // Chọn nhóm là bỏ xã: xã sẽ không được gửi lên nữa, giữ lại là một lựa chọn treo.
-          onChange={(orgSlug) => patch({ orgSlug, ward: orgSlug ? null : filter.ward })}
+          onChange={(orgId) => patch({ orgId, ward: orgId ? null : filter.ward })}
         />
       ) : null}
 
@@ -82,7 +83,8 @@ export function SearchFilterPanel({
         {(categories ?? []).map((c) => (
           <Chip
             key={c.id}
-            label={`${c.icon} ${c.name}`}
+            logo={c}
+            label={c.name}
             on={filter.categoryId === c.id}
             // Đổi danh mục là xoá sạch `attrs`: key của danh mục cũ không có trong template mới,
             // và BE sẽ trả 400 cho đúng những key đó. Giữ lại là biến một lượt bấm chip thành
@@ -129,7 +131,7 @@ export function SearchFilterPanel({
  *
  * Bày theo tỉnh vì nhóm là thứ có địa bàn (`provinceCode`): chọn "Hà Nội" rồi thấy hội nhiếp
  * ảnh Sài Gòn là một lựa chọn gần chắc trả về rỗng. Nhóm không khai tỉnh xếp SAU chứ không bị
- * loại — "không gắn tỉnh" khác "ở tỉnh khác". Nhóm bị khoá thì loại hẳn: gửi slug của nó là
+ * loại — "không gắn tỉnh" khác "ở tỉnh khác". Nhóm bị khoá thì loại hẳn: gửi id của nó là
  * ăn 403 ở mọi request.
  *
  * Khách chưa đăng nhập hoặc người chưa vào nhóm nào → không vẽ gì: khối này nói về nhóm CỦA
@@ -143,7 +145,7 @@ function OrgChips({
 }: {
   province: ProvinceName;
   value: string | null;
-  onChange: (slug: string | null) => void;
+  onChange: (orgId: string | null) => void;
 }) {
   const { data: orgs } = useMyOrgs();
   if (!orgs?.length) return null;
@@ -164,10 +166,10 @@ function OrgChips({
           <Chip label="Tất cả" on={value === null} onPress={() => onChange(null)} />
           {here.map((o) => (
             <Chip
-              key={o.slug}
+              key={o.id}
               label={`👥 ${o.name}`}
-              on={value === o.slug}
-              onPress={() => onChange(value === o.slug ? null : o.slug)}
+              on={value === o.id}
+              onPress={() => onChange(value === o.id ? null : o.id)}
             />
           ))}
         </ScrollView>
@@ -176,12 +178,29 @@ function OrgChips({
   );
 }
 
-function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
+function Chip({
+  label,
+  logo,
+  on,
+  onPress,
+}: {
+  label: string;
+  /** Vắng = viên không thuộc danh mục nào ("Tất cả", chip khu vực) — không có sắc để mang. */
+  logo?: Category;
+  on: boolean;
+  onPress: () => void;
+}) {
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.chip, on && styles.chipOn, pressed && { opacity: 0.7 }]}
+      style={({ pressed }) => [
+        styles.chip,
+        !logo && styles.chipBare,
+        on && styles.chipOn,
+        pressed && { opacity: 0.7 },
+      ]}
     >
+      {!!logo && <CategoryLogo category={logo} size="sm" />}
       <Text style={[styles.chipText, on && { color: C.paperWarm }]}>{label}</Text>
     </Pressable>
   );
@@ -201,12 +220,18 @@ const styles = StyleSheet.create({
   chips: { gap: 7, paddingBottom: 14 },
   hint: { fontFamily: F.ui, fontSize: 12, color: C.inkSoft, marginBottom: 14 },
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     borderWidth: 1,
     borderColor: C.lineInput,
     borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    // Trái hẹp hơn phải vì logo đã là một khối vuông có nền — xem `chipBare` cho nhánh không logo.
+    paddingLeft: 5,
+    paddingRight: 12,
+    paddingVertical: 4,
   },
+  chipBare: { paddingLeft: 12, paddingVertical: 6 },
   chipOn: { backgroundColor: C.moss, borderColor: C.moss },
   chipText: { fontFamily: F.ui, fontSize: 12, color: C.ink },
 });

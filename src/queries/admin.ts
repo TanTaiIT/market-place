@@ -4,38 +4,41 @@ import { adminApi, canModeratePublicAxis, isMaster } from '@/api/admin';
 import type { AdminEvent, ModStatus } from '@/api/admin';
 import type { RerouteListing } from '@/api/generated';
 import { joinAdminRoom, leaveAdminRoom, onSocketEvent } from '@/api/socket';
-import { useIsAuthenticated, useOrgSlug } from '@/stores/auth';
-import { qk } from './keys';
+import { useAdminOrgId } from '@/components/AdminOrgScope';
+import { useIsAuthenticated } from '@/stores/auth';
+import { NO_ORG, qk } from './keys';
 import { usePagedList } from './paged';
 import { useCategories } from './listings';
 
 /**
- * Bàn quản trị của MỘT tổ chức — tổ chức đang thao tác, không phải tổ chức trong token.
+ * Bàn quản trị của MỘT tổ chức.
  *
- * BE v2 lấy org từ header `X-Org-Slug` (`api/http.ts`), nên không hook nào ở đây nhận tham số
- * tổ chức. Hai hệ quả bắt buộc phải xử lý, và cả hai đều nằm ngay dưới:
+ * Mỗi hook đọc `useAdminOrgId()` rồi TRUYỀN XUỐNG hàm api — tầng HTTP không gắn `X-Org-Id` hộ
+ * nữa, nên id phải đi qua chữ ký hàm. Hai hệ quả bắt buộc phải xử lý, và cả hai nằm ngay dưới:
  *
- * 1. `orgSlug` phải nằm TRONG KEY — nếu không, đổi tổ chức xong vẫn đọc trúng cache của tổ
+ * 1. `orgId` phải nằm TRONG KEY — nếu không, đổi tổ chức xong vẫn đọc trúng cache của tổ
  *    chức cũ. Master là người duy nhất đổi tổ chức, và cũng là người ít có khả năng nhận ra
  *    con số đang thuộc về nơi khác.
  * 2. `enabled` phải chặn khi chưa chọn tổ chức. Master cố ý không thuộc tổ chức nào nên
- *    `activeOrgSlug` khởi đầu là `null`; không chặn thì mọi màn quản trị bắn request rồi ăn
+ *    phạm vi khởi đầu là rỗng; không chặn thì mọi màn quản trị bắn request rồi ăn
  *    403 "Chưa xác định được tổ chức" từ `requireOrg`.
  */
 
 /* -------------------------------- queries -------------------------------- */
 
 export function useAdminOverview() {
-  const orgSlug = useOrgSlug();
+  const orgId = useAdminOrgId();
   return useQuery({
-    queryKey: qk.adminOverview(orgSlug ?? '-'),
-    queryFn: adminApi.getOverview,
-    enabled: Boolean(orgSlug),
+    queryKey: qk.adminOverview(orgId ?? NO_ORG),
+    // `orgId!`: `enabled` ngay dưới đã chặn ca rỗng, và `/moderation/overview` là route DUY
+    // nhất của cụm này đòi org thật (`requireOrg`) — master chưa chọn nhóm không đọc được.
+    queryFn: () => adminApi.getOverview(orgId!),
+    enabled: Boolean(orgId),
   });
 }
 
 /**
- * Tổng quan trục danh mục. KHÔNG mang `orgSlug` trong key và không `enabled` theo slug: phạm vi
+ * Tổng quan trục danh mục. KHÔNG mang `orgId` trong key và không `enabled` theo id: phạm vi
  * tới từ `role_grants` của chính người gọi, đổi tổ chức đang chọn không đổi một dòng số liệu nào.
  */
 export function usePublicOverview() {
@@ -45,11 +48,11 @@ export function usePublicOverview() {
   });
 }
 export function useAdminActivity() {
-  const orgSlug = useOrgSlug();
+  const orgId = useAdminOrgId();
   return useQuery({
-    queryKey: qk.adminActivity(orgSlug ?? '-'),
-    queryFn: adminApi.getEvents,
-    enabled: Boolean(orgSlug),
+    queryKey: qk.adminActivity(orgId ?? NO_ORG),
+    queryFn: () => adminApi.getEvents(orgId),
+    enabled: Boolean(orgId),
   });
 }
 
@@ -96,7 +99,7 @@ export function useAdminListings(
   status?: ModStatus,
   filter: { category?: string; q?: string } = {},
 ) {
-  const orgSlug = useOrgSlug();
+  const orgId = useAdminOrgId();
   const master = isMaster(useMyGrants().data);
   const { data: categories } = useCategories();
 
@@ -111,24 +114,28 @@ export function useAdminListings(
 
   const names = new Map((categories ?? []).map((c) => [c.id, c.name]));
   return usePagedList(
-    qk.adminListings(orgSlug ?? '-', status ?? 'all', filter.category ?? 'all', settled),
-    (page) => adminApi.getListings(status, names, page, { category: filter.category, q: settled }),
+    qk.adminListings(orgId ?? NO_ORG, status ?? 'all', filter.category ?? 'all', settled),
+    (page) =>
+      adminApi.getListings(orgId, status, names, page, {
+        category: filter.category,
+        q: settled,
+      }),
     {
       // `|| master`: BE mở các route ĐỌC này cho master chưa chọn org (`requireOrgReadOrMaster`),
       // nên chặn ở client là tự khoá lại đúng thứ vừa mở.
-      enabled: (Boolean(orgSlug) || master) && categories !== undefined,
+      enabled: (Boolean(orgId) || master) && categories !== undefined,
       keepPrevious: true,
     },
   );
 }
 
 export function useAdminReports() {
-  const orgSlug = useOrgSlug();
+  const orgId = useAdminOrgId();
   const grants = useMyGrants().data;
-  return usePagedList(qk.adminReports(orgSlug ?? '-'), adminApi.getReports, {
+  return usePagedList(qk.adminReports(orgId ?? NO_ORG), (page) => adminApi.getReports(orgId, page), {
     // Ba lối vào, không cần org: master đọc xuyên tổ chức; người phụ trách ô trục công khai thấy
-    // báo cáo trong ô mình (BE dựng ô từ grant). Quản trị org thì cần slug như cũ.
-    enabled: Boolean(orgSlug) || isMaster(grants) || canModeratePublicAxis(grants),
+    // báo cáo trong ô mình (BE dựng ô từ grant). Quản trị org thì cần id như cũ.
+    enabled: Boolean(orgId) || isMaster(grants) || canModeratePublicAxis(grants),
   });
 }
 
@@ -141,9 +148,10 @@ export function useAdminReports() {
  */
 export function useSetListingStatus() {
   const qc = useQueryClient();
+  const orgId = useAdminOrgId();
   return useMutation({
     mutationFn: (v: { id: string; status: ModStatus; reason?: string }) =>
-      adminApi.setStatus(v.id, v.status, v.reason),
+      adminApi.setStatus(orgId, v.id, v.status, v.reason),
     onSettled: () => qc.invalidateQueries({ queryKey: qk.adminRoot() }),
   });
 }
@@ -158,8 +166,9 @@ export function useSetListingStatus() {
  */
 export function useBumpListing() {
   const qc = useQueryClient();
+  const orgId = useAdminOrgId();
   return useMutation({
-    mutationFn: (id: string) => adminApi.bump(id),
+    mutationFn: (id: string) => adminApi.bump(orgId, id),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: qk.adminRoot() });
       void qc.invalidateQueries({ queryKey: qk.listings() });
@@ -185,17 +194,19 @@ export function useRerouteListing() {
 
 export function useRemoveModListing() {
   const qc = useQueryClient();
+  const orgId = useAdminOrgId();
   return useMutation({
-    mutationFn: (id: string) => adminApi.remove(id),
+    mutationFn: (id: string) => adminApi.remove(orgId, id),
     onSettled: () => qc.invalidateQueries({ queryKey: qk.adminRoot() }),
   });
 }
 
 export function useResolveReport() {
   const qc = useQueryClient();
+  const orgId = useAdminOrgId();
   return useMutation({
     mutationFn: (v: { id: string; hideTarget: boolean }) =>
-      adminApi.resolveReport(v.id, v.hideTarget),
+      adminApi.resolveReport(orgId, v.id, v.hideTarget),
     onSettled: () => qc.invalidateQueries({ queryKey: qk.adminRoot() }),
   });
 }
@@ -213,11 +224,11 @@ export function useResolveReport() {
  */
 export function useAdminActivityStream(): void {
   const qc = useQueryClient();
-  const orgSlug = useOrgSlug();
+  const orgId = useAdminOrgId();
 
   useEffect(() => {
     // Không có tổ chức nào đang chọn thì không có dòng "Vừa diễn ra" nào để đẩy vào.
-    if (!orgSlug) return;
+    if (!orgId) return;
 
     const onActivity = (payload: unknown) => {
       const log = payload as { id?: string; actorName?: string; summary?: string };
@@ -229,14 +240,14 @@ export function useAdminActivityStream(): void {
        */
       if (!log?.id || !log.summary || !log.actorName) return;
 
-      qc.setQueryData<AdminEvent[]>(qk.adminActivity(orgSlug), (old = []) => [
+      qc.setQueryData<AdminEvent[]>(qk.adminActivity(orgId), (old = []) => [
         { id: log.id!, tone: 'info', text: `${log.actorName} · ${log.summary}`, time: 'vừa xong' },
         // Chốt trùng: cùng một sự kiện có thể tới hai lần (nối lại socket, hoặc một lượt
         // refetch chạy xen giữa). Lọc theo id rẻ hơn nhiều so với đi tìm một dòng lặp.
         ...old.filter((e) => e.id !== log.id).slice(0, 19),
       ]);
       // Thẻ số đổi theo mỗi thao tác duyệt — để BE tính lại thay vì đoán ở client.
-      qc.invalidateQueries({ queryKey: qk.adminOverview(orgSlug) });
+      qc.invalidateQueries({ queryKey: qk.adminOverview(orgId) });
     };
 
     joinAdminRoom();
@@ -246,5 +257,5 @@ export function useAdminActivityStream(): void {
       leaveAdminRoom();
       off();
     };
-  }, [qc, orgSlug]);
+  }, [qc, orgId]);
 }

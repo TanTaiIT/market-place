@@ -8,7 +8,7 @@ import {
 import type { Category as CategoryDto } from './generated';
 import { PAGE_SIZE, relativeTime, unwrap, unwrapPage } from './client';
 import type { Page } from './client';
-import { withAuthRetry } from './http';
+import { ORG_HEADER, withAuthRetry } from './http';
 
 /**
  * Nhóm "Nội dung" của bàn quản trị: danh mục và thông báo đẩy. Cả hai là **cấu hình** — quản
@@ -139,9 +139,12 @@ export const adminContentApi = {
    * nào, nên thông báo họ vừa gửi cho một nhóm không nằm trong hộp thư của họ — panel này sẽ
    * báo gửi xong rồi hiện một danh sách không có nó.
    */
-  async getNotices(page: number): Promise<Page<SentNotice>> {
+  async getNotices(orgId: string, page: number): Promise<Page<SentNotice>> {
     const res = await withAuthRetry(() =>
-      notificationList({ query: { page, limit: PAGE_SIZE, scope: 'managed' } }),
+      notificationList({
+        query: { page, limit: PAGE_SIZE, scope: 'managed' },
+        headers: { [ORG_HEADER]: orgId },
+      }),
     );
     return unwrapPage(res, 'Không tải được thông báo đã gửi', (n) => ({
       id: n.id,
@@ -158,13 +161,17 @@ export const adminContentApi = {
    * Không trả "số người nhận": BE không có con số đó, và bịa ra một con số cho một hành động
    * không rút lại được là kiểu nói dối tệ nhất.
    */
-  async sendNotice(input: { title: string; body: string; unitId: string | null }) {
+  async sendNotice(
+    orgId: string,
+    input: { title: string; body: string; unitId: string | null },
+  ) {
     if (!input.title.trim() || !input.body.trim()) {
       throw new Error('Điền tiêu đề và nội dung trước khi gửi');
     }
     const res = await withAuthRetry(() =>
       notificationCreate({
         body: { title: input.title.trim(), body: input.body.trim(), unitId: input.unitId },
+        headers: { [ORG_HEADER]: orgId },
       }),
     );
     return unwrap(res, 'Không gửi được thông báo');

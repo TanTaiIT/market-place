@@ -1,16 +1,8 @@
 import React from 'react';
-import {
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { CategoryLogo } from './CategoryLogo';
 import { ListingSlide, SlideRow } from './ListingSlide';
-import { squareUrl } from '@/api/cloudinary';
-import { gradOf, initialsOf } from '@/api/client';
+import { OrgFace } from './OrgFace';
 import type { Category, Listing, Profile } from '@/api/db';
 import type { OrgRow } from '@/api/org';
 import { SectionHead } from './SectionHead';
@@ -120,23 +112,11 @@ export function CategoryStrip({
             onPress={() => onOpen(cat.id)}
             style={({ pressed }) => [styles.circleItem, pressed && { opacity: 0.75 }]}
           >
-            {/*
-              Nền màu suy từ `cat.id`, cùng bảng với vòng tròn nhóm ngay dưới — hai dải trên
-              một màn hình phải cùng một ngôn ngữ, nền trắng phẳng làm dải này trông như chưa
-              tải xong.
-
-              Dùng được vì `NEW_PHOTOS` là bộ pastel dịu (`#EFCB9C`…`#D9C2C2`): emoji danh mục
-              tự nó đã có màu, nên nền phải NHẠT hơn nó chứ không tranh với nó. Cùng `id` luôn
-              ra cùng màu, nên một danh mục giữ đúng màu đó ở mọi lần mở.
-            */}
-            <LinearGradient
-              colors={gradOf(cat.id)}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.circle, styles.circleCenter]}
-            >
-              <Text style={styles.circleIcon}>{cat.icon}</Text>
-            </LinearGradient>
+            {/* Nền, cỡ và bóng đổ của vòng tròn đều do `CategoryLogo` giữ — cùng sắc mà danh
+                mục này mang ở hàng chip và ở màn đăng tin. */}
+            <View style={styles.circleWrap}>
+              <CategoryLogo category={cat} size="lg" />
+            </View>
             <Text numberOfLines={1} style={styles.circleName}>
               {cat.name}
             </Text>
@@ -164,7 +144,7 @@ export function OrgNearbyStrip({
   area: Profile['area'];
   orgs: OrgRow[];
   grid?: boolean;
-  onOpen: (slug: string) => void;
+  onOpen: (orgId: string) => void;
 }) {
   if (!area) return null;
 
@@ -190,48 +170,28 @@ export function OrgNearbyStrip({
         }
       />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-        {nearby.map((org) => {
-          // Avatar nếu có, không thì ảnh bìa. Tính MỘT lần: gọi hai lần rồi `!` để dập cảnh
-          // báo null là tự tay tắt đúng thứ đang bảo vệ mình.
-          const face = org.avatarUrl || org.coverUrl;
-          return (
+        {nearby.map((org) => (
           <Pressable
-            key={org.slug}
-            onPress={() => onOpen(org.slug)}
+            key={org.id}
+            onPress={() => onOpen(org.id)}
             style={({ pressed }) => [styles.circleItem, pressed && { opacity: 0.75 }]}
           >
-            {/*
-              Ba bậc: avatar → ẢNH BÌA → chữ viết tắt.
-
-              Bìa làm bậc hai vì màn sửa hồ sơ nhóm hỏi bìa TRƯỚC avatar, nên nhóm có ảnh mà
-              chưa đặt avatar là ca thường gặp nhất — bỏ bậc này là hiện chữ viết tắt cho một
-              nhóm đang có ảnh hẳn hoi. `squareUrl` cắt theo chủ thể, không cắt giữa mù.
-            */}
-            {face ? (
-              <View style={styles.circle}>
-                <Image
-                  source={{ uri: squareUrl(face, 200) }}
-                  style={StyleSheet.absoluteFill}
-                  resizeMode="cover"
-                />
-              </View>
-            ) : (
-              <LinearGradient
-                colors={gradOf(org.slug)}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.circle, styles.circleCenter]}
-              >
-                <Text style={styles.circleInitials}>{initialsOf(org.name)}</Text>
-              </LinearGradient>
-            )}
+            {/* Chuỗi ba bậc avatar → bìa → chữ viết tắt nằm trong `OrgFace` — cùng một bản với
+                hai thẻ nhóm ở màn khám phá, nên một nhóm hiện ra giống nhau ở mọi bề mặt. */}
+            <OrgFace
+              seed={org.id}
+              name={org.name}
+              avatarUrl={org.avatarUrl}
+              coverUrl={org.coverUrl}
+              style={[styles.circle, styles.circleWrap]}
+              initialsSize={24}
+            />
             <Text numberOfLines={1} style={styles.circleName}>
               {org.name}
             </Text>
             <Text style={styles.circleCount}>{org.memberCount} thành viên</Text>
           </Pressable>
-          );
-        })}
+        ))}
       </ScrollView>
     </View>
   );
@@ -256,13 +216,9 @@ const styles = StyleSheet.create({
     marginBottom: S.sm,
     ...shadow,
   },
-  circleCenter: { alignItems: 'center', justifyContent: 'center' },
-
-  /* Hai dòng này là HÌNH, không phải chữ — emoji danh mục và chữ cái đầu trong vòng tròn 74px.
-     Chúng cố tình đứng ngoài thang `T`: buộc chúng vào thang chữ là để một vòng tròn trang trí
-     kéo theo cả phân cấp tiêu đề. */
-  circleIcon: { fontSize: 30 },
-  circleInitials: { fontFamily: F.uiBold, fontSize: 24, color: '#fff' },
+  /* Khoảng thở dưới vòng tròn. Phải ở lớp bọc chứ không nhét vào `CategoryLogo`/`OrgFace`: cùng
+     cỡ đó cũng dùng ở chỗ khác, và lề là việc của bố cục quanh nó. */
+  circleWrap: { marginBottom: S.sm },
   circleName: { fontFamily: F.uiBold, ...T.sm, color: C.ink, maxWidth: 96 },
   circleCount: { fontFamily: F.ui, ...T.xs, color: C.muted },
 });

@@ -1,83 +1,71 @@
 import { useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
-import { OrgRowCard } from '@/components/OrgRowCard';
-import { useToast } from '@/components/Toast';
-import { useMyOrgs, useRequestJoin } from '@/queries/org';
-import { useOrgDiscover } from '@/queries/org-discover';
-import { useProfile } from '@/queries/listings';
-import type { OrgRow } from '@/api/org';
+import { OrgGrid, type OrgGridSection } from '@/components/OrgGrid';
+import { useMyOrgs } from '@/queries/org';
+import { normalizeVi } from '@/api/location';
+import type { MyOrg } from '@/api/org';
 import { C, F } from '@/theme';
 
 /**
- * Khám phá nhóm.
+ * Nhóm của tôi — CHỈ những nhóm mình đang ở trong, lưới hai cột, ô tìm lọc đúng danh sách đó.
  *
- * Thay hẳn màn "nhập mã để gửi đơn" cũ: giờ tìm theo TÊN, xem gợi ý, mở hồ sơ nhóm rồi mới
- * quyết định vào. Cái mã không mất vai trò — nó vẫn là đường DUY NHẤT vào nhóm riêng tư, và gõ
- * mã vào chính ô này sẽ nhảy thẳng tới hồ sơ nhóm đó.
+ * Không còn phần "Gợi ý cho bạn" và không còn tra mã ở đây: hai thứ đó là việc TÌM nhóm mới,
+ * còn màn này trả lời "tôi đang ở những nhóm nào". Trộn hai câu hỏi vào một danh sách là lý do
+ * bản trước phải loại nhóm mình khỏi kết quả tìm — và người dùng gõ tên nhóm mình thì không
+ * thấy nó ở đâu.
  *
- * Nhóm riêng tư không bao giờ xuất hiện trong kết quả tìm: BE lọc `isPublic` ở repository, nên
- * gõ đúng tên một nhóm kín cũng không lộ ra nó có tồn tại.
+ * Lọc tại chỗ vì `useMyOrgs` đã tải trọn danh sách; `normalizeVi` để "hung" ra "Hùng Vương".
  */
 
-/** Mọi nhóm tới được danh sách này đều công khai — nhóm riêng tư bị BE lọc từ repository. */
-function metaOf(org: OrgRow): string {
-  const where = [org.district, org.provinceCode].filter(Boolean).join(', ');
-  const count = org.memberCount.toLocaleString('vi-VN');
-  return [`Công khai · ${count} thành viên`, org.joinCode, where].filter(Boolean).join(' · ');
-}
+const roleOf = (org: MyOrg) => (org.role === 'admin' ? 'Quản trị nhóm' : 'Thành viên');
 
-export default function JoinOrg() {
+export default function MyOrgs() {
   const router = useRouter();
-  const toast = useToast();
   const [term, setTerm] = useState('');
 
-  const { data: profile } = useProfile();
-  const { data: mine } = useMyOrgs();
-  const { data, error, isPending } = useOrgDiscover(term);
-  const join = useRequestJoin();
-
-  const myOrgs = mine ?? [];
-  const mySlugs = new Set(myOrgs.map((o) => o.slug));
-  const rows = (data ?? []).filter((o) => !mySlugs.has(o.slug));
-  /* Gõ trúng mã thì BE trả đúng một dòng — dấu hiệu đủ chắc để tô đậm nó. */
-  const exactCode = term.trim().length >= 4 && rows.length === 1;
-
-  const open = (slug: string) => router.push(`/org/${slug}`);
-
   /*
-   * Gửi đơn thẳng từ danh sách bằng SLUG — chỉ nhóm công khai mới có mặt ở đây, và BE nhận
-   * slug cho đúng nhóm đó. Tên khai báo lấy từ hồ sơ: bắt gõ lại tên mình ngay trong một danh
-   * sách đang lướt là chặn đúng thao tác vừa mở ra cho nhanh.
+   * `isLoading` chứ KHÔNG `isPending`: `useMyOrgs` tắt query khi chưa đăng nhập, mà query tắt
+   * thì `isPending` là `true` mãi mãi — khách lạc vào đây sẽ nhìn một vòng xoay không bao giờ
+   * dừng. `isLoading` chỉ đúng khi query THẬT SỰ đang bay.
    */
-  const requestJoin = (org: OrgRow) =>
-    join.mutate(
-      { slug: org.slug, claimedName: profile?.name ?? '' },
-      {
-        // Nhóm công khai vào ngay, nhóm riêng tư mới có đơn chờ — xem `orgApi.requestJoin`.
-        onSuccess: (res) =>
-          toast(
-            res.status === 'approved'
-              ? `✓ Đã tham gia ${org.name}`
-              : `✓ Đã gửi đơn vào ${org.name}`,
-          ),
-        onError: (e: Error) => toast(`⚠️ ${e.message}`),
-      },
-    );
+  const { data: mine, error, isLoading } = useMyOrgs();
+
+  const needle = normalizeVi(term);
+  const myOrgs = (mine ?? []).filter((o) => !needle || normalizeVi(o.name).includes(needle));
+
+  const sections: OrgGridSection[] = [
+    {
+      key: 'mine',
+      title: `Nhóm của bạn (${myOrgs.length})`,
+      cards: myOrgs.map((o) => ({
+        key: o.id,
+        id: o.id,
+        name: o.name,
+        avatarUrl: o.avatarUrl,
+        coverUrl: o.coverUrl,
+        // `/organizations/mine` không trả số thành viên hay mã — thẻ tự giấu hai ô đó.
+        where: o.provinceCode ?? undefined,
+        action: 'joined',
+        role: roleOf(o),
+        onPress: () => router.push(`/org/${o.id}`),
+      })),
+    },
+  ];
 
   return (
     // `SafeAreaView` chứ không `View`: `ScreenHeader` không tự chừa lề trên — xem docblock của nó.
     <SafeAreaView style={{ flex: 1, backgroundColor: C.cork }} edges={['top']}>
-      <ScreenHeader title="Nhóm" />
+      <ScreenHeader title="Nhóm của tôi" />
 
       <View style={styles.search}>
         <Text style={styles.searchGlyph}>🔍</Text>
         <TextInput
           value={term}
           onChangeText={setTerm}
-          placeholder="Tên nhóm hoặc mã nhóm..."
+          placeholder="Tìm trong nhóm của bạn..."
           placeholderTextColor={C.muted}
           style={styles.searchInput}
           autoCorrect={false}
@@ -85,70 +73,17 @@ export default function JoinOrg() {
         />
       </View>
 
-      <Text style={styles.hint}>
-        Nhập tên nhóm để xem gợi ý, hoặc nhập mã như <Text style={styles.code}>HV-CHO</Text> để
-        vào thẳng nhóm.
-      </Text>
-
-      <FlatList
-        data={rows}
-        keyExtractor={(o) => o.slug}
-        contentContainerStyle={styles.list}
-        keyboardShouldPersistTaps="handled"
-        ListHeaderComponent={
-          exactCode ? (
-            <Text style={styles.exactTag}>KHỚP MÃ {rows[0].joinCode}</Text>
-          ) : myOrgs.length === 0 ? undefined : (
-            <View style={{ gap: 10, marginBottom: 6 }}>
-              <Text style={styles.section}>NHÓM CỦA BẠN ({myOrgs.length})</Text>
-              {myOrgs.map((o) => (
-                // `/organizations/mine` không trả mã hay số thành viên — dòng phụ chỉ nói
-                // được vai của mình, và đó là thứ đúng nhất có ở đây.
-                <OrgRowCard
-                  key={o.id}
-                  slug={o.slug}
-                  name={o.name}
-                  // Thiếu hai dòng này là nhóm CỦA MÌNH hiện dải màu trơn, trong khi nhóm
-                  // người lạ ngay dưới lại có ảnh — nhìn như nhóm mình bị lỗi.
-                  avatarUrl={o.avatarUrl}
-                  coverUrl={o.coverUrl}
-                  meta={`${o.role === 'admin' ? 'Quản trị nhóm' : 'Thành viên'} · /${o.slug}`}
-                  action="joined"
-                  onPress={() => open(o.slug)}
-                />
-              ))}
-              <Text style={[styles.section, { marginTop: 8 }]}>GỢI Ý CHO BẠN</Text>
-            </View>
-          )
-        }
-        renderItem={({ item }) => (
-          <OrgRowCard
-            exact={exactCode}
-            // Nhóm riêng tư chỉ lọt vào đây qua đường gõ đúng mã, nên ổ khoá đi cùng ca đó.
-            locked={exactCode && !item.allowJoinRequests}
-            slug={item.slug}
-            name={item.name}
-            avatarUrl={item.avatarUrl}
-            coverUrl={item.coverUrl}
-            meta={metaOf(item)}
-            action={item.allowJoinRequests ? 'join' : 'closed'}
-            onPress={() => open(item.slug)}
-            onJoin={() => requestJoin(item)}
-          />
-        )}
-        ListEmptyComponent={
-          isPending ? (
+      <OrgGrid
+        sections={sections}
+        empty={
+          isLoading ? (
             <Loading />
           ) : error ? (
             <EmptyState icon="📡" text={(error as Error).message} />
           ) : (
             <EmptyState
-              icon="🔍"
-              text={
-                term
-                  ? `Không có nhóm công khai nào khớp "${term}". Nhóm riêng tư chỉ vào được bằng mã.`
-                  : 'Chưa có nhóm công khai nào để gợi ý'
-              }
+              icon="👥"
+              text={term ? `Không có nhóm nào của bạn khớp "${term}"` : 'Bạn chưa tham gia nhóm nào'}
             />
           )
         }
@@ -158,46 +93,23 @@ export default function JoinOrg() {
 }
 
 const styles = StyleSheet.create({
+  /*
+   * Viền `lineInput`, không phải `pin`: `pin` là `#FF4D4D`, trùng byte với `C.danger`. Một ô
+   * tìm kiếm viền đỏ đọc ra là "ô này đang lỗi" trước khi người ta gõ chữ nào.
+   */
   search: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
     marginHorizontal: 16,
     marginTop: 4,
+    marginBottom: 6,
     paddingHorizontal: 13,
     borderRadius: 10,
     backgroundColor: C.paperWarm,
-    borderWidth: 1.5,
-    borderColor: C.pin,
+    borderWidth: 1,
+    borderColor: C.lineInput,
   },
   searchGlyph: { fontSize: 14 },
   searchInput: { flex: 1, paddingVertical: 12, fontFamily: F.ui, fontSize: 14, color: C.ink },
-  hint: {
-    fontFamily: F.ui,
-    fontSize: 11.5,
-    lineHeight: 17,
-    color: C.sand,
-    marginHorizontal: 16,
-    marginTop: 8,
-  },
-  code: { fontFamily: F.monoBold, color: C.tape },
-  section: {
-    fontFamily: F.mono,
-    fontSize: 10,
-    letterSpacing: 1.2,
-    color: C.sand,
-    marginTop: 12,
-  },
-  list: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 32, gap: 10 },
-  exactTag: {
-    alignSelf: 'flex-start',
-    fontFamily: F.monoBold,
-    fontSize: 9.5,
-    color: C.paper,
-    backgroundColor: C.moss,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 3,
-    marginBottom: 4,
-  },
 });

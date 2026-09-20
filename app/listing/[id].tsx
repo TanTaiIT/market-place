@@ -22,6 +22,7 @@ import { useIsAuthenticated } from '@/stores/auth';
 import { useRecordRecent } from '@/stores/recent';
 import { useListing, useSavedIds, useToggleSaved } from '@/queries/listings';
 import { useOpenConversation } from '@/queries/chat';
+import { ListingHiddenError } from '@/api/client';
 import { useCreateReport } from '@/queries/report';
 import { C, F, T, shadow } from '@/theme';
 
@@ -144,10 +145,14 @@ export default function ListingDetail() {
     );
 
   if (isLoading) return <Loading />;
-  // `isLoading` chỉ true ở lần fetch đầu: query hỏng hoặc id không tồn tại đều rơi xuống đây,
-  // nếu không có nhánh này màn hình đứng ở spinner vĩnh viễn và lỗi không hiện ở đâu cả.
+  // `isLoading` chỉ true ở lần fetch đầu, nên lỗi và id không tồn tại đều rơi xuống đây. 404 là
+  // ổ khoá kèm CẢ HAI khả năng (đã gỡ / nội bộ nhóm) — vì sao không tách: xem `ListingHiddenError`.
+  // Khách được nhắc đăng nhập: là thành viên thì đăng nhập là mở được ngay.
   if (error || !listing) {
-    return <EmptyState icon="📡" text={(error as Error | null)?.message ?? 'Không tìm thấy tin này'} />;
+    const hidden = error instanceof ListingHiddenError;
+    const guestHint = isAuthenticated ? '' : ' Nếu bạn là thành viên nhóm đó, hãy đăng nhập rồi mở lại.';
+    const fallback = (error as Error | null)?.message ?? 'Không tìm thấy tin này';
+    return <EmptyState icon={hidden ? '🔒' : '📡'} text={hidden ? error.message + guestHint : fallback} />;
   }
 
   return (

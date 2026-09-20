@@ -88,7 +88,7 @@ export function AdminPickerField<T extends string>({
   );
 }
 
-/** Nút phụ trên thẻ của bàn quản trị — "Sửa", "Xoá", "Khoá", "Đổi slug". */
+/** Nút phụ trên thẻ của bàn quản trị — "Sửa", "Xoá", "Khoá". */
 export function AdminSmallBtn({ label, onPress }: { label: string; onPress: () => void }) {
   return (
     <Pressable

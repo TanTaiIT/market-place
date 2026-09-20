@@ -108,7 +108,7 @@ export default function Feed() {
         <OrgNearbyStrip
           orgs={orgs ?? []}
           area={profile?.area ?? null}
-          onOpen={(slug) => router.push(`/org/${slug}`)}
+          onOpen={(id) => router.push(`/org/${id}`)}
         />
         <FeedSuggested onOpen={(id) => router.push(`/listing/${id}`)} />
 
@@ -161,8 +161,8 @@ export default function Feed() {
           onMyListings={() =>
             requireAuth(() => router.push('/mylistings'), 'Đăng nhập để xem tin của bạn')
           }
-          onOrg={(slug) => router.push(`/org/${slug}`)}
-          onFindOrg={() => requireAuth(() => router.push('/join-org'), 'Đăng nhập để vào nhóm')}
+          onOrg={(id) => router.push(`/org/${id}`)}
+          onFindOrg={() => requireAuth(() => router.push('/find-org'), 'Đăng nhập để vào nhóm')}
         />
       </Animated.View>
     </Surface>

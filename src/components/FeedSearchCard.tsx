@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { categoryLabel } from './CategoryLogo';
 import { PickerSheet } from './PickerSheet';
 import type { PickerSearch } from './PickerSheet';
 import { useProvinceSearch } from './LocationPicker';
@@ -37,7 +38,7 @@ export function FeedSearchCard({
       const kw = keyword.trim().toLowerCase();
       return categories
         .filter((c) => c.name.toLowerCase().includes(kw))
-        .map((c) => ({ key: c.id, label: c.icon ? `${c.icon} ${c.name}` : c.name }));
+        .map((c) => ({ key: c.id, label: categoryLabel(c) }));
     },
     [categories],
   );
@@ -71,7 +72,7 @@ export function FeedSearchCard({
       <Row
         icon="🏷️"
         label="Danh mục"
-        value={active ? [active.icon, active.name].filter(Boolean).join(' ') : 'Tất cả danh mục'}
+        value={active ? categoryLabel(active) : 'Tất cả danh mục'}
         onPress={() => setPicking('category')}
       />
       <View style={styles.sep} />

@@ -19,6 +19,8 @@ export type ListingDraft = {
   /** Field động ĐANG HIỆN của danh mục đã chọn — đã lọc `showIf` bởi `AttrFields`. */
   attrFields: TemplateField[];
   attributes: ListingAttributes;
+  /** Đã chọn bậc trong nhóm mà chưa chỉ ra nhóm nào — `routeListing` bên BE từ chối tổ hợp đó. */
+  needsGroup: boolean;
 };
 
 /** Một chỗ chưa xong: `label` để liệt kê ở chân form, `message` để nói rõ lúc bấm gửi. */
@@ -71,6 +73,10 @@ export function listingDraftGaps(draft: ListingDraft): DraftGap[] {
         message: `⚠️ Nhập "${f.label}" — danh mục này bắt buộc`,
       });
     }
+  }
+
+  if (draft.needsGroup) {
+    gaps.push({ label: 'nhóm', message: '⚠️ Chọn nhóm sẽ đăng vào, hoặc chuyển sang đăng lên sàn' });
   }
 
   const where = locationGap(draft.location);

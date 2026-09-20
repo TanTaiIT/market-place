@@ -155,8 +155,8 @@ export function GhostButton({ label, onPress }: { label: string; onPress?: () =>
  *
  * Quên bọc thì `paddingTop: 12` là tất cả những gì có, và nút quay lại nằm ở y=12 — lọt dưới
  * đồng hồ / Dynamic Island, nơi iOS không chuyển cú chạm xuống app. Người dùng bấm mãi không
- * được và không có gì trên màn hình cho biết vì sao. Đã xảy ra ở `org/[slug]/index`,
- * `org/[slug]/edit` và `join-org` — cả ba đều dùng `<View>` trần.
+ * được và không có gì trên màn hình cho biết vì sao. Đã xảy ra ở `org/[id]/index`,
+ * `org/[id]/edit` và `join-org` — cả ba đều dùng `<View>` trần.
  */
 export function ScreenHeader({
   title,

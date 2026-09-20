@@ -129,11 +129,12 @@ export function AdminSystemOverview() {
           </View>
         </View>
 
-        <AdminPanel title="Chia theo trục" note="tin đăng">
+        <AdminPanel title="Chia theo bậc phủ sóng" note="tin đăng">
           <Split
             rows={[
-              { label: 'Trục công khai', value: listings.publicAxis },
-              { label: 'Nội bộ tổ chức', value: listings.orgInternal },
+              { label: 'Trên sàn', value: listings.marketplace },
+              { label: 'Nhóm mở', value: listings.groupOpen },
+              { label: 'Chỉ thành viên', value: listings.members },
             ]}
           />
         </AdminPanel>
@@ -152,7 +153,7 @@ export function AdminSystemOverview() {
           <SectionTitle title="Nhịp hoạt động" note="14 ngày gần nhất" />
           <AdminPanel title="Tin đăng mỗi ngày" note="liền: đã duyệt · đứt: chờ duyệt">
             <TrendChart
-              data={listings.trend.map((d) => ({ approved: d.approved, pending: d.pending }))}
+              data={listings.trend}
             />
           </AdminPanel>
         </View>

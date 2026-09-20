@@ -123,116 +123,6 @@ export type UserReport = {
     };
 };
 
-export type Organization = {
-    id: string;
-    name: string;
-    slug: string;
-    joinCode: string;
-    avatarUrl: string | null;
-    description: string;
-    orgType: 'school' | 'company' | 'community' | 'generic';
-    verificationTier: 'unverified' | 'claimed' | 'verified';
-    provinceCode: string | null;
-    status: 'active' | 'suspended' | 'pending_admin';
-    isPublic: boolean;
-};
-
-export type OrganizationLookup = {
-    name: string;
-    slug: string;
-    joinCode: string;
-    avatarUrl: string | null;
-    coverUrl: string | null;
-    memberCount: number;
-    district: string | null;
-    provinceCode: string | null;
-    allowJoinRequests: boolean;
-    allowOutsiderPosts: boolean;
-};
-
-export type OrganizationProfile = {
-    name: string;
-    slug: string;
-    joinCode: string;
-    avatarUrl: string | null;
-    coverUrl: string | null;
-    description: string;
-    provinceCode: string | null;
-    district: string | null;
-    memberCount: number;
-    postsThisWeek: number;
-    rules: Array<string>;
-    feedLayout: 'feed' | 'grid';
-    allowJoinRequests: boolean;
-    allowOutsiderPosts: boolean;
-    joined: boolean;
-};
-
-export type MyOrganization = {
-    id: string;
-    name: string;
-    slug: string;
-    avatarUrl: string | null;
-    coverUrl: string | null;
-    provinceCode: string | null;
-    role: string;
-    unitId: string | null;
-    feedLayout: 'feed' | 'grid';
-    status: 'active' | 'suspended' | 'pending_admin';
-};
-
-export type UpdateOrganization = {
-    name?: string;
-    description?: string;
-    avatarUrl?: string | null;
-    coverUrl?: string | null;
-    allowJoinRequests?: boolean;
-    allowOutsiderPosts?: boolean;
-    rules?: Array<string>;
-    feedLayout?: 'feed' | 'grid';
-};
-
-export type OrganizationCard = {
-    name: string;
-    avatarUrl: string | null;
-    description: string;
-    provinceCode: string | null;
-    district: string | null;
-    memberCount: number;
-    allowJoinRequests: boolean;
-};
-
-export type SlugAvailability = {
-    slug: string;
-    available: boolean;
-    reason?: 'invalid' | 'reserved' | 'taken';
-    suggestions?: Array<string>;
-};
-
-export type CreateOrganization = {
-    name: string;
-    slug?: string;
-    orgType?: 'school' | 'company' | 'community' | 'generic';
-    provinceCode?: string;
-    district?: string;
-};
-
-export type SetOrganizationStatus = {
-    status: 'active' | 'suspended';
-};
-
-export type ChangeOrganizationSlug = {
-    slug: string;
-};
-
-export type OrgManager = {
-    userId: string;
-    name: string | null;
-    email: string | null;
-    avatar: string | null;
-    grantedAt: string;
-};
-
 export type CreateListing = {
     title: string;
     description: string;
@@ -249,9 +139,9 @@ export type CreateListing = {
     attributes?: {
         [key: string]: string | number | boolean | Array<string>;
     };
-    visibility?: 'org_internal' | 'public';
+    reach?: 'members' | 'group_open' | 'marketplace';
     provinceCode?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
-    orgSlug?: string;
+    orgId?: string;
 };
 
 export type PostingFee = {
@@ -347,15 +237,12 @@ export type UpdateListing = {
     attributes?: {
         [key: string]: string | number | boolean | Array<string>;
     };
-    visibility?: 'org_internal' | 'public';
-    provinceCode?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
-    orgSlug?: string;
 };
 
 export type Listing = {
     _id: string;
     organizationId: string | null;
-    visibility: 'org_internal' | 'public';
+    reach: 'members' | 'group_open' | 'marketplace';
     provinceCode: string;
     title: string;
     slug: string;
@@ -420,9 +307,107 @@ export type FavoriteStatus = {
     favorited: boolean;
 };
 
+export type Organization = {
+    id: string;
+    name: string;
+    joinCode: string;
+    avatarUrl: string | null;
+    description: string;
+    orgType: 'school' | 'company' | 'community' | 'generic';
+    verificationTier: 'unverified' | 'claimed' | 'verified';
+    provinceCode: string | null;
+    status: 'active' | 'suspended' | 'pending_admin';
+    isPublic: boolean;
+};
+
+export type OrganizationLookup = {
+    id: string;
+    name: string;
+    joinCode: string;
+    avatarUrl: string | null;
+    coverUrl: string | null;
+    memberCount: number;
+    district: string | null;
+    provinceCode: string | null;
+    allowJoinRequests: boolean;
+    allowOutsiderPosts: boolean;
+};
+
+export type OrganizationProfile = {
+    id: string;
+    name: string;
+    joinCode: string;
+    avatarUrl: string | null;
+    coverUrl: string | null;
+    description: string;
+    provinceCode: string | null;
+    district: string | null;
+    memberCount: number;
+    postsThisWeek: number;
+    rules: Array<string>;
+    feedLayout: 'feed' | 'grid';
+    allowJoinRequests: boolean;
+    allowOutsiderPosts: boolean;
+    isPublic: boolean;
+    joined: boolean;
+};
+
+export type MyOrganization = {
+    id: string;
+    name: string;
+    avatarUrl: string | null;
+    coverUrl: string | null;
+    provinceCode: string | null;
+    role: string;
+    unitId: string | null;
+    isPublic: boolean;
+    feedLayout: 'feed' | 'grid';
+    status: 'active' | 'suspended' | 'pending_admin';
+};
+
+export type UpdateOrganization = {
+    name?: string;
+    description?: string;
+    avatarUrl?: string | null;
+    coverUrl?: string | null;
+    allowJoinRequests?: boolean;
+    allowOutsiderPosts?: boolean;
+    rules?: Array<string>;
+    feedLayout?: 'feed' | 'grid';
+};
+
+export type OrganizationCard = {
+    name: string;
+    avatarUrl: string | null;
+    description: string;
+    provinceCode: string | null;
+    district: string | null;
+    memberCount: number;
+    allowJoinRequests: boolean;
+};
+
+export type CreateOrganization = {
+    name: string;
+    orgType?: 'school' | 'company' | 'community' | 'generic';
+    provinceCode?: string;
+    district?: string;
+};
+
+export type SetOrganizationStatus = {
+    status: 'active' | 'suspended';
+};
+
+export type OrgManager = {
+    userId: string;
+    name: string | null;
+    email: string | null;
+    avatar: string | null;
+    grantedAt: string;
+};
+
 export type CreateJoinRequest = {
     code?: string;
-    slug?: string;
+    orgId?: string;
     claimedName: string;
     claimedUnit?: string;
     note?: string;
@@ -515,7 +500,7 @@ export type InvitePreview = {
 };
 
 export type AcceptInviteResult = {
-    organizationSlug: string;
+    organizationId: string;
 };
 
 export type CreateRoleGrant = {
@@ -863,8 +848,9 @@ export type SystemMetrics = {
         total: number;
         new7d: number;
         new30d: number;
-        publicAxis: number;
-        orgInternal: number;
+        marketplace: number;
+        groupOpen: number;
+        members: number;
         active: number;
         pending: number;
         hidden: number;
@@ -1080,7 +1066,7 @@ export type AuthRegisterErrors = {
      */
     400: ErrorResponse;
     /**
-     * Organization slug đã tồn tại
+     * Email đã có tài khoản
      */
     409: ErrorResponse;
     /**
@@ -1113,13 +1099,9 @@ export type AuthLoginData = {
 
 export type AuthLoginErrors = {
     /**
-     * Sai thông tin đăng nhập, tài khoản bị khoá, hoặc thiếu organization
+     * Sai thông tin đăng nhập hoặc tài khoản bị khoá
      */
     401: ErrorResponse;
-    /**
-     * Organization không tồn tại hoặc đã bị khoá
-     */
-    403: ErrorResponse;
     /**
      * Quá nhiều request
      */
@@ -1880,7 +1862,8 @@ export type ListingListData = {
         province?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
         ward?: string;
         condition?: 'new' | 'like_new' | 'used';
-        visibility?: 'org_internal' | 'public';
+        reach?: Array<'members' | 'group_open' | 'marketplace'>;
+        orgId?: string;
         minPrice?: number | null;
         maxPrice?: number | null;
         attrs?: string;
@@ -2005,7 +1988,8 @@ export type ListingMineData = {
         province?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
         ward?: string;
         condition?: 'new' | 'like_new' | 'used';
-        visibility?: 'org_internal' | 'public';
+        reach?: Array<'members' | 'group_open' | 'marketplace'>;
+        orgId?: string;
         minPrice?: number | null;
         maxPrice?: number | null;
         attrs?: string;
@@ -2132,7 +2116,7 @@ export type ListingGetByIdData = {
 
 export type ListingGetByIdErrors = {
     /**
-     * Không tìm thấy tin hoặc tin chưa được public
+     * Không tìm thấy tin, tin chưa được public, hoặc tin nội bộ của nhóm mà bạn không thuộc về
      */
     404: ErrorResponse;
 };
@@ -2602,7 +2586,7 @@ export type CreateOrganizationErrors = {
      */
     404: ErrorResponse;
     /**
-     * Slug đã tồn tại hoặc bị cấm
+     * Không sinh được mã nhóm, thử lại
      */
     409: ErrorResponse;
 };
@@ -2766,53 +2750,18 @@ export type SetOrganizationVisibilityResponses = {
 
 export type SetOrganizationVisibilityResponse = SetOrganizationVisibilityResponses[keyof SetOrganizationVisibilityResponses];
 
-export type ChangeOrganizationSlugData = {
-    body?: ChangeOrganizationSlug;
+export type OrganizationPublicProfileData = {
+    body?: never;
     path: {
         organizationId: string;
     };
     query?: never;
-    url: '/organizations/{organizationId}/slug';
-};
-
-export type ChangeOrganizationSlugErrors = {
-    /**
-     * Cần quyền master
-     */
-    403: ErrorResponse;
-    /**
-     * Slug mới đã tồn tại hoặc bị cấm
-     */
-    409: ErrorResponse;
-};
-
-export type ChangeOrganizationSlugError = ChangeOrganizationSlugErrors[keyof ChangeOrganizationSlugErrors];
-
-export type ChangeOrganizationSlugResponses = {
-    /**
-     * Đã đổi slug
-     */
-    200: {
-        success: true;
-        message: string;
-        data: Organization;
-    };
-};
-
-export type ChangeOrganizationSlugResponse = ChangeOrganizationSlugResponses[keyof ChangeOrganizationSlugResponses];
-
-export type OrganizationPublicProfileData = {
-    body?: never;
-    path: {
-        slug: string;
-    };
-    query?: never;
-    url: '/organizations/profile/{slug}';
+    url: '/organizations/profile/{organizationId}';
 };
 
 export type OrganizationPublicProfileErrors = {
     /**
-     * Không tìm thấy nhóm công khai nào ở slug này
+     * Không tìm thấy nhóm công khai nào ở id này
      */
     404: ErrorResponse;
     /**
@@ -2866,39 +2815,6 @@ export type OrganizationLookupResponses = {
 };
 
 export type OrganizationLookupResponse = OrganizationLookupResponses[keyof OrganizationLookupResponses];
-
-export type OrganizationSlugAvailabilityData = {
-    body?: never;
-    path?: never;
-    query: {
-        slug: string;
-        district?: string;
-        provinceCode?: string;
-    };
-    url: '/organizations/slug-availability';
-};
-
-export type OrganizationSlugAvailabilityErrors = {
-    /**
-     * Tra cứu quá nhiều lần
-     */
-    429: ErrorResponse;
-};
-
-export type OrganizationSlugAvailabilityError = OrganizationSlugAvailabilityErrors[keyof OrganizationSlugAvailabilityErrors];
-
-export type OrganizationSlugAvailabilityResponses = {
-    /**
-     * Kết quả kiểm tra
-     */
-    200: {
-        success: true;
-        message: string;
-        data: SlugAvailability;
-    };
-};
-
-export type OrganizationSlugAvailabilityResponse = OrganizationSlugAvailabilityResponses[keyof OrganizationSlugAvailabilityResponses];
 
 export type ListJoinRequestsData = {
     body?: never;

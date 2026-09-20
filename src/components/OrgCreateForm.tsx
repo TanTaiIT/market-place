@@ -1,7 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { Text, View } from 'react-native';
 import { AdminChip, AdminPickerField, adminFormStyles } from './AdminPicker';
-import { SlugField } from './SlugField';
 import { Field, PinButton } from './ui';
 import { useToast } from './Toast';
 import type { PickerSearch } from './PickerSheet';
@@ -14,13 +13,11 @@ import { ORG_TYPES, type NewOrgInput, type OrgType } from '@/api/org-admin';
  *
  * Giữ state + luật hợp lệ, KHÔNG gọi mutation — submit đi ngược lên route (AGENTS §Kiến trúc).
  *
- * Chỉ `name` và `adminEmail` là bắt buộc. Bỏ trống slug là cố ý cho phép: BE tự sinh từ tên,
- * và với tổ chức tạo hàng loạt thì tự nghĩ slug cho từng cái là việc thừa.
+ * Chỉ `name` và `adminEmail` là bắt buộc.
  */
 
 const EMPTY: NewOrgInput = {
   name: '',
-  slug: '',
   orgType: 'school',
   adminEmail: '',
   provinceCode: null,
@@ -68,11 +65,6 @@ export function OrgCreateForm({
         placeholder="Ví dụ: THPT Hùng Vương"
       />
 
-      <SlugField
-        label="Slug (bỏ trống để hệ thống tự đặt)"
-        value={form.slug}
-        onChange={(slug) => patch({ slug })}
-      />
 
       <View style={{ marginTop: 16 }}>
         <Text style={adminFormStyles.label}>LOẠI TỔ CHỨC</Text>

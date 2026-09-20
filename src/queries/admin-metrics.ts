@@ -12,7 +12,7 @@ import { qk } from './keys';
  * mỗi lần vào — và cái 403 đó nằm lại trong cache, đúng cơ chế đã làm màn Thông báo hiện
  * "Missing access token" cho người đã đăng nhập.
  *
- * KHÔNG mang `orgSlug` vào key: `requireMaster` không đọc `X-Org-Slug`, nên đổi tổ chức đang
+ * KHÔNG mang `orgId` vào key: `requireMaster` không đọc `X-Org-Id`, nên đổi tổ chức đang
  * chọn không đổi một dòng số liệu nào — bỏ nó vào key chỉ tạo ra N bản cache y hệt nhau.
  */
 export function useSystemMetrics() {

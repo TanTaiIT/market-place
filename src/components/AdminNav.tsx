@@ -4,8 +4,8 @@ import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAdminListings, useAdminReports, useMyGrants } from '@/queries/admin';
 import { canModerateOrg, canModeratePublicAxis, isMaster, topRole } from '@/api/admin';
-import { useJoinRequestQueue, useMyOrgs } from '@/queries/org';
-import { useOrgSlug } from '@/stores/auth';
+import { useAdminOrgs, useJoinRequestQueue } from '@/queries/org';
+import { useAdminOrgId, useSetAdminOrgId } from './AdminOrgScope';
 import { useProfile } from '@/queries/listings';
 import { Avatar } from './ui';
 import { AdminOrgPicker } from './AdminOrgPicker';
@@ -18,7 +18,7 @@ import { C, F, shadow } from '@/theme';
  * Nhóm KHÔNG còn y hệt bản web: xem `GROUPS` về lý do phải chia lại theo trục quyền.
  *
  * Con số bên phải đọc từ chính query mà màn tương ứng dùng, nên số luôn khớp với thứ người
- * dùng sắp thấy. `useMyOrgs` là lượt gọi duy nhất ngăn kéo tự thêm — cần nó để gọi tên tổ
+ * dùng sắp thấy. `useAdminOrgs` là lượt gọi duy nhất ngăn kéo tự thêm — cần nó để gọi tên tổ
  * chức đang thao tác, và nó cache 5 phút dùng chung với bộ chuyển tổ chức trên hồ sơ.
  */
 
@@ -40,13 +40,13 @@ type NavItem = {
  * quả là không nhìn ra được mục nào đổi theo tổ chức đang chọn, mục nào thì không — mà với
  * master, đó đúng là thứ quyết định họ đang thao tác lên dữ liệu của ai.
  *
- * `org: true` = màn đọc `X-Org-Slug`, tức nội dung đổi theo tổ chức đang chọn.
+ * `org: true` = màn đọc `X-Org-Id`, tức nội dung đổi theo tổ chức đang chọn.
  *
  * Nhóm 'Quyền' chỉ master thấy: hệ thống không còn cấp phó, quản trị nhóm không cấp quyền cho ai.
  */
 type NavGroup = {
   label: string;
-  /** Màn trong nhóm đọc `X-Org-Slug` — nội dung đổi theo tổ chức đang chọn. */
+  /** Màn trong nhóm đọc `X-Org-Id` — nội dung đổi theo tổ chức đang chọn. */
   org?: boolean;
   /** Quyền tối thiểu để cả nhóm hiện ra. Hẹp hơn thì gác từng mục bằng `NavItem.gate`. */
   gate?: NavItem['gate'];
@@ -91,7 +91,7 @@ const GROUPS: NavGroup[] = [
       { href: '/admin/notice', icon: '◈', label: 'Gửi thông báo' },
       { href: '/admin/join-requests', icon: '✋', label: 'Đơn xin gia nhập', badge: 'joins' },
       { href: '/admin/members', icon: '👥', label: 'Thành viên' },
-      // Cùng màn Thống kê của master; BE scope theo `X-Org-Slug` nên quản trị nhóm chỉ thấy tin
+      // Cùng màn Thống kê của master; BE scope theo `X-Org-Id` nên quản trị nhóm chỉ thấy tin
       // và thành viên của nhóm mình — không có gì của sàn lọt ra.
       { href: '/admin/analytics', icon: '📊', label: 'Thống kê' },
     ],
@@ -125,7 +125,7 @@ const GROUPS: NavGroup[] = [
     items: [{ href: '/admin/role-grants', icon: '🔑', label: 'Phân quyền', gate: 'master' }],
   },
   {
-    // Không mục nào ở đây đọc `X-Org-Slug`: đổi tổ chức đang chọn không đổi một dòng nào.
+    // Không mục nào ở đây đọc `X-Org-Id`: đổi tổ chức đang chọn không đổi một dòng nào.
     label: 'Hệ thống',
     items: [
       { href: '/admin/organizations', icon: '🏫', label: 'Tổ chức', gate: 'master' },
@@ -172,8 +172,11 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
   const { data: profile } = useProfile();
   const { data: grants } = useMyGrants();
   const { total: joinsTotal } = useJoinRequestQueue('pending');
-  const { data: myOrgs } = useMyOrgs();
-  const activeSlug = useOrgSlug();
+  // Nhóm QUẢN TRỊ được, không phải nhóm tham gia (`useAdminOrgs`): bày một nhóm mình chỉ
+  // ghé mua bán là mời người dùng chọn một phạm vi BE sẽ từ chối.
+  const { rows: adminOrgs, isPending: orgsPending } = useAdminOrgs();
+  const activeId = useAdminOrgId();
+  const setOrgId = useSetAdminOrgId();
   /** Ngăn chọn tổ chức mở từ dòng mồi của nhóm TỔ CHỨC — chỉ có ý nghĩa khi đã thuộc ≥2 nhóm. */
   const [pickOrg, setPickOrg] = useState(false);
 
@@ -189,20 +192,10 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
   };
 
   /*
-   * BE tự suy ra tổ chức khi người dùng có ĐÚNG MỘT membership (`tenant.middleware.ts`
-   * `resolveOrganization`), nên "chưa bấm chọn" KHÔNG đồng nghĩa "chưa có tổ chức". Gate nhóm
-   * này bằng riêng `activeSlug` sẽ giấu mất cả bàn quản trị của đúng nhóm phổ biến nhất:
-   * thành viên của một trường duy nhất, người chưa từng mở bộ chuyển tổ chức lần nào.
-   *
-   * Master KHÔNG còn đi qua đây: nhóm org mang `notMaster` nên nó không hiện với họ, và bàn
-   * của họ không đọc `X-Org-Slug` một dòng nào. Trước đây họ rơi vào nhánh cuối (`mine` rỗng
-   * vì không là thành viên ở đâu, chỉ còn cái slug tự chọn để nhận diện) — nhánh đó vẫn đúng
-   * cho người thuộc nhiều nhóm mà chưa bấm chọn.
+   * `AdminOrgScope` đã áp luật "một nhóm thì khỏi bấm chọn" trước khi tới đây, nên `activeId`
+   * rỗng nghĩa là THẬT SỰ chưa chọn — không còn ca "có một nhóm nhưng id chưa được ghi".
    */
-  const mine = myOrgs ?? [];
-  const orgName =
-    mine.find((o) => o.slug === activeSlug)?.name ??
-    (mine.length === 1 ? mine[0].name : activeSlug);
+  const orgName = adminOrgs.find((o) => o.id === activeId)?.name;
 
   // Cắt cả nhóm khi nó rỗng, không để lại cái tiêu đề nhóm treo lơ lửng không có mục nào.
   const visibleGroups = GROUPS.filter(
@@ -261,9 +254,9 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
                 thật: thành viên 3 nhóm, quản lý 2, và bàn quản trị của họ chỉ còn đúng hai mục.
               */}
               {group.org && !orgName ? (
-                /* `myOrgs` chưa về thì `mine` rỗng và nhánh dưới sẽ nói 'Tham gia một nhóm' với
-                   một người có ba nhóm — chờ một nhịp, đừng nói sai rồi sửa lại. */
-                myOrgs === undefined ? null : mine.length > 0 ? (
+                /* Danh sách chưa về thì nhánh dưới sẽ nói 'Tham gia một nhóm' với một người
+                   có ba nhóm — chờ một nhịp, đừng nói sai rồi sửa lại. */
+                orgsPending ? null : adminOrgs.length > 0 ? (
                   <View style={styles.item}>
                     <Text style={styles.itemIcon}>◇</Text>
                     {/* Chip của bộ chọn LÀ dòng mồi: bấm vào mở ngăn chọn; chọn xong thì `orgName`
@@ -272,11 +265,14 @@ export function AdminNav({ open, onClose }: { open: boolean; onClose: () => void
                       open={pickOrg}
                       onOpen={() => setPickOrg(true)}
                       onClose={() => setPickOrg(false)}
+                      value={activeId ?? null}
+                      onChange={setOrgId}
+                      emptyLabel="Chọn nhóm"
                     />
                   </View>
                 ) : (
                   <Pressable
-                    onPress={() => go('/join-org')}
+                    onPress={() => go('/find-org')}
                     style={({ pressed }) => [styles.item, pressed && { opacity: 0.7 }]}
                   >
                     <Text style={styles.itemIcon}>◇</Text>

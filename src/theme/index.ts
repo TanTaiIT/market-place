@@ -62,6 +62,10 @@ export const C = {
   danger: '#FF4D4D',
   dangerLt: '#FFECEC',
 
+  /** Nền của logo danh mục khi không tra được sắc riêng — xem `CATEGORY_TINTS`. */
+  tintIdle: '#EDEEF0',
+  tintIdleInk: '#6B7280',
+
   // ── Mặt kính ────────────────────────────────────────────────────
   /*
    * Trắng mờ đặt TRÊN nền thương hiệu hoặc trên ảnh. Cố tình là alpha, không phải một sắc của
@@ -134,6 +138,55 @@ export const C = {
 
 /** Bo góc của prototype — `--r-lg/md/sm`. Viên tròn dùng `pill`. */
 export const R = { lg: 16, md: 12, sm: 8, pill: 999 } as const;
+
+/**
+ * Sắc NHẬN DẠNG của danh mục — nền cho logo, và mực cho chữ đặt trên nền đó.
+ *
+ * Bảng này thay việc dùng `NEW_PHOTOS` cho danh mục, và lý do không phải thẩm mỹ:
+ *
+ * 1. `NEW_PHOTOS` chỉ có BỐN màu, mà nó sinh ra để làm ảnh giả cho tin đăng — nơi trùng màu
+ *    không nói sai điều gì. Một hàng 6 danh mục thì gần như chắc chắn có hai cái trùng, và ở
+ *    đó màu đang được đọc là "danh mục nào", nên trùng là nói sai.
+ * 2. Nó được tra bằng `gradOf(cat.id)`, tức băm ObjectId — thứ mà chính `Category.id` khai là
+ *    "sinh lúc seed, đổi theo từng môi trường". Cùng một danh mục vì thế đổi màu giữa dev và
+ *    prod, và đổi lần nữa sau mỗi lần seed lại. `CategoryLogo` tra bằng `slug` (khoá ổn định).
+ *
+ * MƯỜI sắc, không hơn: quá đó thì các sắc bắt đầu không phân biệt được bằng mắt ở cỡ 26px của
+ * viên chip, mà 26px mới là nơi bảng này làm việc nhiều nhất.
+ *
+ * Bốn ô, ba nền khác nhau cho ba cỡ bề mặt:
+ *
+ * - `bg` nhạt có chủ ý — glyph là emoji và emoji tự nó đã đủ màu, nên nền phải lùi lại phía sau
+ *   nó chứ không tranh. Đây là nền của logo cỡ nhỏ và vừa.
+ * - `deep` ghép với `bg` thành gradient cho vòng tròn 74px ở bảng tin, để dải danh mục còn nói
+ *   cùng thứ tiếng với dải "Nhóm quanh bạn" ngay dưới nó.
+ * - `strong` là cặp ĐẬM cho mặt thẻ 132px của màn chọn danh mục, nơi chữ là màu trắng.
+ * - `ink` là mực đọc được trên `bg`.
+ *
+ * `strong` nuốt luôn `CATEGORY_GRADS` — một bảng 8 màu từng nằm riêng trong `CategoryPicker` và
+ * được tra bằng `CATEGORY_GRADS[i % length]`, tức theo VỊ TRÍ trong mảng. Nên đổi thứ tự hiển
+ * thị của một danh mục là đổi luôn màu của nó, và màu thẻ ở màn đăng tin chưa bao giờ khớp màu
+ * vòng tròn ở bảng tin. Gộp vào đây thì một danh mục có đúng một sắc, ở mọi cỡ, mọi màn.
+ *
+ * ponytail: cần danh mục CHỌN được màu của mình thì thêm cột `color` vào `Category` ở BE, đừng
+ * nới bảng này — nới thêm chỉ làm các sắc gần nhau hơn mà vẫn không ai chọn được.
+ */
+export const CATEGORY_TINTS = [
+  { bg: '#E4F7EC', deep: '#C4EDD7', ink: '#12855A', strong: ['#2FB56D', '#177F4C'] },
+  { bg: '#E4F1FD', deep: '#C6E2FA', ink: '#1668B8', strong: ['#4A7FE0', '#2A55B0'] },
+  { bg: '#EDEAFB', deep: '#D9D3F6', ink: '#5647C4', strong: ['#7C5CE0', '#5533B5'] },
+  { bg: '#FDE8EE', deep: '#F9CEDB', ink: '#C03562', strong: ['#E85D8A', '#B93463'] },
+  // Chặng tối `#96610C` chứ không phải `#AF7511` như sắc vàng thường thấy: trắng trên `#AF7511`
+  // chỉ đạt 3.96:1, dưới ngưỡng 4.5 mà cả bảng `strong` cam kết (xem `CategoryPicker.tile`).
+  { bg: '#FEF2DC', deep: '#FBE2B0', ink: '#A5700B', strong: ['#E0A32E', '#96610C'] },
+  { bg: '#FFEBE0', deep: '#FFD5C0', ink: '#C4551F', strong: ['#F2683C', '#C7461F'] },
+  { bg: '#DFF5F4', deep: '#BCE9E7', ink: '#0E7C79', strong: ['#2BAFA8', '#127E79'] },
+  { bg: '#EFF7DC', deep: '#DDEEB4', ink: '#5E8215', strong: ['#7FA92E', '#5A7C15'] },
+  { bg: '#E6ECFB', deep: '#CBD8F5', ink: '#35529E', strong: ['#5568C4', '#35429B'] },
+  { bg: '#F6E9F7', deep: '#EDD2EF', ink: '#8B3D91', strong: ['#B052B8', '#82357F'] },
+] as const satisfies readonly { bg: string; deep: string; ink: string; strong: Grad }[];
+
+export type CategoryTint = (typeof CATEGORY_TINTS)[number];
 
 /**
  * Tên font sau khi load bằng @expo-google-fonts.

@@ -16,7 +16,12 @@
  * - Max file size + max image dimensions: app đã thu nhỏ về `MAX_DIMENSION` trước khi gửi,
  *   nên đặt trần ở preset là chặn đúng thứ KHÔNG đi qua app này.
  * - Folder: ghim tất cả vào một thư mục để tách được rác khi phải dọn.
- * - Auto-moderation / access control nếu cần, và theo dõi hạn mức để biết khi bị lạm dụng.
+ * - Access control nếu cần, và theo dõi hạn mức để biết khi bị lạm dụng.
+ *
+ * KHÔNG bật lại add-on kiểm duyệt ảnh ở đây. Nó từng được bật, và hạ cả luồng đăng tin: hết hạn
+ * mức thì Cloudinary không "bỏ qua bước kiểm" mà TỪ CHỐI CẢ LƯỢT UPLOAD, nên một công tơ bên
+ * thứ ba cạn giữa tháng là không ai đăng được tin nữa. Ảnh vi phạm giờ do người duyệt gỡ ở bàn
+ * quản trị — chậm hơn, nhưng không biến một lá chắn thành sự cố toàn hệ thống.
  *
  * Muốn chặn triệt để thì BE phải cấp chữ ký cho từng lượt upload — khi đó luồng không còn là
  * "FE upload thẳng" nữa, và đó là một thay đổi kiến trúc chứ không phải một cờ cấu hình.
@@ -152,12 +157,6 @@ export function displayUrl(url: string, width: number): string {
 type CloudinaryUploadResponse = {
   secure_url?: string;
   error?: { message?: string };
-  /**
-   * Chỉ có khi preset bật add-on kiểm duyệt ảnh (aws_rek...). Add-on ĐỒNG BỘ trả kết quả ngay
-   * trong response này; add-on bất đồng bộ trả `pending` rồi báo kết quả về webhook của BE
-   * (`market/src/features/moderation/moderation.webhook.*`).
-   */
-  moderation?: Array<{ status?: 'approved' | 'rejected' | 'pending'; kind?: string }>;
 };
 
 /**
@@ -189,12 +188,6 @@ export async function uploadImage(uri: string): Promise<string> {
     throw new Error(
       detail ? `Tải ảnh lên thất bại — Cloudinary: ${detail}` : 'Tải ảnh lên thất bại, thử lại nhé',
     );
-  }
-  // Ảnh bị kiểm duyệt ĐỒNG BỘ từ chối: báo ngay trên thumbnail như một lượt upload hỏng —
-  // đừng để người dùng đăng tin với một URL mà Cloudinary sẽ không bao giờ phục vụ.
-  // `pending` thì cho qua: kết quả sẽ về webhook của BE, gỡ sau nếu vi phạm.
-  if (json.moderation?.some((m) => m.status === 'rejected')) {
-    throw new Error('Ảnh không được chấp nhận vì chứa nội dung không phù hợp');
   }
   return json.secure_url;
 }

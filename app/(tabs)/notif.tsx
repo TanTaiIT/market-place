@@ -164,8 +164,7 @@ export default function Notifications() {
                 time={item.time}
                 unread={item.unread}
                 onPress={() => {
-                  const slug = orgById.get(item.orgId ?? '')?.slug;
-                  if (slug) router.push(`/org/${slug}`);
+                  if (item.orgId) router.push(`/org/${item.orgId}`);
                 }}
               />
             ) : (

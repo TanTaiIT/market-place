@@ -11,6 +11,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ListingAttrs } from '@/components/ListingAttrs';
 import { ListingGallery } from '@/components/ListingGallery';
+import { ListingOrg } from '@/components/ListingOrg';
 import { ListingSeller } from '@/components/ListingSeller';
 import { ListingSuggestions } from '@/components/ListingSuggestions';
 import { SafetyNote } from '@/components/SafetyNote';
@@ -260,6 +261,20 @@ export default function ListingDetail() {
               onOpen={() => router.push(`/user/${listing.sellerId}`)}
             />
           </View>
+
+          {/*
+            Khối 2b — ĐĂNG TRONG NHÓM NÀO. Chỉ dựng khi tin thật sự mang danh thiếp nhóm:
+            `org` rỗng cả khi tin không thuộc nhóm lẫn khi nhóm đó riêng tư (BE quyết, xem
+            `withOrgBadge`), và cả hai ca đều không có gì để nói ở đây.
+          */}
+          {listing.org && (
+            <View style={styles.block}>
+              <ListingOrg
+                org={listing.org}
+                onOpen={() => router.push(`/org/${listing.org!.id}`)}
+              />
+            </View>
+          )}
 
           {/* Khối 3 — NGƯỜI BÁN NÓI GÌ. */}
           <View style={styles.block}>

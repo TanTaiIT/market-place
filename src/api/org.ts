@@ -194,9 +194,18 @@ export const orgApi = {
     return unwrap(res, 'Không tìm được nhóm nào');
   },
 
-  /** Hồ sơ nhóm công khai. Nhóm riêng tư trả 404 — không phân biệt được với id không có thật. */
-  async profile(orgId: string): Promise<OrgProfile> {
-    const res = await organizationPublicProfile({ path: { organizationId: orgId } });
+  /**
+   * Hồ sơ nhóm. Nhóm riêng tư trả 404 — không phân biệt được với id không có thật.
+   *
+   * `code` là CHÌA KHOÁ cho nhóm riêng tư, không phải bộ lọc: đưa đúng mã của chính nhóm đó
+   * thì hồ sơ mở ra, sai mã vẫn 404 y như không gửi. Chỉ truyền khi người dùng thật sự cầm mã
+   * (đi từ thẻ khớp mã ở màn Tìm nhóm) — gửi bừa một mã không liên quan không mở được gì.
+   */
+  async profile(orgId: string, code?: string): Promise<OrgProfile> {
+    const res = await organizationPublicProfile({
+      path: { organizationId: orgId },
+      ...(code ? { query: { code } } : {}),
+    });
     return unwrap(res, 'Không tìm thấy nhóm này');
   },
 

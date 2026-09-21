@@ -42,16 +42,31 @@ export default function FindOrg() {
   /* Gõ trúng mã thì BE trả đúng một dòng — dấu hiệu đủ chắc để gọi tên nó ra ở tiêu đề mục. */
   const exactCode = term.trim().length >= 4 && suggested.length === 1;
 
-  const open = (id: string) => router.push(`/org/${id}`);
+  /*
+   * Mang MÃ theo khi mở hồ sơ: nhóm riêng tư 404 với người ngoài, và mã là chìa khoá duy nhất
+   * mở được nó. Thẻ ở đây chỉ có mã khi người dùng vừa gõ trúng nó, nên gắn kèm là đưa lại
+   * đúng thứ họ vừa đưa cho app — không phải rò rỉ gì mới.
+   */
+  const open = (org: OrgRow) =>
+    router.push(`/org/${org.id}?code=${encodeURIComponent(org.joinCode)}`);
 
   /*
-   * Gửi đơn thẳng từ danh sách bằng ID — chỉ nhóm công khai mới có mặt ở đây, và BE nhận
-   * id cho đúng nhóm đó. Tên khai báo lấy từ hồ sơ: bắt gõ lại tên mình ngay trong một danh
-   * sách đang lướt là chặn đúng thao tác vừa mở ra cho nhanh.
+   * Gửi đơn thẳng từ danh sách. Tên khai báo lấy từ hồ sơ: bắt gõ lại tên mình ngay trong một
+   * danh sách đang lướt là chặn đúng thao tác vừa mở ra cho nhanh.
+   *
+   * GỬI BẰNG MÃ, KHÔNG BẰNG ID. Đường `orgId` bên BE cố ý chỉ nhận nhóm CÔNG KHAI: id nằm
+   * trong mọi đường link, nên cho gửi đơn bằng id là mở lại đúng bề mặt spam mà cái mã sinh ra
+   * để chặn. Nhưng danh sách này CÓ nhóm riêng tư — `discover` trả chúng khi người dùng gõ
+   * trúng mã, và đó là chủ ý. Gửi id cho một nhóm như vậy ăn 404 "Không tìm thấy nhóm công
+   * khai này", một câu vô nghĩa với người vừa dán đúng mã của nhóm.
+   *
+   * Mã là thứ người dùng THẬT SỰ đưa ra để chứng minh mình được phép hỏi — gửi đúng nó thì
+   * nhóm công khai vẫn vào thẳng, nhóm riêng tư sinh đơn chờ quản trị duyệt, và BE không phải
+   * nới một dòng nào.
    */
   const requestJoin = (org: OrgRow) =>
     join.mutate(
-      { orgId: org.id, claimedName: profile?.name ?? '' },
+      { code: org.joinCode, claimedName: profile?.name ?? '' },
       {
         // Nhóm công khai vào ngay, nhóm riêng tư mới có đơn chờ — xem `orgApi.requestJoin`.
         onSuccess: (res) =>
@@ -80,7 +95,7 @@ export default function FindOrg() {
         action: o.allowJoinRequests ? 'join' : 'closed',
         // Nhóm không nhận đơn chỉ lọt vào đây qua đường gõ đúng mã, nên ổ khoá đi cùng ca đó.
         locked: exactCode && !o.allowJoinRequests,
-        onPress: () => open(o.id),
+        onPress: () => open(o),
         onJoin: () => requestJoin(o),
       })),
     },

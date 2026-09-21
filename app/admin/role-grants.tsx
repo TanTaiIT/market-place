@@ -2,6 +2,7 @@ import React from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AdminPanel, AdminScreen } from '@/components/AdminScreen';
 import { adminFormStyles } from '@/components/AdminPicker';
+import { CategoryAxisPanel } from '@/components/CategoryAxisPanel';
 import { RoleGrantForm } from '@/components/RoleGrantForm';
 import { EmptyState, Loading } from '@/components/ui';
 import { useToast } from '@/components/Toast';
@@ -14,9 +15,10 @@ import { C, F } from '@/theme';
 /**
  * Phân quyền: ai được cầm quyền gì, trong phạm vi nào.
  *
- * Danh sách phía trên là quyền CỦA CHÍNH MÌNH, không phải của cả tổ chức — `/role-grants/mine`
- * là route duy nhất trả về `id` của grant, mà thu hồi thì cần đúng cái id đó. Hệ quả nói thẳng
- * dưới danh sách: cấp quyền cho người khác xong thì trong app không rút lại được.
+ * Danh sách đầu là quyền CỦA CHÍNH MÌNH (`/role-grants/mine`). Dưới nó, chỉ master thấy, là
+ * bảng "ai phụ trách danh mục nào" — trước đây không tồn tại, và sự vắng mặt của nó khiến việc
+ * cấp quyền thành đường một chiều: `DELETE /role-grants/:id` vẫn cho master thu hồi quyền của
+ * bất kỳ ai, nhưng không có route nào trả về `id` của người khác để mà gọi.
  */
 export default function AdminRoleGrants() {
   const toast = useToast();
@@ -85,10 +87,17 @@ export default function AdminRoleGrants() {
           )}
 
           <Text style={adminFormStyles.limit}>
-            BE chỉ có route đọc quyền của chính mình, nên đây không phải danh sách quyền của cả
-            tổ chức — quyền vừa cấp cho người khác sẽ không hiện ở đây và app không thu hồi được.
+            Đây là quyền của riêng bạn. Quyền TRỤC DANH MỤC của mọi người nằm ở bảng ngay dưới;
+            quản trị NHÓM thì xem ở màn Tổ chức › ngăn chi tiết.
           </Text>
         </AdminPanel>
+
+        {/* Bảng danh tính của cả hệ thống — route master-only, nên chỉ dựng cho master. */}
+        {master && (
+          <View style={{ marginTop: 18 }}>
+            <CategoryAxisPanel />
+          </View>
+        )}
 
         {!isLoading && !error && (
           <View style={{ marginTop: 18 }}>

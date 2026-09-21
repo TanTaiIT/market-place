@@ -129,19 +129,43 @@ export function useSetOrgVisibility() {
  * Refetch contract của cấp/thu hồi quyền: `myGrants()` là thứ quyết định người dùng mở được
  * những mục nào trong `AdminNav`, nên tự thu hồi quyền của mình phải đổi menu ngay lập tức.
  *
- * Cấp quyền cho NGƯỜI KHÁC thì không có gì trong cache để làm mới — BE không có route đọc grant
- * của người khác. Vẫn dùng chung hook: thà quét thừa một key rẻ tiền còn hơn hai đường xử lý.
+ * Cấp/thu hồi cho NGƯỜI KHÁC giờ CÓ thứ để làm mới: bảng `adminCategoryAxis` và ma trận phủ
+ * sóng đều đọc cùng tập grant đó. Quét cả `adminRoot()` thay vì liệt kê hai key — gỡ một
+ * người phụ trách làm đổi luôn con số "ô chưa có ai" ở tổng quan.
  */
 function useGrantMutation<TVars, TData>(fn: (v: TVars) => Promise<TData>) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: fn,
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.myGrants() }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.myGrants() });
+      void qc.invalidateQueries({ queryKey: qk.adminRoot() });
+    },
+  });
+}
+
+/**
+ * Ai đang phụ trách danh mục nào — master-only, nên `enabled` gác bằng chính cờ đó: người
+ * khác gọi vào chắc chắn 403, và một request hỏng mỗi lần mở màn là nhiễu thuần tuý.
+ */
+export function useCategoryAxisGrants(
+  filter: { categoryId?: string; province?: string } = {},
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: qk.adminCategoryAxis(filter.categoryId ?? '', filter.province ?? ''),
+    queryFn: () => orgAdminApi.categoryAxis(filter),
+    enabled,
+    staleTime: 60_000,
   });
 }
 
 export function useGrantRole() {
   return useGrantMutation(orgAdminApi.grantRole);
+}
+
+export function useUpdateGrantScope() {
+  return useGrantMutation(orgAdminApi.updateGrantScope);
 }
 
 export function useRevokeGrant() {

@@ -5,6 +5,8 @@ import {
   organizationManagers,
   organizationGrantAdmin,
   revokeRoleGrant,
+  categoryAxisGrants,
+  updateRoleGrantScope,
   setOrganizationStatus,
   setOrganizationVisibility,
 } from './generated';
@@ -80,6 +82,36 @@ export const ROLE_LABEL: Record<RoleGrant['role'], string> = {
   manager: 'Quản lý',
   staff: 'Nhân sự',
 };
+
+/**
+ * Một dòng của bảng "ai phụ trách danh mục nào".
+ *
+ * Mang `id` của grant vì đó là đầu vào duy nhất của `revokeGrant` — không có nó thì bảng chỉ
+ * để nhìn, và cấp quyền vẫn là đường một chiều như trước.
+ */
+export type CategoryAxisGrant = RoleGrant & {
+  holderName: string;
+  holderEmail: string;
+  /** `false` = tài khoản đã khoá hoặc không còn — ô nhìn như "đã có người" mà thực ra không. */
+  holderActive: boolean;
+  categoryName: string;
+};
+
+/** Phạm vi của một grant trục danh mục, gọn thành một dòng đọc được. */
+export function axisScopeLabel(g: CategoryAxisGrant): string {
+  /*
+   * Tầng PHƯỜNG phải đọc ra ngay là hẹp hơn tỉnh. Bản trước ghi "Hà Nội · 1 phường", và người
+   * đọc hiểu thành "phụ trách Hà Nội" — rồi thắc mắc vì sao ma trận phủ sóng vẫn báo ô Hà Nội
+   * trống. Chữ "chỉ" là toàn bộ khác biệt giữa hai cách hiểu đó.
+   */
+  const where =
+    g.provinceCodes.length === 0
+      ? 'toàn quốc'
+      : g.wardCodes.length > 0
+        ? `${g.provinceCodes.join(', ')} · CHỈ ${g.wardCodes.length} phường`
+        : `${g.provinceCodes.join(', ')} · cả tỉnh`;
+  return `${g.categoryName || 'Danh mục đã xoá'} · ${where}`;
+}
 
 export const SCOPE_LABEL: Record<RoleGrant['scopeType'], string> = {
   system: 'Toàn hệ thống',
@@ -254,6 +286,52 @@ export const orgAdminApi = {
   },
 
   /** BE chặn thu hồi master CUỐI CÙNG — hệ thống không còn master là không ai cấp lại được nữa. */
+  /**
+   * Ai đang phụ trách danh mục nào — master-only.
+   *
+   * Khác `getCoverage`: ma trận phủ sóng chỉ nói ô CÓ hay KHÔNG có người, không nói ai. Đây
+   * là chỗ duy nhất trả về `id` của grant người KHÁC, tức là chỗ duy nhất mở đường thu hồi.
+   */
+  async categoryAxis(filter: { categoryId?: string; province?: string } = {}) {
+    const res = await withAuthRetry(() =>
+      categoryAxisGrants({
+        query: {
+          ...(filter.categoryId ? { categoryId: filter.categoryId } : {}),
+          ...(filter.province ? { province: filter.province } : {}),
+        },
+      }),
+    );
+    return unwrap(res, 'Không tải được danh sách phụ trách') as CategoryAxisGrant[];
+  },
+
+  /**
+   * Đổi phạm vi của một grant trục danh mục. Thay TOÀN BỘ, không vá từng field — hạ từ tầng
+   * phường xuống tầng tỉnh bắt buộc phải xoá `wardCodes`, và bán phần là chỗ dễ quên nhất.
+   *
+   * Giữ nguyên grant `id`: đây là SỬA, không phải gỡ rồi cấp lại. `grantedAt` đứng yên nên
+   * vết kiểm toán không đứt, và không có khoảng nào ô đó trống người phụ trách.
+   */
+  async updateGrantScope(input: {
+    id: string;
+    scopeType: 'category_province' | 'category_ward';
+    categoryId: string;
+    provinceCodes: string[];
+    wardCodes: string[];
+  }) {
+    const res = await withAuthRetry(() =>
+      updateRoleGrantScope({
+        path: { id: input.id },
+        body: {
+          scopeType: input.scopeType,
+          categoryId: input.categoryId,
+          provinceCodes: input.provinceCodes,
+          wardCodes: input.wardCodes,
+        },
+      }),
+    );
+    return unwrap(res, 'Không sửa được phạm vi phụ trách');
+  },
+
   async revokeGrant(id: string) {
     const res = await withAuthRetry(() => revokeRoleGrant({ path: { id } }));
     unwrap(res, 'Không thu hồi được quyền');

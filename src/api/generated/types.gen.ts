@@ -242,6 +242,11 @@ export type UpdateListing = {
 export type Listing = {
     _id: string;
     organizationId: string | null;
+    org?: {
+        id: string;
+        name: string;
+        avatarUrl: string | null;
+    } | null;
     reach: 'members' | 'group_open' | 'marketplace';
     provinceCode: string;
     title: string;
@@ -398,6 +403,7 @@ export type SetOrganizationStatus = {
 };
 
 export type OrgManager = {
+    grantId: string;
     userId: string;
     name: string | null;
     email: string | null;
@@ -515,6 +521,13 @@ export type CreateRoleGrant = {
     wardCodes?: Array<string>;
 };
 
+export type UpdateRoleGrant = {
+    scopeType: 'category_province' | 'category_ward';
+    categoryId: string;
+    provinceCodes?: Array<string>;
+    wardCodes?: Array<string>;
+};
+
 export type RoleGrant = {
     id: string;
     userId: string;
@@ -527,6 +540,13 @@ export type RoleGrant = {
     wardCodes: Array<string>;
     grantedBy: string | null;
     grantedAt: string;
+};
+
+export type CategoryAxisGrant = RoleGrant & {
+    holderName: string;
+    holderEmail: string;
+    holderActive: boolean;
+    categoryName: string;
 };
 
 export type FieldOption = {
@@ -2755,13 +2775,15 @@ export type OrganizationPublicProfileData = {
     path: {
         organizationId: string;
     };
-    query?: never;
+    query?: {
+        code?: string;
+    };
     url: '/organizations/profile/{organizationId}';
 };
 
 export type OrganizationPublicProfileErrors = {
     /**
-     * Không tìm thấy nhóm công khai nào ở id này
+     * Không tìm thấy nhóm ở id này, hoặc mã không đúng
      */
     404: ErrorResponse;
     /**
@@ -3407,6 +3429,38 @@ export type CreateRoleGrantResponses = {
 
 export type CreateRoleGrantResponse = CreateRoleGrantResponses[keyof CreateRoleGrantResponses];
 
+export type CategoryAxisGrantsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        categoryId?: string;
+        province?: string;
+    };
+    url: '/role-grants/category-axis';
+};
+
+export type CategoryAxisGrantsErrors = {
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+};
+
+export type CategoryAxisGrantsError = CategoryAxisGrantsErrors[keyof CategoryAxisGrantsErrors];
+
+export type CategoryAxisGrantsResponses = {
+    /**
+     * Phụ trách trục danh mục
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<CategoryAxisGrant>;
+    };
+};
+
+export type CategoryAxisGrantsResponse = CategoryAxisGrantsResponses[keyof CategoryAxisGrantsResponses];
+
 export type MyRoleGrantsData = {
     body?: never;
     path?: never;
@@ -3461,6 +3515,45 @@ export type RevokeRoleGrantResponses = {
 };
 
 export type RevokeRoleGrantResponse = RevokeRoleGrantResponses[keyof RevokeRoleGrantResponses];
+
+export type UpdateRoleGrantScopeData = {
+    body?: UpdateRoleGrant;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/role-grants/{id}';
+};
+
+export type UpdateRoleGrantScopeErrors = {
+    /**
+     * Không phải grant trục danh mục, hoặc phạm vi không hợp lệ
+     */
+    400: ErrorResponse;
+    /**
+     * Cần quyền master, hoặc đang sửa quyền của chính mình
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy quyền này
+     */
+    404: ErrorResponse;
+};
+
+export type UpdateRoleGrantScopeError = UpdateRoleGrantScopeErrors[keyof UpdateRoleGrantScopeErrors];
+
+export type UpdateRoleGrantScopeResponses = {
+    /**
+     * Đã sửa phạm vi phụ trách
+     */
+    200: {
+        success: true;
+        message: string;
+        data: RoleGrant;
+    };
+};
+
+export type UpdateRoleGrantScopeResponse = UpdateRoleGrantScopeResponses[keyof UpdateRoleGrantScopeResponses];
 
 export type CategoryGetTemplateData = {
     body?: never;

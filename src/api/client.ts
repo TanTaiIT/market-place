@@ -269,6 +269,7 @@ function toListing(dto: OwnerListingDto, names: Map<string, string>): Listing {
     reach: dto.reach,
     meta: relativeTime(dto.createdAt),
     organizationId: dto.organizationId,
+    org: dto.org ?? null,
     photo: gradOf(dto._id),
     photoUrls: dto.images,
     seller: sellerName,

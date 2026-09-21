@@ -7,7 +7,6 @@ import { SearchCrumbBar } from '@/components/SearchCrumbBar';
 import { useRequireAuth } from '@/components/GuestGate';
 import { EmptyState, Loading, PagedFooter, ScreenHeader } from '@/components/ui';
 import { useSavedIds, useSearch, useToggleSaved } from '@/queries/listings';
-import { useMyOrgs } from '@/queries/org';
 import { useRecordSearch } from '@/stores/search-history';
 import { hasSearchCriteria, paramsToSearch, searchToParams } from '@/api/db';
 import type { SearchFilter } from '@/api/db';
@@ -55,12 +54,8 @@ export default function SearchResults() {
   const { data: savedIds } = useSavedIds();
   const toggleSaved = useToggleSaved();
   const requireAuth = useRequireAuth();
-  const { data: myOrgs } = useMyOrgs();
 
   const saved = new Set(savedIds ?? []);
-  // BE không snapshot tên tổ chức vào tin; tra từ danh sách tổ chức của chính người xem là đủ và
-  // trung thực. Tra không ra (khách, hoặc tin công khai) thì thẻ tự bỏ dòng đó chứ không bịa tên.
-  const orgNameById = new Map((myOrgs ?? []).map((o) => [o.id, o.name]));
 
   /*
    * Bỏ một tiêu chí = viết lại params, và `replace` chứ không `push`.
@@ -107,7 +102,6 @@ export default function SearchResults() {
           <ListingCard
             item={item}
             index={index}
-            orgName={item.organizationId ? orgNameById.get(item.organizationId) : undefined}
             saved={saved.has(item.id)}
             onPress={() => router.push(`/listing/${item.id}`)}
             onToggleSave={() =>

@@ -33,19 +33,30 @@ const EMPTY = {
 
 export function RoleGrantForm({
   busy,
+  initial,
+  submitLabel = 'Cấp quyền',
   onSubmit,
 }: {
   busy: boolean;
+  /**
+   * Có `initial` = chế độ SỬA: ô email biến mất vì đổi người không phải là sửa phạm vi — đó
+   * là một grant khác, và nó đi qua cấp/thu hồi để hai chốt `canGrant` với `usableOrgAdmins`
+   * còn chạy. Mọi phần còn lại dùng chung, kể cả luật hợp lệ — tách hai form là tách hai bộ
+   * luật rồi để chúng lệch nhau.
+   */
+  initial?: Omit<typeof EMPTY, 'userEmail'>;
+  submitLabel?: string;
   onSubmit: (values: NewGrantInput, reset: () => void) => void;
 }) {
   const toast = useToast();
-  const [form, setForm] = useState(EMPTY);
+  const editing = initial !== undefined;
+  const [form, setForm] = useState(initial ? { ...EMPTY, ...initial } : EMPTY);
   const patch = (fields: Partial<typeof EMPTY>) => setForm((prev) => ({ ...prev, ...fields }));
 
   const submit = () => {
     // Chỉ chặn ca rõ ràng là chưa điền — "email này có tài khoản không" là câu của BE, dựng
     // luật email riêng ở client chỉ tạo thêm một định nghĩa "email hợp lệ" để lệch nhau.
-    if (!form.userEmail.includes('@')) return toast('⚠️ Nhập email người nhận quyền');
+    if (!editing && !form.userEmail.includes('@')) return toast('⚠️ Nhập email người nhận quyền');
     if (!form.categoryId) return toast('⚠️ Chọn danh mục cho trục này');
     if (form.scopeType === 'category_province' && form.provinceCodes.length === 0) {
       return toast('⚠️ Chọn ít nhất một tỉnh');
@@ -72,21 +83,25 @@ export function RoleGrantForm({
 
   return (
     <>
-      <Field
-        onDark
-        label="Cấp cho ai (email)"
-        value={form.userEmail}
-        onChangeText={(userEmail) => patch({ userEmail })}
-        placeholder="email@vidu.com"
-        autoCapitalize="none"
-        keyboardType="email-address"
-      />
-      <Text style={adminFormStyles.hint}>
-        Người nhận phải có tài khoản sẵn — BE tra theo email, chưa có thì trả lỗi. Vai trò luôn là
-        Quản lý; quản trị nhóm đặt ở màn Tổ chức.
-      </Text>
+      {editing ? null : (
+        <>
+          <Field
+            onDark
+            label="Cấp cho ai (email)"
+            value={form.userEmail}
+            onChangeText={(userEmail) => patch({ userEmail })}
+            placeholder="email@vidu.com"
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+          <Text style={adminFormStyles.hint}>
+            Người nhận phải có tài khoản sẵn — BE tra theo email, chưa có thì trả lỗi. Vai trò
+            luôn là Quản lý; quản trị nhóm đặt ở màn Tổ chức.
+          </Text>
+        </>
+      )}
 
-      <View style={{ marginTop: 18 }}>
+      <View style={{ marginTop: editing ? 0 : 18 }}>
         <Text style={adminFormStyles.label}>PHẠM VI</Text>
         <View style={adminFormStyles.chips}>
           {SCOPES.map((s) => (
@@ -112,7 +127,7 @@ export function RoleGrantForm({
       <RoleGrantGeoFields scope={form.scopeType} value={form} onChange={patch} />
 
       <View style={{ marginTop: 16 }}>
-        <PinButton label="Cấp quyền" loading={busy} onPress={submit} />
+        <PinButton label={submitLabel} loading={busy} onPress={submit} />
       </View>
     </>
   );

@@ -35,11 +35,17 @@ export function useOrgDiscover(keyword: string) {
   });
 }
 
-/** Hồ sơ nhóm công khai. `retry: false` vì 404 là câu trả lời thật, không phải sự cố mạng. */
-export function useOrgProfile(orgId: string) {
+/**
+ * Hồ sơ nhóm. `retry: false` vì 404 là câu trả lời thật, không phải sự cố mạng.
+ *
+ * `code` nằm TRONG khoá cache: cùng một id, có mã và không mã là hai câu trả lời khác nhau
+ * (một bên hồ sơ, một bên 404). Dùng chung ô cache thì mở bằng mã một lần là lần sau vào
+ * không mã vẫn thấy — một lời hứa app không giữ nổi sau khi cache hết hạn.
+ */
+export function useOrgProfile(orgId: string, code?: string) {
   return useQuery({
-    queryKey: qk.orgProfile(orgId),
-    queryFn: () => orgApi.profile(orgId),
+    queryKey: qk.orgProfile(orgId, code),
+    queryFn: () => orgApi.profile(orgId, code),
     enabled: orgId.length > 0,
     retry: false,
   });

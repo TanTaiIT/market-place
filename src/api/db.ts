@@ -90,14 +90,22 @@ export type Listing = {
   /** Số người đã lưu tin — "N người quan tâm" trên thẻ. */
   favoriteCount: number;
   /**
-   * Tổ chức tin thuộc về; `null` = tin ở trục công khai.
-   *
-   * Chỉ có ID vì BE không snapshot tên tổ chức vào tin. Thẻ tin tra tên từ `useMyOrgs()`:
-   * tin nội bộ chỉ hiện cho thành viên của chính tổ chức đó, nên người đang xem luôn có
-   * tên trong danh sách của mình. Tra không ra thì giấu dòng đó đi, không bịa.
+   * Tổ chức tin thuộc về; `null` = tin ở trục công khai. Dùng để PHÂN QUYỀN, không để hiển thị.
    */
   organizationId: string | null;
+  /**
+   * Danh thiếp nhóm để HIỂN THỊ — BE tra sẵn, app không tự ghép tên nữa.
+   *
+   * `null` không chỉ nghĩa "tin không thuộc nhóm": nhóm riêng tư, đang khoá hoặc đã xoá cũng
+   * ra `null`. Bản trước app tra tên từ `useMyOrgs()`, và cách đó hỏng đúng ở ca thang phủ
+   * sóng vừa mở ra — người NGOÀI đọc được tin của nhóm công khai thì không có nhóm đó trong
+   * danh sách của mình, nên thấy một tin không rõ đến từ đâu.
+   */
+  org: ListingOrg | null;
 };
+
+/** Ba thứ đủ để nhận ra một nhóm và mở hồ sơ của nó — không hơn. */
+export type ListingOrg = { id: string; name: string; avatarUrl: string | null };
 
 /** Lời BE soạn cho chính chủ về tin chưa lên bảng. `hint` = việc họ làm được ngay, nếu có. */
 export type ListingReview = {

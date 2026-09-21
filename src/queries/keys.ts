@@ -121,7 +121,9 @@ export const qk = {
   orgByCode: (code: string) => ['orgs', 'by-code', code] as const,
   /** Tìm nhóm công khai. Từ khoá nằm trong key: mỗi từ khoá là một tập kết quả khác. */
   orgDiscover: (q: string) => ['orgs', 'discover', q] as const,
-  orgProfile: (orgId: string) => ['orgs', 'profile', orgId] as const,
+  /** `code` tham gia khoá: có mã và không mã là hai câu trả lời khác nhau cho cùng một id. */
+  orgProfile: (orgId: string, code?: string) =>
+    ['orgs', 'profile', orgId, code ?? ''] as const,
   /** Danh bạ + tin của MỘT nhóm đang mở hồ sơ, tách khỏi cụm scope theo org đang thao tác. */
   orgPeek: (orgId: string, take: number) => ['orgs', 'peek', orgId, take] as const,
   /** Prefix của cụm đơn xin tham gia — quét cả "đơn của tôi" lẫn hàng đợi của người duyệt. */
@@ -154,6 +156,12 @@ export const qk = {
     ['admin', 'listings', orgId, status, category, q] as const,
   adminPublicQueue: (status: string) => ['admin', 'public-queue', status] as const,
   adminCoverage: () => ['admin', 'coverage'] as const,
+  /**
+   * Ai phụ trách danh mục nào. Nằm dưới prefix `admin` để thu hồi một grant quét được cả
+   * bảng này lẫn ma trận phủ sóng — gỡ người phụ trách là ô đó đổi trạng thái ngay.
+   */
+  adminCategoryAxis: (categoryId: string, province: string) =>
+    ['admin', 'category-axis', categoryId, province] as const,
   adminPublicOverview: () => ['admin', 'public-overview'] as const,
   /**
    * Bàn của master. Nằm trong cụm `admin` để một lượt duyệt tin quét luôn nó, nhưng KHÔNG mang

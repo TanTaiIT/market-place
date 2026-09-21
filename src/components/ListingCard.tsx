@@ -23,15 +23,20 @@ import { C, F, R, S, T, shadow } from '@/theme';
 export function ListingCard({
   item,
   index,
-  orgName,
+  showOrg = true,
   saved,
   onPress,
   onToggleSave,
 }: {
   item: Listing;
   index: number;
-  /** Tên tổ chức của tin nội bộ; vắng thì thẻ giấu viên đó đi chứ không bịa tên. */
-  orgName?: string;
+  /**
+   * Hiện viên "🏫 tên nhóm". Tắt ở chính hồ sơ nhóm — xem chỗ gọi ở `app/org/[id]`.
+   *
+   * Mặc định BẬT: viên này trả lời "tin này đến từ đâu", và quên bật nó ở một màn trộn nhiều
+   * nguồn là mất đúng thông tin người xem đang cần. Quên TẮT ở hồ sơ nhóm thì chỉ thừa.
+   */
+  showOrg?: boolean;
   saved: boolean;
   onPress: () => void;
   onToggleSave: () => void;
@@ -82,10 +87,13 @@ export function ListingCard({
                 <Text style={[styles.chipText, { color: C.orange }]}>🚚 Giao tận nơi</Text>
               </View>
             )}
-            {!!orgName && (
+            {/* Tên nhóm đọc thẳng từ tin (`item.org`), do BE tra sẵn. Bản trước nhận qua prop
+                và người gọi ghép tên từ `useMyOrgs()` — cách đó câm với chính người NGOÀI
+                nhóm, tức là đúng những người cần biết tin này đến từ đâu. */}
+            {showOrg && !!item.org && (
               <View style={styles.chip}>
                 <Text style={styles.chipText} numberOfLines={1}>
-                  🏫 {orgName}
+                  🏫 {item.org.name}
                 </Text>
               </View>
             )}

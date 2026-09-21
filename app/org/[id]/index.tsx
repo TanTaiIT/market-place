@@ -23,16 +23,18 @@ import { C, F } from '@/theme';
  * người, đăng bao nhiêu tin một tuần, nội quy ra sao, RỒI mới bấm.
  *
  * Nhóm riêng tư vào đây sẽ nhận 404 từ BE — không phân biệt được với id không tồn tại, nên
- * không ai quét id để lập danh sách nhóm kín được.
+ * không ai quét id để lập danh sách nhóm kín được. TRỪ khi đường dẫn mang `?code=`: mã đúng
+ * của chính nhóm đó là chìa khoá mở hồ sơ, và màn Tìm nhóm gắn sẵn nó vào link khi người dùng
+ * vừa gõ trúng mã. Mã sai vẫn 404 như thường.
  */
 export default function OrgProfileScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, code } = useLocalSearchParams<{ id: string; code?: string }>();
   const router = useRouter();
   const toast = useToast();
   /* `null` = ngăn đóng; mở ra thì chính id này là thứ bật query danh bạ — không có cờ thứ hai. */
   const [membersOrgId, setMembersOrgId] = useState<string | null>(null);
 
-  const { data: org, error, isPending } = useOrgProfile(id ?? '');
+  const { data: org, error, isPending } = useOrgProfile(id ?? '', code);
   const { data: me } = useProfile();
   const join = useRequestJoin();
   /*
@@ -79,9 +81,16 @@ export default function OrgProfileScreen() {
     );
   }
 
+  /*
+   * Cầm mã thì gửi đơn BẰNG MÃ. Đường `orgId` bên BE cố ý chỉ nhận nhóm công khai (id nằm
+   * trong mọi link — xem `joinRequestService.create`), nên với nhóm kín mở bằng mã thì gửi id
+   * sẽ ăn 404 ngay sau khi người dùng vừa nhìn thấy hồ sơ.
+   */
   const requestJoin = () =>
     join.mutate(
-      { orgId: org.id, claimedName: me?.name ?? '' },
+      code
+        ? { code, claimedName: me?.name ?? '' }
+        : { orgId: org.id, claimedName: me?.name ?? '' },
       {
         // Nhóm công khai vào ngay, nhóm riêng tư mới có đơn chờ — xem `orgApi.requestJoin`.
         onSuccess: (res) =>
@@ -140,13 +149,14 @@ export default function OrgProfileScreen() {
               item={item}
               index={index}
               /*
-               * KHÔNG truyền `orgName`, dù ở đây biết chắc nó là gì.
+               * TẮT viên "🏫 tên nhóm", dù ở đây biết chắc nó là gì.
                *
-               * Viên "🏫 tên nhóm" có nghĩa ở màn kết quả tìm kiếm vì tin ở đó đến từ nhiều
-               * nguồn — nó trả lời "tin này của nhóm nào". Trên chính hồ sơ nhóm thì câu trả
-               * lời đã nằm ở tiêu đề trang, nên in lại trên từng thẻ chỉ là lặp N lần một
-               * thông tin không ai còn hỏi. `ListingCard` tự giấu viên đó khi prop vắng.
+               * Viên đó có nghĩa ở bảng tin và kết quả tìm kiếm vì tin ở đó đến từ nhiều nguồn
+               * — nó trả lời "tin này của nhóm nào". Trên chính hồ sơ nhóm thì câu trả lời đã
+               * nằm ở tiêu đề trang, nên in lại trên từng thẻ chỉ là lặp N lần một thông tin
+               * không ai còn hỏi.
                */
+              showOrg={false}
               saved={saved.has(item.id)}
               onPress={() => router.push(`/listing/${item.id}`)}
               onToggleSave={() =>

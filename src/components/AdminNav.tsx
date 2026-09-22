@@ -122,7 +122,12 @@ const GROUPS: NavGroup[] = [
     // Chỉ master: hệ thống không còn cấp phó, quản trị nhóm không cấp được quyền cho ai nữa.
     // Ở đây master đặt người phụ trách các ô trục công khai; quản trị NHÓM đặt ở màn Tổ chức.
     label: 'Quyền',
-    items: [{ href: '/admin/role-grants', icon: '🔑', label: 'Phân quyền', gate: 'master' }],
+    items: [
+      { href: '/admin/role-grants', icon: '🔑', label: 'Phân quyền', gate: 'master' },
+      /* TẠM THỜI — bàn duyệt định danh cho vòng kiểm duyệt Bộ Công Thương. Gỡ dòng này cùng
+         lớp phủ KYC; nó là lối vào DUY NHẤT tới `app/admin/kyc.tsx`. */
+      { href: '/admin/kyc', icon: '🪪', label: 'Định danh', gate: 'master' },
+    ],
   },
   {
     // Không mục nào ở đây đọc `X-Org-Id`: đổi tổ chức đang chọn không đổi một dòng nào.

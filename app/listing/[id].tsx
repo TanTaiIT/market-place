@@ -216,7 +216,17 @@ export default function ListingDetail() {
             đúng chỗ đó và giá bị che mất. Đặt giá thành một dòng thật trong khối vừa hết chồng
             lấn, vừa cho nó đứng đúng thứ tự người ta đọc: tên món → giá → ở đâu, bao giờ.
           */}
-          <Text style={styles.price}>{listing.price}</Text>
+          <View style={styles.priceRow}>
+            <Text style={[styles.price, listing.priceValue <= 0 && styles.priceFree]}>
+              {listing.price}
+            </Text>
+            {/*
+              "Giao tận nơi" đứng CẠNH giá, không lẫn vào hàng meta bên dưới: cùng với giá, nó
+              là hai thứ người mua cân trước khi quyết định nhắn tin. Chỉ hiện khi người bán
+              thật sự bật — im lặng là câu trả lời "không", không phải "chưa biết".
+            */}
+            {listing.canDeliver && <Text style={styles.deliver}>🚚 Giao tận nơi</Text>}
+          </View>
 
           {/*
             Ba mảnh RỜI thay cho một chuỗi `meta` mờ.
@@ -415,7 +425,11 @@ const styles = StyleSheet.create({
    * Con số lớn nhất màn — `T.xl` là bậc chữ chỉ dùng cho MỘT dòng mỗi màn, và ở trang này đúng
    * là giá. `monoBold` để các chữ số đều bề ngang, không nhảy khi giá đổi.
    */
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' },
   price: { fontFamily: F.monoBold, ...T.xl, color: C.moss, marginTop: 10 },
+  /* Tin CHO TẶNG đổi hẳn quyết định của người xem, nên nó được đổi cả màu — không chỉ đổi chữ. */
+  priceFree: { color: C.pin },
+  deliver: { fontFamily: F.uiSemi, fontSize: 12, color: C.orange },
   /** Khe hở giữa các khối — chính nó để lộ nền `C.paper` và làm đường phân chia. */
   sheet: { gap: 9 },
   block: { backgroundColor: C.paperWarm, paddingHorizontal: 20, paddingVertical: 18 },

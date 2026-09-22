@@ -10,22 +10,22 @@ import Animated, {
 import { AttrFields, visibleAttrFields } from './AttrFields';
 import { PhotoPicker } from './PhotoPicker';
 import { EMPTY_LOCATION, LocationFields, type ListingLocation } from './LocationFields';
-import { listingDraftGaps } from './listingDraft';
+import { listingDraftGaps, type ListingFormValues } from './listingDraft';
 import {
   ListingReachField,
   defaultPick,
   usePostGroups,
-  type ListingReach,
   type PostGroup,
   type ReachPick,
 } from './ListingReach';
 import { BoxField, FormSection } from './FormSection';
+import { ListingPriceFields } from './ListingPriceFields';
 import { CategoryField } from './CategoryField';
 import { useToast } from './Toast';
 import { useCategoryTemplate } from '@/queries/templates';
 import { useProfile } from '@/queries/listings';
 import { MAX_PHOTOS, type ListingPhotosController } from '@/queries/upload';
-import type { Listing, ListingAttributes } from '@/api/db';
+import type { ListingAttributes } from '@/api/db';
 import { C, F, S, shadow } from '@/theme';
 
 /**
@@ -37,49 +37,6 @@ import { C, F, S, shadow } from '@/theme';
  * Form giữ state + luật hợp lệ, KHÔNG gọi mutation: submit đi ngược lên route qua `onSubmit`
  * (AGENTS §Kiến trúc — mutation chỉ khởi động từ `app/**`).
  */
-
-type ListingFormValues = {
-  title: string;
-  /** Chuỗi thô từ `TextInput`; đổi sang số là việc của `client.ts`, không phải của form. */
-  price: string;
-  desc: string;
-  categoryId: string;
-  /** Bậc phủ sóng + nhóm đích. Chỉ có nghĩa lúc TẠO — BE không cho sửa cả hai sau khi đăng. */
-  reach: ListingReach;
-  orgId: string | null;
-  location: ListingLocation;
-  /** Thuộc tính động theo template của danh mục — rỗng khi danh mục chưa có field nào. */
-  attributes: ListingAttributes;
-  /**
-   * Bản template của tin đang sửa. Chỉ form SỬA mới có — tin mới luôn dùng bản mới nhất.
-   * Không gửi lên BE; nó chỉ quyết định form hỏi template nào.
-   */
-  templateVersion?: number;
-};
-
-/**
- * Tin đã lưu → giá trị điền sẵn cho form sửa.
- *
- * Đọc `priceValue` chứ không phải `price`: bản hiển thị đã qua `formatPrice`, và "Miễn phí"
- * thì không còn đường nào quay về `0`.
- */
-export function listingToFormValues(listing: Listing): ListingFormValues {
-  return {
-    title: listing.title,
-    price: String(listing.priceValue),
-    desc: listing.desc,
-    categoryId: listing.categoryId,
-    reach: listing.reach,
-    orgId: null,
-    attributes: listing.attributes ?? {},
-    templateVersion: listing.templateVersion,
-    location: {
-      province: listing.province ?? null,
-      ward: listing.ward ?? null,
-      address: listing.address ?? '',
-    },
-  };
-}
 
 export function ListingForm({
   photos,
@@ -112,6 +69,7 @@ export function ListingForm({
   // Giữ id chứ không giữ tên: BE nhận `categoryId` là ObjectId. Rỗng cho tới khi danh mục
   // tải xong hoặc người dùng chọn.
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? '');
+  const [canDeliver, setCanDeliver] = useState(initial?.canDeliver ?? false);
   /**
    * Bậc phủ sóng: SUY RA cho tới khi người dùng chạm vào, chứ không giữ trong state ngay.
    *
@@ -210,7 +168,7 @@ export function ListingForm({
 
     // `...pick` rải đúng hai khoá `reach` + `orgId` — chúng đi liền nhau nên tách ra hai
     // dòng chỉ mở chỗ cho một bên được cập nhật mà bên kia quên.
-    onSubmit({ title, price, desc, categoryId, ...pick, location, attributes });
+    onSubmit({ title, price, desc, categoryId, canDeliver, ...pick, location, attributes });
   };
 
   return (
@@ -274,13 +232,11 @@ export function ListingForm({
                 maxLength={150}
                 counter
               />
-              <BoxField
-                label="Mức giá"
-                value={price}
-                onChangeText={setPrice}
-                placeholder="0"
-                keyboardType="number-pad"
-                suffix="đ"
+              <ListingPriceFields
+                price={price}
+                onPrice={setPrice}
+                canDeliver={canDeliver}
+                onCanDeliver={setCanDeliver}
               />
 
               {/* Field động của đúng danh mục vừa chọn — vẫn trong nhóm "Chi tiết". */}

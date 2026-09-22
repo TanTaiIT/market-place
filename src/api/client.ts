@@ -68,6 +68,7 @@ import type {
   SearchFilter,
 } from './db';
 import { getCurrentUserId, withAuthRetry } from './http';
+import { REVIEW_MODE } from '@/compliance';
 
 /**
  * Lớp truy cập dữ liệu — toàn bộ đi qua SDK generated (BE `market` thật), không còn stub local.
@@ -259,6 +260,7 @@ function toListing(dto: OwnerListingDto, names: Map<string, string>): Listing {
     title: dto.title,
     price: formatPrice(dto.price),
     priceValue: dto.price,
+    canDeliver: dto.canDeliver,
     // BE trả `category` là ObjectId; tên hiển thị tra từ từ điển danh mục. Không tra được
     // thì để rỗng — `NoteCard` tự giấu pill, tin vẫn đọc được bình thường.
     cat: names.get(dto.category) ?? '',
@@ -327,7 +329,15 @@ function toProfile(dto: MeProfile): Profile {
     posted: '—',
     sold: '—',
     email: dto.email,
-    emailVerified: dto.isEmailVerified,
+    /*
+     * MỘT dòng tắt cả bốn bề mặt xác thực email — xem `REVIEW_MODE`.
+     *
+     * Tắt ở đây thay vì gác từng màn: dải nhắc ở Cá nhân, mục ở Cài đặt và cổng
+     * `useRequireVerifiedEmail` đều đọc đúng cờ này, nên một chỗ là đủ và gỡ cũng chỉ một chỗ.
+     * BE đã đặt `emailVerifiedAt` ngay lúc tạo (`SKIP_EMAIL_VERIFICATION`), nên đây không phải
+     * nói dối giao diện — nó chỉ khớp lại với sự thật phía server.
+     */
+    emailVerified: REVIEW_MODE ? true : dto.isEmailVerified,
     rating: dto.ratingCount > 0 ? dto.ratingAvg.toFixed(1) : '—',
   };
 }
@@ -433,6 +443,9 @@ type ListingInput = {
   price: string;
   desc: string;
   categoryId: string;
+  /** Người bán nhận giao tận nơi. Sửa được sau khi đăng — nó là thuộc tính món hàng, không
+   *  phải khoá định tuyến như `reach`/`provinceCode`. */
+  canDeliver?: boolean;
   photoUrls?: string[];
   address?: string | null;
   province?: ProvinceName | null;
@@ -495,6 +508,7 @@ function toEditableBody(input: ListingInput) {
     title: input.title.trim(),
     description: input.desc.trim(),
     price,
+    canDeliver: input.canDeliver ?? false,
     categoryId: input.categoryId,
     images: input.photoUrls ?? [],
     // `location: {}` rỗng qua được `.strict()` của BE nhưng tạo ra bản ghi không lọc
@@ -702,7 +716,7 @@ export const api = {
    * cả app sang làm việc ở đó. BE vẫn đối chiếu membership với id nhận được, nên gọi
    * cho nhóm mình không thuộc về sẽ 403 — chỉ gọi khi hồ sơ trả `joined: true`.
    */
-  async getOrgListings(orgId: string, take: number): Promise<Listing[]> {
+  async getOrgListings(orgId: string, take: number, q?: string): Promise<Listing[]> {
     const [res, names] = await Promise.all([
       withAuthRetry(() =>
         listingList({
@@ -718,7 +732,12 @@ export const api = {
            * nên thấy đúng phần nhóm đã mở (`group_open`). Header thì không làm nổi vế đó, vì
            * người ngoài không có chỗ đứng nào trên trục org để mà thu hẹp.
            */
-          query: { limit: take, orgId },
+          /*
+           * `q` do BE khớp (tiêu đề + tên người đăng), KHÔNG lọc lại ở client: khối này chỉ
+           * tải `take` tin đầu, nên lọc trên mảng đó là tìm trong ba tin thay vì trong nhóm —
+           * đúng thứ vô dụng nhất ở một nhóm nhiều tin.
+           */
+          query: { limit: take, orgId, ...(q ? { q } : {}) },
         }),
       ),
       categoryNames(),

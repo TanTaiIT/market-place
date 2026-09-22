@@ -23,30 +23,18 @@
  * Gỡ tiếp thế nào: `grep -rn "placeholders" src app` ra đúng danh sách call-site.
  */
 
-/** Băm id thành số nguyên ổn định — cùng id, cùng kết quả, mọi phiên. */
-function hash(id: string): number {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return h;
-}
-
-const pick = <T,>(id: string, table: readonly T[], salt = 0): T =>
-  table[(hash(id) + salt) % table.length];
-
-/**
- * TODO(be): không có field vận chuyển trên `Listing`.
+/*
+ * BỘ SỐ BỊA ĐÃ HẾT SẠCH — không còn con số nào trên thẻ tin do máy nghĩ ra.
  *
- * Thứ DUY NHẤT còn sót lại của bộ số tạm. Năm thứ kia — sao đánh giá, số giao dịch, % giảm,
- * giá cũ gạch ngang, khoảng cách — đã gỡ hẳn: chúng là những con số người mua DỰA VÀO ĐỂ
- * QUYẾT ĐỊNH nhắn cho ai, mà ba trong số đó BE không có đường nào cấp trong tương lai gần
- * (module `review` còn là stub, `Listing` không có giá cũ, BE đã bỏ GeoJSON). Bịa một con số
- * trang trí là một chuyện; bịa bằng chứng đáng tin cậy về người bán là chuyện khác.
+ * Sao đánh giá, số giao dịch, % giảm giá, giá cũ gạch ngang và khoảng cách bị gỡ trước, vì
+ * chúng là thứ người mua DỰA VÀO ĐỂ QUYẾT ĐỊNH nhắn cho ai. "Giao tận nơi" là cái cuối, và nó
+ * sống lâu nhất vì trông vô hại nhất — nhưng nó suy từ hash của id, nghĩa là nói với người mua
+ * một điều về người bán mà chính người bán chưa hề nói. Giờ nó là field `canDeliver` thật, do
+ * người đăng tự bật.
+ *
+ * Bịa một con số trang trí là một chuyện; bịa bằng chứng đáng tin cậy về người bán là chuyện
+ * khác. File này chỉ còn giữ những thứ thuộc vế đầu.
  */
-const SHIP = [true, false, false, true, false] as const;
-
-/** Tin này có giao tận nơi không — cùng `id` luôn ra cùng câu trả lời. */
-export const listingShips = (id: string): boolean => pick(id, SHIP, 4);
-
 /** TODO(be): chưa có hệ khuyến mãi/chiến dịch. Banner "Đang diễn ra" ở màn Khám phá. */
 export const PROMOS = [
   {

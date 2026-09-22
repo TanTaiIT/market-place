@@ -4,6 +4,8 @@ import { Tabs, useRouter } from 'expo-router';
 import { SupportFab } from '@/components/SupportFab';
 import { TabBar } from '@/components/TabBar';
 import { useAuthStore, usePendingEmailVerify } from '@/stores/auth';
+// Lớp phủ tuân thủ TẠM THỜI — xem khối `CỔNG ĐỊNH DANH` bên dưới; hai thứ này cùng bị gỡ.
+import { useMyKyc } from '@/queries/kyc';
 
 export default function TabsLayout() {
   const router = useRouter();
@@ -25,6 +27,25 @@ export default function TabsLayout() {
     useAuthStore.getState().clearPendingEmailVerify();
     router.push('/verify-email');
   }, [pendingVerify, router]);
+
+  /*
+   * CỔNG ĐỊNH DANH — TẠM THỜI, cho vòng kiểm duyệt của Bộ Công Thương.
+   *
+   * Đây là ĐIỂM CHẠM DUY NHẤT của lớp phủ KYC vào app. Gỡ về sau = xoá `useEffect` này, ba
+   * dòng `import`, và ba file `api/kyc.ts` · `queries/kyc.ts` · `app/kyc.tsx`.
+   *
+   * Đặt cạnh lượt mời xác thực email ở trên vì cùng một lý do HARD#18: điều hướng đến từ
+   * TRẠNG THÁI app sau khi stack đã mount, không từ sự kiện đăng nhập — bắn lúc đăng nhập
+   * là chạy trên stack cũ rồi bị vứt.
+   *
+   * `data === undefined` (đang tải, hoặc BE chưa bật cờ nên query lỗi) thì KHÔNG đẩy đi đâu:
+   * nghi ngờ thì để người dùng ở lại, đừng ném họ vào một form có thể không ai đang cần.
+   */
+  const { data: kyc } = useMyKyc();
+  useEffect(() => {
+    if (kyc === undefined || kyc?.status === 'approved') return;
+    router.replace('/kyc');
+  }, [kyc, router]);
 
   return (
     /*

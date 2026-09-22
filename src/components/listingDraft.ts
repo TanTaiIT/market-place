@@ -1,5 +1,6 @@
 import { locationGap, type ListingLocation } from './LocationFields';
-import type { ListingAttributes, TemplateField } from '@/api/db';
+import type { Listing, ListingAttributes, TemplateField } from '@/api/db';
+import type { ListingReach } from './ListingReach';
 
 /*
  * Khớp `createListingSchema` của BE. Chặn ở client để người dùng biết ngay lúc bấm, thay vì gõ
@@ -22,6 +23,60 @@ export type ListingDraft = {
   /** Đã chọn bậc trong nhóm mà chưa chỉ ra nhóm nào — `routeListing` bên BE từ chối tổ hợp đó. */
   needsGroup: boolean;
 };
+
+
+/*
+ * Hình dạng dữ liệu của form, và phép ánh xạ từ một tin đã lưu sang nó.
+ *
+ * Ở đây chứ không trong `ListingForm.tsx` vì cả hai là LUẬT THUẦN của form, không phải giao
+ * diện — cùng lý do `listingDraftGaps` nằm ở file này. Và `ListingForm` đã quá trần LOC, nên
+ * mọi thứ không phải JSX đều nên rời khỏi đó trước.
+ */
+export type ListingFormValues = {
+  title: string;
+  /** Chuỗi thô từ `TextInput`; đổi sang số là việc của `client.ts`, không phải của form. */
+  price: string;
+  desc: string;
+  categoryId: string;
+  /** Người bán nhận giao tận nơi — lời hứa của họ, sửa được sau khi đăng. */
+  canDeliver: boolean;
+  /** Bậc phủ sóng + nhóm đích. Chỉ có nghĩa lúc TẠO — BE không cho sửa cả hai sau khi đăng. */
+  reach: ListingReach;
+  orgId: string | null;
+  location: ListingLocation;
+  /** Thuộc tính động theo template của danh mục — rỗng khi danh mục chưa có field nào. */
+  attributes: ListingAttributes;
+  /**
+   * Bản template của tin đang sửa. Chỉ form SỬA mới có — tin mới luôn dùng bản mới nhất.
+   * Không gửi lên BE; nó chỉ quyết định form hỏi template nào.
+   */
+  templateVersion?: number;
+};
+
+/**
+ * Tin đã lưu → giá trị điền sẵn cho form sửa.
+ *
+ * Đọc `priceValue` chứ không phải `price`: bản hiển thị đã qua `formatPrice`, và "Miễn phí"
+ * thì không còn đường nào quay về `0`.
+ */
+export function listingToFormValues(listing: Listing): ListingFormValues {
+  return {
+    title: listing.title,
+    price: String(listing.priceValue),
+    desc: listing.desc,
+    categoryId: listing.categoryId,
+    canDeliver: listing.canDeliver,
+    reach: listing.reach,
+    orgId: null,
+    attributes: listing.attributes ?? {},
+    templateVersion: listing.templateVersion,
+    location: {
+      province: listing.province ?? null,
+      ward: listing.ward ?? null,
+      address: listing.address ?? '',
+    },
+  };
+}
 
 /** Một chỗ chưa xong: `label` để liệt kê ở chân form, `message` để nói rõ lúc bấm gửi. */
 export type DraftGap = { label: string; message: string };

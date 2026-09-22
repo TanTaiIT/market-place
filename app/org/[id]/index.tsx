@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FlatList, Share, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { OrgMemberSheet } from '@/components/OrgMemberSheet';
@@ -9,7 +9,7 @@ import { Header } from '@/components/OrgProfileCard';
 import { useToast } from '@/components/Toast';
 import { useRequireAuth } from '@/components/GuestGate';
 import { useRequestJoin } from '@/queries/org';
-import { useOrgPeek, useOrgProfile } from '@/queries/org-discover';
+import { useOrgListingSearch, useOrgPeek, useOrgProfile } from '@/queries/org-discover';
 import { useMyGrants } from '@/queries/admin';
 import { canAdminOrg } from '@/api/admin';
 import { useProfile, useSavedIds, useToggleSaved } from '@/queries/listings';
@@ -33,10 +33,24 @@ export default function OrgProfileScreen() {
   const toast = useToast();
   /* `null` = ngăn đóng; mở ra thì chính id này là thứ bật query danh bạ — không có cờ thứ hai. */
   const [membersOrgId, setMembersOrgId] = useState<string | null>(null);
+  /** Từ khoá tìm tin TRONG nhóm. Rỗng = khối xem trước như cũ. */
+  const [term, setTerm] = useState('');
 
   const { data: org, error, isPending } = useOrgProfile(id ?? '', code);
   const { data: me } = useProfile();
   const join = useRequestJoin();
+  /*
+   * Đang tìm hay đang xem trước — MỘT biến quyết định cả nguồn dữ liệu lẫn câu nói khi rỗng.
+   *
+   * Đọc `term` chứ không `search.data`: người vừa gõ xong mà kết quả chưa về thì vẫn là đang
+   * tìm, và rơi về khối xem trước lúc đó là nháy một danh sách không liên quan tới thứ họ gõ.
+   *
+   * Khai ở ĐÂY, trên mọi nhánh `return` sớm: hook không được gọi có điều kiện. Đặt nó cạnh
+   * chỗ dùng (dưới `invite`) thì nó rơi xuống sau nhánh "đang tải"/"404", và thứ tự hook đổi
+   * giữa hai lượt render — React vỡ ở lần trạng thái đổi, không phải ở lần đầu.
+   */
+  const searching = term.trim().length > 0;
+  const search = useOrgListingSearch(id ?? '', term, searching);
   /*
    * Tin trong nhóm bày bằng `ListingCard` — CÙNG một thẻ với mọi bề mặt công khai.
    *
@@ -108,14 +122,17 @@ export default function OrgProfileScreen() {
       message: `Vào nhóm "${org.name}" trên Ghim — mã tham gia: ${org.joinCode}`,
     }).catch(() => {});
 
+  const rows = searching ? (search.data ?? []) : (peek.data?.listings ?? []);
+
   return (
     <Shell>
       <FlatList
-        data={peek.data?.listings ?? []}
+        data={rows}
         keyExtractor={(l) => l.id}
         // `gap: 14` khớp nhịp của màn kết quả tìm kiếm — xem `styles.post`.
         contentContainerStyle={[styles.body, { gap: 14 }]}
         ListHeaderComponent={
+          <>
           <Header
             org={org}
             members={peek.data?.members ?? []}
@@ -141,8 +158,36 @@ export default function OrgProfileScreen() {
             onOpenMembers={() => setMembersOrgId(org.id)}
             busy={join.isPending}
           />
+            {/*
+              Ô TÌM nằm trong `ListHeaderComponent`, dưới phần hồ sơ và ngay trên danh sách:
+              nó thuộc về khối tin, không phải khối nhận diện nhóm. Chỉ dựng khi người xem
+              ĐỌC ĐƯỢC tin của nhóm — người ngoài một nhóm kín không có gì để mà tìm.
+            */}
+            {org.joined && (
+              <View style={styles.search}>
+                <Text style={styles.searchIcon}>🔍</Text>
+                <TextInput
+                  value={term}
+                  onChangeText={setTerm}
+                  placeholder="Tìm tin trong nhóm…"
+                  placeholderTextColor={C.muted}
+                  style={styles.searchInput}
+                  returnKeyType="search"
+                  autoCorrect={false}
+                />
+                {/* Nút xoá thay cho việc bắt người dùng xoá từng ký tự để về lại xem trước. */}
+                {term.length > 0 && (
+                  <Text onPress={() => setTerm('')} style={styles.searchClear}>
+                    ✕
+                  </Text>
+                )}
+              </View>
+            )}
+          </>
         }
         ListHeaderComponentStyle={{ marginBottom: 4 }}
+        // Gõ xong bấm ra ngoài để đóng bàn phím mà không mất phím vừa chạm.
+        keyboardShouldPersistTaps="handled"
         renderItem={({ item, index }) => (
           <View style={styles.post}>
             <ListingCard
@@ -168,7 +213,17 @@ export default function OrgProfileScreen() {
             />
           </View>
         )}
-        ListEmptyComponent={<GroupFeed org={org} />}
+        ListEmptyComponent={
+          searching ? (
+            <Text style={styles.noHit}>
+              {search.isPending
+                ? 'Đang tìm…'
+                : `Không có tin nào khớp “${term.trim()}”`}
+            </Text>
+          ) : (
+            <GroupFeed org={org} />
+          )
+        }
       />
 
       <OrgMemberSheet
@@ -229,6 +284,29 @@ function Shell({ children }: { children: React.ReactNode }) {
 }
 
 const styles = StyleSheet.create({
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    marginHorizontal: 16,
+    marginTop: 14,
+    paddingHorizontal: 13,
+    borderRadius: 10,
+    backgroundColor: C.paper,
+    borderWidth: 1,
+    borderColor: C.lineInput,
+  },
+  searchIcon: { fontSize: 13, opacity: 0.6 },
+  searchInput: { flex: 1, paddingVertical: 10, fontFamily: F.ui, fontSize: 13, color: C.ink },
+  searchClear: { fontFamily: F.uiBold, fontSize: 13, color: C.inkSoft, paddingHorizontal: 4 },
+  noHit: {
+    fontFamily: F.ui,
+    fontSize: 13,
+    color: C.inkSoft,
+    textAlign: 'center',
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+  },
   /** Khoảng cách hàng do call-site truyền vào — 10, khớp danh sách của màn tìm kiếm. */
   body: { paddingBottom: 32 },
   /** Lề NGOÀI cho thẻ tin, khớp với `inset` của khối hồ sơ phía trên. */

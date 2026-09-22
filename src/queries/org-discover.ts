@@ -87,6 +87,15 @@ const AVATAR_STACK = 4;
 const PEEK_ROWS = 3;
 
 /**
+ * Số tin một lượt TÌM trong nhóm trả về.
+ *
+ * Rộng hơn hẳn `PEEK_ROWS`: xem trước là để biết nhóm còn sống, còn tìm là để thấy cho ra thứ
+ * mình cần. 30 là trần một trang của BE nhân ba — đủ cho gần mọi lượt tìm mà chưa phải dựng
+ * phân trang cho một khối vốn không phải bảng tin.
+ */
+const SEARCH_ROWS = 30;
+
+/**
  * Danh bạ + tin của nhóm đang mở hồ sơ.
  *
  * `enabled: joined` là chốt bắt buộc, không phải tối ưu: cả hai endpoint đòi tư cách thành
@@ -101,5 +110,33 @@ export function useOrgPeek(orgId: string, joined: boolean) {
     }),
     enabled: orgId.length > 0 && joined,
     staleTime: 60_000,
+  });
+}
+
+/**
+ * Tìm tin THEO TÊN trong một nhóm — chỉ chạy khi người dùng đã gõ.
+ *
+ * Tách khỏi `useOrgPeek` thay vì thêm tham số `q` vào nó, vì hai thứ khác nhau ở cả ba mặt:
+ * khối xem trước lấy đúng 3 tin và đi kèm danh bạ, còn lượt tìm lấy rộng hơn nhiều và không
+ * cần danh bạ. Nhét chung một query là mỗi lần gõ một chữ lại kéo theo một lượt gọi danh bạ.
+ *
+ * Hoãn 300ms như `useOrgDiscover`: mỗi tiền tố là một khoá mới, gõ thẳng là một request cho
+ * từng chữ cái.
+ */
+export function useOrgListingSearch(orgId: string, keyword: string, enabled: boolean) {
+  const term = keyword.trim();
+  const [settled, setSettled] = useState(term);
+  useEffect(() => {
+    const t = setTimeout(() => setSettled(term), 300);
+    return () => clearTimeout(t);
+  }, [term]);
+
+  return useQuery({
+    queryKey: qk.orgListingSearch(orgId, settled),
+    queryFn: () => api.getOrgListings(orgId, SEARCH_ROWS, settled),
+    // Chuỗi rỗng KHÔNG gọi: đó là trạng thái "chưa tìm", và khối xem trước đã trả lời rồi.
+    enabled: enabled && orgId.length > 0 && settled.length > 0,
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
   });
 }

@@ -171,6 +171,10 @@ export default function RootLayout() {
                   {/* Cần đăng nhập vì BE lấy địa chỉ nhận mã từ TOKEN, không từ body — xem
                       `auth.routes.ts`. Khách chưa có tài khoản thì chưa có gì để xác thực. */}
                   <Stack.Screen name="verify-email" />
+                  {/* TẠM THỜI — màn định danh cho vòng kiểm duyệt Bộ Công Thương; gỡ cùng lớp
+                      phủ KYC. `gestureEnabled: false` vì vuốt về là thoát khỏi đúng cái cổng
+                      vừa đưa họ tới, rồi vòng lại ngay ở lượt render sau. */}
+                  <Stack.Screen name="kyc" options={{ gestureEnabled: false }} />
                   {/* Cần đăng nhập nhưng KHÔNG cần thuộc tổ chức nào — `find-org` chính là đường
                       vào tổ chức đầu tiên của một tài khoản mới; `join-org` là danh sách nhóm
                       mình đang ở, rỗng cũng mở được. */}

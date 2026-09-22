@@ -128,6 +128,7 @@ export type CreateListing = {
     description: string;
     price: number;
     isNegotiable?: boolean;
+    canDeliver?: boolean;
     condition?: 'new' | 'like_new' | 'used';
     categoryId: string;
     images: Array<string>;
@@ -226,6 +227,7 @@ export type UpdateListing = {
     description?: string;
     price?: number;
     isNegotiable?: boolean;
+    canDeliver?: boolean;
     condition?: 'new' | 'like_new' | 'used';
     categoryId?: string;
     images?: Array<string>;
@@ -254,6 +256,7 @@ export type Listing = {
     description: string;
     price: number;
     isNegotiable: boolean;
+    canDeliver: boolean;
     condition: 'new' | 'like_new' | 'used';
     images: Array<string>;
     category: string;
@@ -895,6 +898,46 @@ export type SystemMetrics = {
         totalCells: number;
         coverageBacklog: number;
     };
+};
+
+export type SubmitKyc = {
+    subjectType: 'individual';
+    fullName: string;
+    birthDate: string | null;
+    idNumber: string;
+} | {
+    subjectType: 'company';
+    companyName: string;
+    companyAddress: string;
+    companyTaxCode: string;
+    fullName: string;
+    birthDate: string | null;
+    idNumber: string;
+};
+
+export type RejectKyc = {
+    reason: string;
+};
+
+export type KycProfile = {
+    id: string;
+    userId: string;
+    subjectType: 'individual' | 'company';
+    status: 'pending' | 'approved' | 'rejected';
+    fullName: string;
+    birthDate: string;
+    companyName?: string;
+    companyAddress?: string;
+    companyTaxCode?: string;
+    rejectReason: string | null;
+    reviewedAt: string | null;
+    createdAt: string;
+};
+
+export type KycDetail = KycProfile & {
+    idNumber: string;
+    accountName: string;
+    accountEmail: string;
 };
 
 export type MySupportThread = {
@@ -5487,6 +5530,197 @@ export type MetricsSystemResponses = {
 };
 
 export type MetricsSystemResponse = MetricsSystemResponses[keyof MetricsSystemResponses];
+
+export type MyKycData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/kyc/me';
+};
+
+export type MyKycResponses = {
+    /**
+     * Hồ sơ của tôi
+     */
+    200: {
+        success: true;
+        message: string;
+        data: KycProfile & unknown;
+    };
+};
+
+export type MyKycResponse = MyKycResponses[keyof MyKycResponses];
+
+export type SubmitKycData = {
+    body?: SubmitKyc;
+    path?: never;
+    query?: never;
+    url: '/kyc/me';
+};
+
+export type SubmitKycErrors = {
+    /**
+     * Thông tin không hợp lệ
+     */
+    400: ErrorResponse;
+    /**
+     * Hồ sơ đã được duyệt
+     */
+    409: ErrorResponse;
+};
+
+export type SubmitKycError = SubmitKycErrors[keyof SubmitKycErrors];
+
+export type SubmitKycResponses = {
+    /**
+     * Đã nộp hồ sơ
+     */
+    201: {
+        success: true;
+        message: string;
+        data: KycProfile;
+    };
+};
+
+export type SubmitKycResponse = SubmitKycResponses[keyof SubmitKycResponses];
+
+export type ListKycData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: 'pending' | 'approved' | 'rejected';
+        page?: number;
+        limit?: number;
+    };
+    url: '/kyc';
+};
+
+export type ListKycErrors = {
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+};
+
+export type ListKycError = ListKycErrors[keyof ListKycErrors];
+
+export type ListKycResponses = {
+    /**
+     * Hồ sơ định danh
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Array<KycProfile>;
+    };
+};
+
+export type ListKycResponse = ListKycResponses[keyof ListKycResponses];
+
+export type KycDetailData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/kyc/{id}';
+};
+
+export type KycDetailErrors = {
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy hồ sơ
+     */
+    404: ErrorResponse;
+};
+
+export type KycDetailError = KycDetailErrors[keyof KycDetailErrors];
+
+export type KycDetailResponses = {
+    /**
+     * Chi tiết hồ sơ
+     */
+    200: {
+        success: true;
+        message: string;
+        data: KycDetail;
+    };
+};
+
+export type KycDetailResponse = KycDetailResponses[keyof KycDetailResponses];
+
+export type ApproveKycData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/kyc/{id}/approve';
+};
+
+export type ApproveKycErrors = {
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy hồ sơ
+     */
+    404: ErrorResponse;
+};
+
+export type ApproveKycError = ApproveKycErrors[keyof ApproveKycErrors];
+
+export type ApproveKycResponses = {
+    /**
+     * Duyệt hồ sơ định danh (master)
+     */
+    200: {
+        success: true;
+        message: string;
+        data: KycProfile;
+    };
+};
+
+export type ApproveKycResponse = ApproveKycResponses[keyof ApproveKycResponses];
+
+export type RejectKycData = {
+    body?: RejectKyc;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/kyc/{id}/reject';
+};
+
+export type RejectKycErrors = {
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy hồ sơ
+     */
+    404: ErrorResponse;
+};
+
+export type RejectKycError = RejectKycErrors[keyof RejectKycErrors];
+
+export type RejectKycResponses = {
+    /**
+     * Từ chối hồ sơ định danh (master)
+     */
+    200: {
+        success: true;
+        message: string;
+        data: KycProfile;
+    };
+};
+
+export type RejectKycResponse = RejectKycResponses[keyof RejectKycResponses];
 
 export type SupportMyThreadData = {
     body?: never;

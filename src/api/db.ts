@@ -23,6 +23,14 @@ export type Listing = {
    * nạp lại con số, mà đọc ngược từ chuỗi hiển thị thì "Miễn phí" không còn đường về 0.
    */
   priceValue: number;
+  /**
+   * Người bán nhận giao tận nơi — LỜI HỨA CỦA HỌ, không phải dịch vụ của sàn.
+   *
+   * Bản trước viên "🚚 Giao tận nơi" trên thẻ tin được suy từ HASH CỦA ID
+   * (`placeholders.listingShips`), nghĩa là nó nói dối người mua về mọi tin. Field này là thứ
+   * thay nó, và mặc định `false` ở BE để tin cũ không tiếp tục hứa thay người bán.
+   */
+  canDeliver: boolean;
   cat: string;
   /**
    * Id danh mục + tỉnh giữ nguyên bên cạnh bản hiển thị (`cat`): đây là hai tiêu chí đi tìm

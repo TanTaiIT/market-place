@@ -126,6 +126,8 @@ export const qk = {
     ['orgs', 'profile', orgId, code ?? ''] as const,
   /** Danh bạ + tin của MỘT nhóm đang mở hồ sơ, tách khỏi cụm scope theo org đang thao tác. */
   orgPeek: (orgId: string, take: number) => ['orgs', 'peek', orgId, take] as const,
+  /** Tìm tin theo tên trong MỘT nhóm. Từ khoá nằm trong khoá — mỗi từ là một tập kết quả khác. */
+  orgListingSearch: (orgId: string, q: string) => ['orgs', 'peek', orgId, 'search', q] as const,
   /** Prefix của cụm đơn xin tham gia — quét cả "đơn của tôi" lẫn hàng đợi của người duyệt. */
   joinRequestsRoot: () => ['join-requests'] as const,
   myJoinRequests: () => ['join-requests', 'mine'] as const,

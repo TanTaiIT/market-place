@@ -76,8 +76,8 @@ export default function AdminAnalytics() {
   const meta = active.data ? (
     // Múi giờ phải nói ra: "ngày" ở đây là ngày Việt Nam, không phải ngày máy đang xem.
     <Text style={styles.tz}>
-      Gộp theo giờ {active.data.timezone} · {active.data.points.length} cột
-      {active.data.truncated > 0 ? ` · đã cắt ${active.data.truncated} cột cũ nhất` : ''}
+      Gộp theo giờ {active.data.timezone} · {active.data.points.length} kỳ
+      {active.data.truncated > 0 ? ` · đã cắt ${active.data.truncated} kỳ cũ nhất` : ''}
     </Text>
   ) : null;
 

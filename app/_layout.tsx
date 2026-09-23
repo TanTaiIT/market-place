@@ -154,6 +154,9 @@ export default function RootLayout() {
                 {/* Bài viết pháp lý — cụm tạm thời, công thức gỡ ở `@/api/legal`. Công khai
                     có chủ ý: cả điểm của nó là cho người chưa có tài khoản đọc. */}
                 <Stack.Screen name="legal/[slug]" />
+                {/* Không cần đăng nhập: người chưa có tài khoản cũng cần biết sàn này
+                    hoạt động thế nào trước khi quyết định đăng ký. */}
+                <Stack.Screen name="guide" />
                 {/* Hai màn của cột "Hỗ trợ khách hàng" — dựng dạng modal cho khớp bản web.
                     Route TĨNH nên expo-router ưu tiên chúng trước `legal/[slug]`. */}
                 <Stack.Screen name="legal/feedback" options={{ presentation: 'modal' }} />

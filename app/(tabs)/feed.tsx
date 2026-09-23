@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Surface } from '@/components/Surface';
 import { FeedBar } from '@/components/FeedBar';
-import { BannerBoard, GuideStrip, PerkStrip, PromoStrip } from '@/components/FeedStrips';
+import { BannerBoard, GuideStrip, PromoStrip } from '@/components/FeedStrips';
 import {
   CategoryStrip,
   FeaturedStrip,
@@ -113,10 +113,10 @@ export default function Feed() {
         <FeedSuggested onOpen={(id) => router.push(`/listing/${id}`)} />
 
         {/*
-          Ba khối TIẾP THỊ, LUÔN hiện, đặt ở cuối.
+          Hai khối TIẾP THỊ, LUÔN hiện, đặt ở cuối.
 
-          Nội dung của chúng là hardcode trong `api/placeholders` (`BANNERS`, `GUIDE_STEPS`,
-          `PERKS`) — chữ giới thiệu, không phải dữ liệu. Đã có một lượt gác chúng sau cờ
+          Nội dung của chúng là hardcode trong `api/placeholders` (`BANNERS`,
+          `GUIDE_STEPS`) — chữ giới thiệu, không phải dữ liệu. Đã có một lượt gác chúng sau cờ
           `isGuest` để bảng tin của người đã đăng nhập gọn còn 5 mục; BỎ vì đó là quyết định
           SẢN PHẨM chứ không phải quyết định layout — nó làm nội dung biến mất khỏi màn mà
           chủ sản phẩm không chờ đợi. Muốn gọn lại thì gác lại, nhưng phải là lựa chọn có ý
@@ -126,7 +126,6 @@ export default function Feed() {
         */}
         <BannerBoard onPress={openBanner} />
         <GuideStrip />
-        <PerkStrip />
 
         <SiteFooter />
       </Animated.ScrollView>

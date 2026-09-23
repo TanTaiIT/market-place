@@ -3,13 +3,13 @@ import { useRouter } from 'expo-router';
 import { useMyOrgs } from '@/queries/org';
 import { useMyGrants } from '@/queries/admin';
 import { isMaster } from '@/api/admin';
-import { useOrgSlug, useSetActiveOrg } from '@/stores/auth';
+import { useOrgId, useSetActiveOrg } from '@/stores/auth';
 import { C, F, shadow } from '@/theme';
 
 /**
  * Chọn tổ chức đang thao tác.
  *
- * Từ v2, org KHÔNG nằm trong token: mỗi request tự khai bằng header `X-Org-Slug`. Nghĩa là
+ * Từ v2, org KHÔNG nằm trong token: mỗi request tự khai bằng header `X-Org-Id`. Nghĩa là
  * lựa chọn ở đây quyết định toàn bộ dữ liệu người dùng nhìn thấy ở màn sau — nên nó phải là
  * một thứ hiện rõ trên hồ sơ, không phải một tuỳ chọn giấu trong cài đặt.
  *
@@ -19,7 +19,7 @@ import { C, F, shadow } from '@/theme';
 export function OrgSwitcher() {
   const router = useRouter();
   const orgs = useMyOrgs();
-  const active = useOrgSlug();
+  const active = useOrgId();
   const setActiveOrg = useSetActiveOrg();
   const grants = useMyGrants();
   const master = isMaster(grants.data);
@@ -69,17 +69,17 @@ export function OrgSwitcher() {
       <Text style={styles.title}>Đang thao tác trong</Text>
 
       {rows.map((org) => {
-        const selected = org.slug === active;
+        const selected = org.id === active;
         return (
           <Pressable
             key={org.id}
             style={[styles.row, selected && styles.rowOn]}
-            onPress={() => setActiveOrg(selected ? null : org.slug)}
+            onPress={() => setActiveOrg(selected ? null : org.id)}
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>{org.name}</Text>
               <Text style={styles.meta}>
-                {org.role === 'owner' ? 'Chủ tổ chức' : 'Thành viên'} · {org.slug}
+                {org.role === 'owner' ? 'Chủ tổ chức' : 'Thành viên'} · {org.id}
               </Text>
             </View>
             {selected ? <Text style={styles.check}>✓</Text> : null}
@@ -88,7 +88,7 @@ export function OrgSwitcher() {
       })}
 
       {/* Master chọn được org mình KHÔNG thuộc về, nên nó không có dòng nào ở trên để đánh dấu ✓. */}
-      {master && active && !rows.some((o) => o.slug === active) ? (
+      {master && active && !rows.some((o) => o.id === active) ? (
         <Text style={styles.meta}>Đang thao tác trong /{active}</Text>
       ) : null}
 

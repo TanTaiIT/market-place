@@ -11,16 +11,15 @@ import { EmptyState, Loading, PinButton, ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { canAdminOrg } from '@/api/admin';
 import { useMyGrants } from '@/queries/admin';
-import { useMyOrgs } from '@/queries/org';
 import { useOrgProfile, useUpdateOrg } from '@/queries/org-discover';
 import { C, F } from '@/theme';
 
 /**
  * Sửa hồ sơ nhóm — ảnh bìa, mô tả, nội quy.
  *
- * Nằm trong `app/org/[slug]/` chứ không phải bàn quản trị: slug đi theo đường dẫn nên màn này
- * sửa đúng nhóm mình vừa mở, không phụ thuộc "tổ chức đang thao tác" của cả app. Quản trị mở
- * hồ sơ nhóm B rồi bấm sửa thì sửa B, dù họ đang làm việc ở A.
+ * Nằm trong `app/org/[id]/` chứ không phải bàn quản trị: id đi theo đường dẫn nên màn này sửa
+ * đúng nhóm mình vừa mở, không phụ thuộc "tổ chức đang thao tác" của cả app. Quản trị mở hồ sơ
+ * nhóm B rồi bấm sửa thì sửa B, dù họ đang làm việc ở A.
  *
  * Cửa quyền thật là `requireOrgAdmin` bên BE. Phần chặn ở đây chỉ để người không có quyền
  * không phải điền hết form rồi mới ăn 403.
@@ -32,14 +31,13 @@ const MAX_RULE_LEN = 200;
 const MAX_DESC = 500;
 
 export default function OrgEditScreen() {
-  const { slug } = useLocalSearchParams<{ slug: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
 
-  const { data: org, isPending } = useOrgProfile(slug ?? '');
+  const { data: org, isPending } = useOrgProfile(id ?? '');
   const { data: grants, isPending: grantsPending } = useMyGrants();
-  const { data: myOrgs } = useMyOrgs();
-  const save = useUpdateOrg(slug ?? '');
+  const save = useUpdateOrg(id ?? '');
 
   /*
    * Form dựng MỘT LẦN từ hồ sơ, không đồng bộ lại theo `org`.
@@ -59,7 +57,8 @@ export default function OrgEditScreen() {
     );
   }
 
-  if (!canAdminOrg(grants, myOrgs?.find((o) => o.slug === org.slug)?.id)) {
+  // `org.id` dùng thẳng: hồ sơ nhóm mang id từ lượt gỡ slug, không phải tra qua `useMyOrgs` nữa.
+  if (!canAdminOrg(grants, org.id)) {
     return (
       <Shell>
         <EmptyState

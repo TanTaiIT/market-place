@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import {
-  setActiveOrgSlug,
+  setActiveOrgId,
   setHttpSession,
   setOrgGoneHandler,
   setSessionRefresher,
@@ -116,13 +116,13 @@ export function useSyncAccessToken(qc: QueryClient): void {
   const session = useAuthStore((s) => s.session);
   // Org đang chọn cũng phải xuống tầng HTTP: v2 gửi nó theo header ở MỌI request, và nó đổi
   // được giữa phiên (người dùng chuyển tổ chức) mà không hề đụng tới token.
-  const activeOrgSlug = useAuthStore((s) => s.activeOrgSlug);
+  const activeOrgId = useAuthStore((s) => s.activeOrgId);
 
   // Ghi ngay trong render, KHÔNG qua useEffect: effect của màn con chạy trước effect của
   // layout cha, nên query đầu tiên sau khi mở lại app sẽ bay đi lúc token còn null và nhận
   // 401. Layout cha render trước con, nên ghi ở đây là kịp. An toàn vì lệnh này idempotent.
   setHttpSession(session ? { accessToken: session.accessToken, userId: session.userId } : null);
-  setActiveOrgSlug(activeOrgSlug);
+  setActiveOrgId(activeOrgId);
   setSessionRefresher(() => refreshSession(qc));
   // Org bị khoá giữa lúc dùng: bỏ chọn nó, đừng đăng xuất. Phiên vẫn tốt nguyên — người dùng
   // chỉ mất tổ chức đang thao tác, và vẫn xem được nội dung công khai như lúc chưa chọn org.

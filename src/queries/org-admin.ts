@@ -11,41 +11,11 @@ import { usePagedList } from './paged';
  * dùng ĐI VÀO tổ chức, còn đây là bàn của người đã ở trong và đang cầm quyền.
  */
 
-/** Dưới ngưỡng này BE coi là slug không hợp lệ — hỏi trước khi gõ đủ chỉ tốn một lượt rate limit. */
-const MIN_SLUG_CHARS = 3;
-
-/**
- * Kiểm tra slug còn trống không.
- *
- * **Debounce là thứ giữ rate limit, không phải `enabled`/`staleTime`.** `enabled` chỉ chặn dưới
- * 3 ký tự, còn `staleTime` chỉ cứu term ĐÃ gõ qua — mỗi prefix mới là một `queryKey` mới, nên
- * gõ thẳng thì `hung-vuong` bắn 8 request lên một endpoint công khai có rate limit chặt.
- * 300ms, cùng con số với ô tìm kiếm (`app/search.tsx`).
- *
- * `enabled` chứ không phải `if` ở call-site: hook phải gọi được vô điều kiện.
+/*
+ * `useSlugAvailability` ĐÃ GỠ cùng hai route slug của BE — xem ghi chú ở `api/org-admin.ts`.
+ * Nhắc lại ở đây vì phần debounce của nó từng là mẫu được hai hook khác trong file này viện
+ * dẫn; mẫu đó nay đọc ở `useAllOrganizations` bên dưới.
  */
-export function useSlugAvailability(slug: string) {
-  const term = slug.trim().toLowerCase();
-  const [settled, setSettled] = useState(term);
-  useEffect(() => {
-    const t = setTimeout(() => setSettled(term), 300);
-    return () => clearTimeout(t);
-  }, [term]);
-
-  const query = useQuery({
-    queryKey: qk.slugAvailability(settled),
-    queryFn: () => orgAdminApi.checkSlug(settled),
-    enabled: settled.length >= MIN_SLUG_CHARS,
-    staleTime: 5 * 60_000,
-  });
-
-  return {
-    // Trong lúc chờ debounce, câu trả lời đang cầm là của slug CŨ — giấu đi. Để nguyên là ô báo
-    // "dùng được" cho đúng chữ người dùng vừa gõ thêm mà chưa ai kiểm.
-    result: settled === term ? query.data : undefined,
-    checking: query.isFetching || (settled !== term && term.length >= MIN_SLUG_CHARS),
-  };
-}
 
 /**
  * Bảng tổ chức toàn hệ thống (chỉ master).
@@ -101,9 +71,9 @@ export function useOrgManagers(orgId: string) {
 /**
  * Danh bạ của MỘT org theo slug, không phụ thuộc org đang thao tác.
  *
- * Khác `useOrgRoster` ở đúng chỗ đó: hàm kia đọc `useOrgSlug()`, tức muốn xem nhóm khác thì
+ * Khác `useOrgRoster` ở đúng chỗ đó: hàm kia đọc `useOrgId()`, tức muốn xem nhóm khác thì
  * phải chuyển org đang thao tác của cả app — chính thao tác mà bàn của master vừa bỏ đi.
- * `memberPage` gắn `X-Org-Slug` cho riêng lượt gọi, nên xem nhóm nào không đổi chỗ đứng.
+ * `memberPage` gắn `X-Org-Id` cho riêng lượt gọi, nên xem nhóm nào không đổi chỗ đứng.
  *
  * BE cho master đọc: route gác `requireMembershipOrOrgModerator`, và comment ở đó nói rõ
  * người quản org mà không phải thành viên cũng phải đọc được — họ xoá được thành viên thì
@@ -158,24 +128,10 @@ export function useSetOrgVisibility() {
   });
 }
 
-/**
- * Đổi slug. Ngoài bảng tổ chức phải quét luôn `adminRoot()`: slug là thứ `http.ts` gắn vào header
- * `X-Org-Slug`, nên mọi dữ liệu scope theo tổ chức đang nằm trong cache đều gắn với slug cũ.
- *
- * Hook KHÔNG đụng `activeOrgSlug`: nó không biết org vừa đổi có phải org đang thao tác hay
- * không, mà master đổi slug của org khác là chuyện thường. Việc đó thuộc về call-site —
- * `app/admin/organizations.tsx` so slug rồi mới đặt lại.
+/*
+ * `useChangeOrganizationSlug` ĐÃ GỠ. Định danh tổ chức giờ là `_id` — bất biến, không có gì để
+ * đổi, nên cũng không còn nhu cầu quét cache theo khoá cũ.
  */
-export function useChangeOrganizationSlug() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: { id: string; slug: string }) => orgAdminApi.changeSlug(v.id, v.slug),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.allOrgsRoot() });
-      qc.invalidateQueries({ queryKey: qk.adminRoot() });
-    },
-  });
-}
 
 /**
  * Refetch contract của cấp/thu hồi quyền: `myGrants()` là thứ quyết định người dùng mở được

@@ -11,15 +11,16 @@ import { AttrFields, visibleAttrFields } from './AttrFields';
 import { PhotoPicker } from './PhotoPicker';
 import { EMPTY_LOCATION, LocationFields, type ListingLocation } from './LocationFields';
 import { listingDraftGaps } from './listingDraft';
-import { VisibilityPicker, type PostVisibility } from './VisibilityPicker';
+import { ReachPicker, defaultReach, type ReachTarget } from './ReachPicker';
 import { BoxField, FormSection } from './FormSection';
 import { CategoryField } from './CategoryField';
 import { useToast } from './Toast';
 import { useCategoryTemplate } from '@/queries/templates';
 import { useProfile } from '@/queries/listings';
 import { MAX_PHOTOS, type ListingPhotosController } from '@/queries/upload';
-import type { Listing, ListingAttributes } from '@/api/db';
-import { useOrgSlug } from '@/stores/auth';
+import { useMyOrgs } from '@/queries/org';
+import type { Listing, ListingAttributes, ListingReach } from '@/api/db';
+import { useOrgId } from '@/stores/auth';
 import { C, F, S, shadow } from '@/theme';
 
 /**
@@ -38,7 +39,11 @@ type ListingFormValues = {
   price: string;
   desc: string;
   categoryId: string;
-  visibility: PostVisibility;
+  /**
+   * Bậc phủ sóng. Form SỬA vẫn mang nó để hiện đúng trạng thái, nhưng route sửa không gửi đi:
+   * `PATCH /listings/:id` của BE không nhận `reach`.
+   */
+  reach: ListingReach;
   location: ListingLocation;
   /** Thuộc tính động theo template của danh mục — rỗng khi danh mục chưa có field nào. */
   attributes: ListingAttributes;
@@ -61,7 +66,7 @@ export function listingToFormValues(listing: Listing): ListingFormValues {
     price: String(listing.priceValue),
     desc: listing.desc,
     categoryId: listing.categoryId,
-    visibility: listing.visibility,
+    reach: listing.reach,
     attributes: listing.attributes ?? {},
     templateVersion: listing.templateVersion,
     location: {
@@ -93,16 +98,19 @@ export function ListingForm({
   /**
    * Đăng thẳng vào MỘT nhóm — người dùng đi từ trang hồ sơ nhóm, không phải từ nút đăng chung.
    *
-   * Có nó thì hiển thị bị KHOÁ ở `org_internal` và bộ chọn hiển thị biến mất. Đây không phải
-   * để cho gọn: `public` sẽ đưa tin sang hàng đợi của người phụ trách DANH MỤC, và quản trị
-   * nhóm không có lấy một lượt duyệt nào (`routeListing`). Người bấm "Đăng tin" trên trang
-   * một nhóm đang nói "gửi cho nhóm này duyệt" — để hở lựa chọn kia là phản bội đúng câu đó.
+   * Có nó thì bậc `marketplace` biến mất khỏi bộ chọn. Đây không phải để cho gọn: lên sàn sẽ
+   * đưa tin sang hàng đợi của người phụ trách DANH MỤC, và quản trị nhóm không có lấy một lượt
+   * duyệt nào (`routeListing`). Người bấm "Đăng tin" trên trang một nhóm đang nói "gửi cho nhóm
+   * này duyệt" — để hở lựa chọn kia là phản bội đúng câu đó.
+   *
+   * Hai bậc TRONG nhóm vẫn chọn được (nếu nhóm công khai): cả hai đều do nhóm duyệt, nên không
+   * bậc nào phản bội câu trên.
    */
-  toGroup?: { slug: string; name: string };
+  toGroup?: { id: string; name: string; isPublic: boolean };
   onSubmit: (values: ListingFormValues) => void;
 }) {
   const toast = useToast();
-  const activeOrg = useOrgSlug();
+  const activeOrg = useOrgId();
   const { data: profile } = useProfile();
 
   const [title, setTitle] = useState(initial?.title ?? '');
@@ -111,11 +119,23 @@ export function ListingForm({
   // Giữ id chứ không giữ tên: BE nhận `categoryId` là ObjectId. Rỗng cho tới khi danh mục
   // tải xong hoặc người dùng chọn.
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? '');
-  // Mặc định nội bộ: tin ở lại trong tổ chức cho tới khi người đăng chủ động đưa ra công khai.
-  // Không thuộc tổ chức nào thì chỉ còn một lựa chọn, và nó đã đúng.
-  const [visibility, setVisibility] = useState<PostVisibility>(
-    toGroup ? 'org_internal' : (initial?.visibility ?? (activeOrg ? 'org_internal' : 'public')),
-  );
+  /*
+   * Nhóm ĐÍCH của tin: nhóm đi từ trang hồ sơ (`toGroup`) thắng nhóm đang thao tác.
+   *
+   * Phải tra ra cả `isPublic` chứ không chỉ id, vì bậc `group_open` chỉ tồn tại dưới nhóm công
+   * khai. `useMyOrgs` là nguồn duy nhất có sẵn cờ đó cho nhóm đang thao tác — và nó đã nằm
+   * trong cache từ lúc mở app, nên đây không phải một lượt gọi thêm.
+   */
+  const { data: myOrgs } = useMyOrgs();
+  const activeOrgRow = myOrgs?.find((o) => o.id === activeOrg);
+  const target: ReachTarget = toGroup
+    ? { name: toGroup.name, isPublic: toGroup.isPublic }
+    : activeOrgRow
+      ? { name: activeOrgRow.name, isPublic: activeOrgRow.isPublic }
+      : null;
+
+  // Tin đang sửa giữ nguyên bậc cũ; tin mới rơi về đúng bậc BE sẽ tự chọn nếu app không gửi gì.
+  const [reach, setReach] = useState<ListingReach>(initial?.reach ?? defaultReach(target));
   /**
    * Tên tỉnh/xã, không phải mã — BE lưu và lọc bằng chính chuỗi này.
    *
@@ -200,7 +220,7 @@ export function ListingForm({
     const error = gaps[0]?.message ?? null;
     if (error) return toast(error);
 
-    onSubmit({ title, price, desc, categoryId, visibility, location, attributes });
+    onSubmit({ title, price, desc, categoryId, reach, location, attributes });
   };
 
   return (
@@ -293,18 +313,25 @@ export function ListingForm({
               </View>
 
               <View style={styles.card}>
-              <FormSection flush step={4} title={toGroup ? 'Khu vực' : 'Khu vực & hiển thị'} />
-              {toGroup ? (
+              <FormSection flush step={4} title="Khu vực & hiển thị" />
+              {/*
+                Thẻ "đăng vào nhóm" chỉ nói nhóm NÀO — không còn nói tin hiện ở đâu, vì đó đã
+                thành một lựa chọn thật ngay dưới nó (nhóm công khai có hai bậc). Nói hộ một câu
+                mà bộ chọn ngay bên dưới có thể phủ định là cách chắc chắn để hai chỗ lệch nhau.
+              */}
+              {toGroup && (
                 <View style={styles.toGroup}>
                   <Text style={styles.toGroupLabel}>ĐĂNG VÀO NHÓM</Text>
                   <Text style={styles.toGroupName}>{toGroup.name}</Text>
-                  <Text style={styles.toGroupHint}>
-                    Quản trị nhóm sẽ duyệt tin này. Tin chỉ hiện trong nhóm.
-                  </Text>
+                  <Text style={styles.toGroupHint}>Quản trị nhóm sẽ duyệt tin này.</Text>
                 </View>
-              ) : (
-                <VisibilityPicker value={visibility} onChange={setVisibility} />
               )}
+              <ReachPicker
+                value={reach}
+                target={target}
+                lockToGroup={Boolean(toGroup)}
+                onChange={setReach}
+              />
               <LocationFields value={location} onChange={setLocation} />
               </View>
             </>

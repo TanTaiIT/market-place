@@ -39,6 +39,8 @@ import {
 import type {
   AuthResponse,
   Conversation as ConversationDto,
+  CreateListing,
+  UpdateListing,
   Listing as ListingDto,
   MeProfile,
   Message as MessageDto,
@@ -232,7 +234,7 @@ function toListing(dto: OwnerListingDto, names: Map<string, string>): Listing {
     province: dto.location?.province,
     ward: dto.location?.ward,
     address: dto.location?.address,
-    visibility: dto.visibility,
+    reach: dto.reach,
     meta: relativeTime(dto.createdAt),
     organizationId: dto.organizationId,
     photo: gradOf(dto._id),
@@ -260,7 +262,7 @@ function toListing(dto: OwnerListingDto, names: Map<string, string>): Listing {
  * dựng ở đây — ba bản copy là ba chỗ có thể quên `refreshToken` mới sau khi BE rotate.
  *
  * Phiên KHÔNG mang tổ chức nữa: v2 tách org khỏi danh tính. Org là lựa chọn theo từng request
- * (`X-Org-Slug`) và sống ở `stores/auth.activeOrgSlug`.
+ * (`X-Org-Id`) và sống ở `stores/auth.activeOrgId`.
  */
 function toSession(auth: AuthResponse): AuthSession {
   return {
@@ -391,7 +393,7 @@ async function categoryNames(): Promise<Map<string, string>> {
 
 /**
  * Thứ người đăng gõ ra ở form tin — chung cho cả tạo mới lẫn sửa. `price` là chuỗi vì nó tới
- * thẳng từ `TextInput`; chuẩn hoá thành số là việc của `toListingBody`, không phải của màn hình.
+ * thẳng từ `TextInput`; chuẩn hoá thành số là việc của `toUpdateBody`, không phải của màn hình.
  */
 type ListingInput = {
   title: string;
@@ -403,23 +405,30 @@ type ListingInput = {
   province?: ProvinceName | null;
   ward?: string | null;
   /**
-   * Nơi tin sẽ hiển thị — và cũng là thứ quyết định AI DUYỆT nó (BE §0.1): `org_internal`
-   * về hàng đợi của tổ chức, `public` về hàng đợi manager danh mục theo (danh mục × tỉnh).
-   * Bỏ trống thì BE mặc định `org_internal`.
+   * BẬC PHỦ SÓNG — nơi tin hiển thị, và qua đó là AI DUYỆT nó (`routeListing`).
+   *
+   * Ba bậc, thay cho cặp `org_internal`/`public` cũ:
+   *  - `members` — chỉ thành viên nhóm đọc được; nhóm duyệt.
+   *  - `group_open` — vẫn trong nhóm nhưng ai cũng đọc; nhóm duyệt. CHỈ hợp lệ ở nhóm công
+   *    khai, BE trả 400 nếu nhóm riêng tư.
+   *  - `marketplace` — lên bảng tin chung; manager danh mục theo (danh mục × tỉnh) duyệt.
+   *
+   * Bỏ trống thì BE tự chọn theo nhóm đích (`defaultReachFor`): nhóm công khai → `group_open`,
+   * nhóm riêng tư → `members`, không nhóm → `marketplace`.
    */
-  visibility?: 'org_internal' | 'public';
+  reach?: 'members' | 'group_open' | 'marketplace';
   /**
    * Nhóm đích, khi người đăng đi từ TRANG HỒ SƠ NHÓM thay vì từ nút đăng chung.
    *
-   * Không gửi thì BE lấy nhóm đang thao tác (`X-Org-Slug`) — đường cũ, và nó buộc người
-   * thuộc nhiều nhóm phải chuyển nhóm đang thao tác trước khi đăng. Gửi slug thì tin vào
-   * ĐÚNG nhóm đó, bất kể họ đang đứng ở đâu.
+   * Không gửi thì BE lấy nhóm đang thao tác (`X-Org-Id`) — đường cũ, và nó buộc người thuộc
+   * nhiều nhóm phải chuyển nhóm đang thao tác trước khi đăng. Gửi id thì tin vào ĐÚNG nhóm
+   * đó, bất kể họ đang đứng ở đâu.
    *
-   * BE tự tra tư cách thành viên với slug này (`resolveTargetOrg`), nên đây KHÔNG phải
-   * đường vòng qua phân quyền: gửi slug của nhóm mình không thuộc thì tin rơi vào hàng đợi
-   * người-ngoài của nhóm đó, và nhóm đóng cửa thì 400.
+   * BE tự tra tư cách thành viên với id này (`resolveTargetOrg`), nên đây KHÔNG phải đường
+   * vòng qua phân quyền: gửi id của nhóm mình không thuộc thì tin rơi vào hàng đợi người-ngoài
+   * của nhóm đó, và nhóm đóng cửa thì 400.
    */
-  orgSlug?: string;
+  orgId?: string;
   /**
    * Thuộc tính động theo template của danh mục. Gửi thô — BE ép kiểu và loại key lạ ở
    * `validateAttributes`, app không đoán trước luật đó (nó nằm trong DB, không trong bundle).
@@ -439,7 +448,7 @@ type ListingInput = {
  * `address` là số nhà / tên đường tự gõ, nằm dưới xã trong mô hình 2 cấp — không phải cấp
  * quận/huyện đã bỏ từ 01/07/2025.
  */
-function toListingBody(input: ListingInput) {
+function toUpdateBody(input: ListingInput): UpdateListing {
   // Ô giá là `number-pad` nhưng vẫn lọt dấu phân cách người dùng tự gõ; BE nhận `number`.
   const price = Number(input.price.replace(/\D/g, ''));
 
@@ -461,16 +470,40 @@ function toListingBody(input: ListingInput) {
     // `location: {}` rỗng qua được `.strict()` của BE nhưng tạo ra bản ghi không lọc
     // được theo gì — thà vắng hẳn field.
     ...(Object.keys(location).length ? { location } : {}),
-    ...(input.visibility ? { visibility: input.visibility } : {}),
-    ...(input.orgSlug ? { orgSlug: input.orgSlug } : {}),
     // Bỏ hẳn key khi rỗng, cùng lý do với `location`: `attributes: {}` qua được `.strict()`
     // của BE nhưng ghi ra một tin không lọc được theo gì.
     ...(input.attributes && Object.keys(input.attributes).length
       ? { attributes: input.attributes }
       : {}),
-    // Tin công khai BẮT BUỘC có tỉnh: nó là thứ chọn ra người duyệt. Gửi kèm tường minh
-    // thay vì để BE suy từ tổ chức — người đăng tin công khai có thể không thuộc org nào.
-    ...(input.visibility === 'public' && input.province ? { provinceCode: input.province } : {}),
+  };
+}
+
+/**
+ * Thân của lượt TẠO = thân của lượt sửa, cộng ba field chỉ có nghĩa lúc khai sinh.
+ *
+ * Tách đôi vì `updateListingSchema` bên BE là `.pick().partial().strict()` — nó KHÔNG có
+ * `reach`/`orgId`/`provinceCode`, và `.strict()` trả 400 cho key lạ. Một hàm dùng chung sẽ
+ * đính `reach` vào cả lượt sửa và làm hỏng mọi lượt sửa tin.
+ *
+ * TypeScript KHÔNG bắt được lỗi đó: giá trị đi vào `body:` là kết quả một hàm, không phải object
+ * literal tại chỗ gọi, nên phép kiểm dư-thừa-thuộc-tính không chạy. Kiểu trả về khai tường minh
+ * ở cả hai hàm chính là thứ thay cho phép kiểm đã mất đó.
+ */
+function toCreateBody(input: ListingInput): CreateListing {
+  return {
+    ...toUpdateBody(input),
+    // Bắt buộc ở `CreateListing`, optional ở `UpdateListing` — `toUpdateBody` có thể bỏ trống.
+    title: input.title.trim(),
+    description: input.desc.trim(),
+    price: Number(input.price.replace(/\D/g, '')),
+    categoryId: input.categoryId,
+    images: input.photoUrls ?? [],
+    ...(input.reach ? { reach: input.reach } : {}),
+    ...(input.orgId ? { orgId: input.orgId } : {}),
+    // Tin LÊN SÀN bắt buộc có tỉnh: nó là thứ chọn ra người duyệt (ô danh mục × tỉnh). Gửi kèm
+    // tường minh thay vì để BE suy từ tổ chức — người đăng lên sàn có thể không thuộc nhóm nào.
+    // Hai bậc trong nhóm không cần: nhóm duyệt tin của mình, không cần tra theo tỉnh.
+    ...(input.reach === 'marketplace' && input.province ? { provinceCode: input.province } : {}),
   };
 }
 
@@ -604,24 +637,28 @@ export const api = {
   /**
    * Tin của MỘT nhóm cụ thể — khối "Tin trong nhóm" trên hồ sơ nhóm.
    *
-   * Gắn `X-Org-Slug` riêng cho lượt gọi này: mở hồ sơ một nhóm không có nghĩa là chuyển
-   * cả app sang làm việc ở đó. BE vẫn đối chiếu membership với slug nhận được, nên gọi
+   * Gắn `X-Org-Id` riêng cho lượt gọi này: mở hồ sơ một nhóm không có nghĩa là chuyển
+   * cả app sang làm việc ở đó. BE vẫn đối chiếu membership với id nhận được, nên gọi
    * cho nhóm mình không thuộc về sẽ 403 — chỉ gọi khi hồ sơ trả `joined: true`.
    */
-  async getOrgListings(slug: string, take: number): Promise<Listing[]> {
+  async getOrgListings(organizationId: string, take: number): Promise<Listing[]> {
     const [res, names] = await Promise.all([
       withAuthRetry(() =>
         listingList({
           /*
-           * `visibility: 'org_internal'` là BẮT BUỘC ở đây, không phải tinh chỉnh.
+           * HAI bộ lọc, mỗi cái chặn một thứ khác nhau — bỏ cái nào cũng sai.
            *
-           * Scope đọc của BE là "nhánh org HOẶC nhánh công khai" — đúng cho bảng tin chính,
-           * nhưng ở mục "Tin trong nhóm" thì không lọc gì nghĩa là hứng luôn cả trục công khai.
-           * Triệu chứng đã gặp: một nhóm vừa tạo, chưa mời ai, chưa có tin nào, vẫn bày ra 6
-           * tin `organizationId: null` chẳng liên quan gì tới nhóm.
+           * `orgId` chặn tin KHÔNG thuộc nhóm. Scope đọc của BE là "nhánh org HOẶC nhánh công
+           * khai", đúng cho bảng tin chính nhưng ở mục "Tin trong nhóm" thì không lọc gì nghĩa
+           * là hứng luôn cả sàn: triệu chứng đã gặp là một nhóm vừa tạo, chưa có tin nào, vẫn
+           * bày ra 6 tin `organizationId: null` chẳng liên quan.
+           *
+           * `reach` chặn tin của nhóm nhưng đã LÊN SÀN. Chúng vẫn mang `organizationId` làm
+           * badge, nên `orgId` một mình vẫn kéo chúng về — mà chỗ của chúng là bảng tin chung,
+           * không phải bảng tin nhóm. Hai bậc còn lại mới đúng nghĩa "ở trong nhóm này".
            */
-          query: { limit: take, visibility: 'org_internal' },
-          headers: { [ORG_HEADER]: slug },
+          query: { limit: take, orgId: organizationId, reach: ['members', 'group_open'] },
+          headers: { [ORG_HEADER]: organizationId },
         }),
       ),
       categoryNames(),
@@ -760,12 +797,12 @@ export const api = {
      */
     const term = filter.q.trim();
     /*
-     * Lọc theo nhóm = đúng cách `getOrgListings` đang làm: `X-Org-Slug` cho lượt gọi này thôi
-     * (không chuyển cả app sang nhóm đó) + `visibility: 'org_internal'` để không hứng luôn trục
-     * công khai. Không cần tham số BE mới — danh mục, giá, `q`, `attrs` vẫn `AND` lên trên
-     * trong `buildFilter`. Riêng tỉnh/xã thì KHÔNG đi cùng nhóm — xem `locationApplies`.
+     * Lọc theo nhóm = đúng cách `getOrgListings` đang làm: `X-Org-Id` cho lượt gọi này thôi
+     * (không chuyển cả app sang nhóm đó), `orgId` để chỉ lấy tin CỦA nhóm, và `reach` để loại
+     * tin của nhóm đã lên sàn. Danh mục, giá, `q`, `attrs` vẫn `AND` lên trên trong
+     * `buildFilter`. Riêng tỉnh/xã thì KHÔNG đi cùng nhóm — xem `locationApplies`.
      */
-    const org = filter.orgSlug;
+    const org = filter.orgId;
     const province = locationApplies(filter) ? filter.province : null;
     const [res, names] = await Promise.all([
       withAuthRetry(() =>
@@ -778,7 +815,7 @@ export const api = {
             ...(term ? { q: term } : {}),
             ...(province ? { province } : {}),
             ...(province && filter.ward ? { ward: filter.ward } : {}),
-            ...(org ? { visibility: 'org_internal' as const } : {}),
+            ...(org ? { orgId: org, reach: ['members', 'group_open'] as const } : {}),
             ...(filter.categoryId ? { category: filter.categoryId } : {}),
             ...(filter.minPrice !== null ? { minPrice: filter.minPrice } : {}),
             ...(filter.maxPrice !== null ? { maxPrice: filter.maxPrice } : {}),
@@ -814,7 +851,7 @@ export const api = {
    */
   async createListing(input: ListingInput): Promise<Listing> {
     const [res, names] = await Promise.all([
-      withAuthRetry(() => listingCreate({ body: toListingBody(input) })),
+      withAuthRetry(() => listingCreate({ body: toCreateBody(input) })),
       categoryNames(),
     ]);
     return toListing(unwrap(res, 'Không ghim được tin lên bảng'), names);
@@ -830,7 +867,7 @@ export const api = {
    */
   async updateListing({ id, ...input }: ListingInput & { id: string }): Promise<Listing> {
     const [res, names] = await Promise.all([
-      withAuthRetry(() => listingUpdate({ path: { id }, body: toListingBody(input) })),
+      withAuthRetry(() => listingUpdate({ path: { id }, body: toUpdateBody(input) })),
       categoryNames(),
     ]);
     return toListing(unwrap(res, 'Không lưu được thay đổi'), names);

@@ -6,7 +6,7 @@ import { ListingCard } from '@/components/ListingCard';
 import { Header } from '@/components/OrgProfileCard';
 import { useToast } from '@/components/Toast';
 import { useRequireAuth } from '@/components/GuestGate';
-import { useMyOrgs, useRequestJoin } from '@/queries/org';
+import { useRequestJoin } from '@/queries/org';
 import { useOrgPeek, useOrgProfile } from '@/queries/org-discover';
 import { useMyGrants } from '@/queries/admin';
 import { canAdminOrg } from '@/api/admin';
@@ -20,15 +20,15 @@ import { C, F } from '@/theme';
  * Đây là thứ thay cho luồng cũ "gõ mã rồi gửi đơn ngay": bây giờ họ nhìn thấy nhóm bao nhiêu
  * người, đăng bao nhiêu tin một tuần, nội quy ra sao, RỒI mới bấm.
  *
- * Nhóm riêng tư vào đây sẽ nhận 404 từ BE — không phân biệt được với slug không tồn tại, nên
- * không ai quét slug để lập danh sách nhóm kín được.
+ * Nhóm riêng tư vào đây sẽ nhận 404 từ BE — không phân biệt được với id không tồn tại, nên
+ * không ai dò id để lập danh sách nhóm kín được.
  */
 export default function OrgProfileScreen() {
-  const { slug } = useLocalSearchParams<{ slug: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
 
-  const { data: org, error, isPending } = useOrgProfile(slug ?? '');
+  const { data: org, error, isPending } = useOrgProfile(id ?? '');
   const { data: me } = useProfile();
   const join = useRequestJoin();
   /*
@@ -44,7 +44,7 @@ export default function OrgProfileScreen() {
    * để quyết định xin vào, mà lưới hai cột thì cắt mất đúng những thứ dùng để quyết định
    * (lượt xem, người quan tâm, khu vực).
    */
-  const peek = useOrgPeek(slug ?? '', Boolean(org?.joined));
+  const peek = useOrgPeek(id ?? '', Boolean(org?.joined));
 
   /*
    * Ba thứ `ListingCard` cần ngoài `item`.
@@ -60,12 +60,11 @@ export default function OrgProfileScreen() {
   /*
    * Ai được sửa: master, hoặc người giữ grant `manager` trên ĐÚNG nhóm này — xem `canAdminOrg`.
    *
-   * Cần `orgId` để so, mà `OrganizationProfile` cố tình không mang `id` (nó là DTO công khai).
-   * `useMyOrgs` có cả `id` lẫn `slug` và đã cache sẵn, nên nó là bảng tra rẻ nhất. Master
-   * không thuộc nhóm nào thì `orgId` là `undefined` — `canAdminOrg` đã short-circuit trước đó.
+   * Không còn phải tra `useMyOrgs` để đổi slug lấy id: từ lượt gỡ slug, `OrganizationProfile`
+   * mang thẳng `id`, nên so được ngay. Bảng tra cũ tồn tại chỉ vì DTO công khai hồi đó cố tình
+   * giấu `id` — mà giấu id không còn nghĩa gì khi id CHÍNH LÀ địa chỉ của trang này.
    */
   const { data: grants } = useMyGrants();
-  const { data: myOrgs } = useMyOrgs();
 
   if (isPending) return <Shell><Loading /></Shell>;
   if (error || !org) {
@@ -73,9 +72,9 @@ export default function OrgProfileScreen() {
       <Shell>
         <EmptyState
           icon="🔒"
-          // 404 gộp ba ca: slug sai, nhóm đã đóng, và nhóm riêng tư mà mình không thuộc về.
+          // 404 gộp ba ca: id sai, nhóm đã đóng, và nhóm riêng tư mà mình không thuộc về.
           // Đổ hết cho 'riêng tư' là nói sai với hai ca đầu — BE cố tình không phân biệt được
-          // ba ca này để không ai quét slug lập danh sách nhóm kín.
+          // ba ca này để không ai dò id lập danh sách nhóm kín.
           text="Không mở được nhóm này. Địa chỉ có thể sai, nhóm đã đóng, hoặc đây là nhóm riêng tư mà bạn chưa tham gia — lúc đó cần mã tham gia."
         />
       </Shell>
@@ -84,7 +83,7 @@ export default function OrgProfileScreen() {
 
   const requestJoin = () =>
     join.mutate(
-      { slug: org.slug, claimedName: me?.name ?? '' },
+      { orgId: org.id, claimedName: me?.name ?? '' },
       {
         // Nhóm công khai vào ngay, nhóm riêng tư mới có đơn chờ — xem `orgApi.requestJoin`.
         onSuccess: (res) =>
@@ -124,13 +123,11 @@ export default function OrgProfileScreen() {
              */
             onPost={
               org.joined || org.allowOutsiderPosts
-                ? () => router.push(`/post?org=${org.slug}`)
+                ? () => router.push(`/post?org=${org.id}`)
                 : undefined
             }
             onEdit={
-              canAdminOrg(grants, myOrgs?.find((o) => o.slug === org.slug)?.id)
-                ? () => router.push(`/org/${org.slug}/edit`)
-                : undefined
+              canAdminOrg(grants, org.id) ? () => router.push(`/org/${org.id}/edit`) : undefined
             }
             busy={join.isPending}
           />
@@ -170,7 +167,7 @@ export default function OrgProfileScreen() {
  * Chỗ trống của danh sách tin trong nhóm.
  *
  * Tin của nhóm là dữ liệu SCOPE THEO ORG — `GET /listings` đối chiếu tư cách thành viên với
- * `X-Org-Slug`. Người chưa vào không đọc được, và đó là đúng: tin nội bộ của một trường không
+ * `X-Org-Id`. Người chưa vào không đọc được, và đó là đúng: tin nội bộ của một trường không
  * phải thứ ai lướt qua hồ sơ cũng xem. Hai ca phải nói khác nhau — "chưa được xem" và "nhóm
  * chưa có tin" nhìn giống hệt nhau nếu dùng chung một câu.
  */

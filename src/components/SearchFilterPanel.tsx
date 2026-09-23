@@ -51,7 +51,7 @@ export function SearchFilterPanel({
           // Đổi tỉnh là bỏ xã và nhóm NGAY tại đây, không đợi `WardField` tự dọn: nó chỉ dọn sau
           // khi danh sách xã mới tải xong, còn nút "Tìm kiếm" thì bấm được ngay — kịp lọt một xã
           // của tỉnh cũ xuống BE và ăn 400. Nhóm thì bày theo tỉnh, đổi tỉnh là danh sách khác.
-          patch({ province, ward: null, orgSlug: null });
+          patch({ province, ward: null, orgId: null });
         }}
         allowAll
       />
@@ -63,16 +63,16 @@ export function SearchFilterPanel({
         // Có nhóm thì tỉnh/xã không lọc lên tin (`locationApplies`): ô xã khoá và nói thẳng vì sao,
         // thay vì nhận một lựa chọn rồi lặng lẽ không dùng.
         disabledReason={
-          filter.orgSlug ? 'Đang lọc theo nhóm — bỏ chọn nhóm để lọc theo phường / xã' : undefined
+          filter.orgId ? 'Đang lọc theo nhóm — bỏ chọn nhóm để lọc theo phường / xã' : undefined
         }
       />
       {/* Chỉ sau khi đã chọn tỉnh — nhóm có địa bàn, chưa có tỉnh thì chưa biết bày nhóm nào. */}
       {filter.province ? (
         <OrgChips
           province={filter.province}
-          value={filter.orgSlug}
+          value={filter.orgId}
           // Chọn nhóm là bỏ xã: xã sẽ không được gửi lên nữa, giữ lại là một lựa chọn treo.
-          onChange={(orgSlug) => patch({ orgSlug, ward: orgSlug ? null : filter.ward })}
+          onChange={(orgId) => patch({ orgId, ward: orgId ? null : filter.ward })}
         />
       ) : null}
 
@@ -164,10 +164,10 @@ function OrgChips({
           <Chip label="Tất cả" on={value === null} onPress={() => onChange(null)} />
           {here.map((o) => (
             <Chip
-              key={o.slug}
+              key={o.id}
               label={`👥 ${o.name}`}
-              on={value === o.slug}
-              onPress={() => onChange(value === o.slug ? null : o.slug)}
+              on={value === o.id}
+              onPress={() => onChange(value === o.id ? null : o.id)}
             />
           ))}
         </ScrollView>

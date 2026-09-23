@@ -57,7 +57,7 @@ export function AdminOrgSheet({ org, onClose }: { org: Organization | null; onCl
    * điều kiện: ngăn đóng thì `enabled: false` và không lượt nào bay đi.
    */
   const managers = useOrgManagers(org?.id ?? '');
-  const members = useOrgMemberList(org?.slug ?? '');
+  const members = useOrgMemberList(org?.id ?? '');
 
   return (
     /* `fade` + `entering` chứ không `slide` — xem lý do đầy đủ ở `AdminListingSheet`. */
@@ -93,7 +93,7 @@ export function AdminOrgSheet({ org, onClose }: { org: Organization | null; onCl
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.name}>{org.name}</Text>
                 <Text style={styles.slug}>
-                  /{org.slug} · {STATUS_LABEL[org.status]}
+                  /{org.id} · {STATUS_LABEL[org.status]}
                   {org.isPublic ? '' : ' · 🙈 riêng tư'}
                 </Text>
               </View>

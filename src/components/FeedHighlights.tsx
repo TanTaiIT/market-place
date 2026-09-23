@@ -121,22 +121,20 @@ export function CategoryStrip({
             style={({ pressed }) => [styles.circleItem, pressed && { opacity: 0.75 }]}
           >
             {/*
-              Nền màu suy từ `cat.id`, cùng bảng với vòng tròn nhóm ngay dưới — hai dải trên
-              một màn hình phải cùng một ngôn ngữ, nền trắng phẳng làm dải này trông như chưa
-              tải xong.
+              KHÔNG có nền: emoji đứng trần trên giấy.
 
-              Dùng được vì `NEW_PHOTOS` là bộ pastel dịu (`#EFCB9C`…`#D9C2C2`): emoji danh mục
-              tự nó đã có màu, nên nền phải NHẠT hơn nó chứ không tranh với nó. Cùng `id` luôn
-              ra cùng màu, nên một danh mục giữ đúng màu đó ở mọi lần mở.
+              Bản trước là một ô gradient suy từ `cat.id`, với lý do "hai dải cùng một ngôn ngữ
+              story". Lý do đó đã bị chính chỗ này phủ định: emoji danh mục vốn đã có màu, nên
+              đặt nó lên một ô màu nữa là hai lớp màu tranh nhau trong 74px, và sáu ô sáu màu
+              ngẫu nhiên đứng cạnh nhau đọc ra ồn chứ không ra thứ tự.
+
+              Ô giữ nguyên 74×74 dù trong suốt: nó là thứ giữ nhịp ngang với dải "Nhóm quanh
+              bạn" ngay dưới, và giữ mọi dòng chữ thẳng hàng. Xoá kích thước đi thì hai dải lệch
+              nhau một quãng mà không ai chỉ ra được vì sao.
             */}
-            <LinearGradient
-              colors={gradOf(cat.id)}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.circle, styles.circleCenter]}
-            >
+            <View style={[styles.circle, styles.circleCenter, styles.bare]}>
               <Text style={styles.circleIcon}>{cat.icon}</Text>
-            </LinearGradient>
+            </View>
             <Text numberOfLines={1} style={styles.circleName}>
               {cat.name}
             </Text>
@@ -196,8 +194,8 @@ export function OrgNearbyStrip({
           const face = org.avatarUrl || org.coverUrl;
           return (
           <Pressable
-            key={org.slug}
-            onPress={() => onOpen(org.slug)}
+            key={org.id}
+            onPress={() => onOpen(org.id)}
             style={({ pressed }) => [styles.circleItem, pressed && { opacity: 0.75 }]}
           >
             {/*
@@ -217,7 +215,7 @@ export function OrgNearbyStrip({
               </View>
             ) : (
               <LinearGradient
-                colors={gradOf(org.slug)}
+                colors={gradOf(org.id)}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={[styles.circle, styles.circleCenter]}
@@ -257,6 +255,25 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   circleCenter: { alignItems: 'center', justifyContent: 'center' },
+  /**
+   * Ô danh mục: giữ KÍCH THƯỚC của `circle`, bỏ mọi thứ vẽ ra được.
+   *
+   * Ghi đè bằng style riêng thay vì sửa `circle`: `circle` là của CẢ hai dải, đổi ở đó là đổi
+   * luôn vòng tròn của "Nhóm quanh bạn" — mà avatar nhóm thì vẫn cần nền, nó là ảnh thật hoặc
+   * chữ viết tắt trên gradient.
+   *
+   * `shadow` phải tắt tường minh: nó tới từ `circle` và đổ bóng cho một ô trong suốt thì bóng
+   * vẫn hiện, thành một vệt xám lơ lửng không có vật nào đổ ra nó. Trên Android là `elevation`,
+   * nên đặt `0` cho cả hai đường.
+   */
+  bare: {
+    backgroundColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
+    // `circle` cắt theo đường tròn (`overflow: 'hidden'` + bo 37). Không còn nền để cắt, nhưng
+    // cái kéo đó vẫn cắt cả emoji — mở ra để lần sau phóng to icon không bị xén mất góc.
+    overflow: 'visible',
+  },
 
   /* Hai dòng này là HÌNH, không phải chữ — emoji danh mục và chữ cái đầu trong vòng tròn 74px.
      Chúng cố tình đứng ngoài thang `T`: buộc chúng vào thang chữ là để một vòng tròn trang trí

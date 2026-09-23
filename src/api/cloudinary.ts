@@ -1,36 +1,46 @@
 /**
  * Upload ảnh thẳng từ máy người dùng lên Cloudinary rồi chỉ gửi URL xuống BE.
  *
- * Dùng **unsigned upload preset** — đây là cách duy nhất upload từ client an toàn:
- * bundle React Native giải nén được, nên `apiSecret` (và cả `apiKey`) tuyệt đối không
- * được xuất hiện trong repo này. Chữ ký chỉ tồn tại ở phía server; muốn upload có ký
- * thì BE phải cấp signature, và khi đó luồng không còn là "FE upload thẳng" nữa.
+ * Preset chạy ở chế độ **Signed**, nên mỗi lượt gồm HAI chặng:
  *
- * Cloud name không phải bí mật — nó nằm sẵn trong mọi URL ảnh Cloudinary trả về.
+ *   1. `POST /uploads/signature` tới BE  → xin `signature` + `timestamp` + `api_key`.
+ *   2. `POST` thẳng lên Cloudinary       → file đi kèm ba thứ đó.
  *
- * RỦI RO CÒN LẠI, và nó KHÔNG chặn được bằng code ở đây: unsigned nghĩa là bất kỳ ai đọc được
- * bundle (giải nén .apk là xong) cũng upload được vào tài khoản này. Đây là bài toán lạm dụng
- * và hoá đơn, không phải rò khoá — chặn nó bằng cấu hình PRESET ở Cloudinary Console:
+ * File vẫn KHÔNG đi qua server — chỉ chữ ký đi. Đẩy vài MB ảnh qua instance mỗi lượt đăng tin
+ * là tốn băng thông gấp đôi để đổi lấy đúng một phép băm.
  *
- * - Allowed formats: chỉ ảnh (jpg, png, webp, heic). Mặc định cho phép cả video và raw.
- * - Max file size + max image dimensions: app đã thu nhỏ về `MAX_DIMENSION` trước khi gửi,
- *   nên đặt trần ở preset là chặn đúng thứ KHÔNG đi qua app này.
- * - Folder: ghim tất cả vào một thư mục để tách được rác khi phải dọn.
- * - Auto-moderation / access control nếu cần, và theo dõi hạn mức để biết khi bị lạm dụng.
+ * `apiSecret` tuyệt đối không có mặt trong repo này: bundle React Native giải nén được. Nó chỉ
+ * sống ở BE (`upload.service.ts`), và đó là toàn bộ lý do chặng 1 tồn tại. `apiKey` thì không
+ * phải bí mật, nhưng vẫn lấy từ BE cho cùng một nguồn sự thật.
  *
- * Muốn chặn triệt để thì BE phải cấp chữ ký cho từng lượt upload — khi đó luồng không còn là
- * "FE upload thẳng" nữa, và đó là một thay đổi kiến trúc chứ không phải một cờ cấu hình.
+ * ĐIỀU ĐỔI LẠI: upload không còn ẩn danh — chưa đăng nhập thì không có chữ ký. Trước đây (preset
+ * unsigned) bất kỳ ai giải nén được .apk đều bơm được file vào tài khoản này, và không dòng code
+ * nào bên app chặn nổi. Đó là lỗ hổng mà Signed bịt lại.
+ *
+ * Cấu hình preset ở Console vẫn còn giá trị và vẫn nên đặt — Allowed formats (chỉ ảnh),
+ * Max file size, Max image dimensions — nhưng giờ chúng là lớp thứ hai, không phải lớp duy nhất.
+ * `folder` thì KHÔNG còn đọc từ preset: BE ký kèm nó, nên thư mục ảnh rơi vào luôn khớp thư mục
+ * mà job dọn ảnh quét.
  */
 import { Image } from 'react-native';
 import { File } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import { API_BASE_URL, getAccessToken } from './http';
 
-const CLOUD_NAME = 'ds4dqc7s5';
-
-/** Preset phải được tạo ở Cloudinary Console với Signing Mode = Unsigned. */
-const UPLOAD_PRESET = 'ghim_unsigned';
-
-const UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
+/**
+ * Chữ ký cho một lượt upload, do BE cấp (`POST /uploads/signature`).
+ *
+ * Cloud name, thư mục và tên preset đều tới từ đó chứ không còn hằng số trong file này: cả ba
+ * đều là tham số ĐƯỢC KÝ, nên app tự chọn một giá trị khác là chữ ký lệch và Cloudinary trả 401.
+ */
+type UploadTicket = {
+  cloudName: string;
+  apiKey: string;
+  timestamp: number;
+  signature: string;
+  folder: string;
+  uploadPreset: string;
+};
 
 /**
  * Trần cạnh dài của ảnh upload. Màn rộng nhất app phục vụ ~430pt × 3 = 1290px, và `displayUrl`
@@ -149,6 +159,9 @@ export function displayUrl(url: string, width: number): string {
     : url;
 }
 
+/** Xem lý do chọn 60s ở chỗ dùng nó trong `uploadImage`. */
+const UPLOAD_TIMEOUT_MS = 60_000;
+
 type CloudinaryUploadResponse = {
   secure_url?: string;
   error?: { message?: string };
@@ -160,12 +173,65 @@ type CloudinaryUploadResponse = {
   moderation?: Array<{ status?: 'approved' | 'rejected' | 'pending'; kind?: string }>;
 };
 
+/** Trần chờ chữ ký — request thường, cùng ngân sách với `REQUEST_TIMEOUT_MS` bên `http.ts`. */
+const TICKET_TIMEOUT_MS = 15_000;
+
+/**
+ * Xin chữ ký từ BE cho một lượt upload.
+ *
+ * `fetch` tay chứ không qua SDK generated: nó chỉ là một chặng của `uploadImage`, mà hàm đó vốn
+ * đã nói chuyện thẳng với Cloudinary. Đổi lại phải tự cầm token — xem `getAccessToken`.
+ *
+ * Một chữ ký cho MỘT ảnh, không tái sử dụng: `timestamp` nằm trong chữ ký, và Cloudinary từ chối
+ * chữ ký quá cũ. Đăng tin 5 ảnh là 5 lượt gọi — rẻ, vì response chỉ vài trăm byte.
+ */
+async function fetchTicket(): Promise<UploadTicket> {
+  const token = getAccessToken();
+  /*
+   * Khách chưa đăng nhập KHÔNG upload được nữa, và đó chính là điểm của việc chuyển preset sang
+   * Signed: trước đây ai giải nén được bundle cũng đẩy file vào tài khoản này. Bắt ở đây thay vì
+   * để BE trả 401 — câu này nói ra được việc cần làm, mã 401 thì không.
+   */
+  if (!token) throw new Error('Đăng nhập để tải ảnh lên');
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TICKET_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/uploads/signature`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      signal: ctrl.signal,
+    });
+  } catch (err) {
+    throw new Error('Không xin được chữ ký tải ảnh. Kiểm tra Wi-Fi hoặc 4G rồi thử lại.', {
+      cause: err,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+
+  // 501 = server thiếu `CLOUDINARY_*`; 429 = xin chữ ký quá nhanh. Cả hai đều có câu đọc được ở
+  // BE, nên hiện nguyên văn thay vì nuốt đi và nói chung chung "tải ảnh thất bại".
+  const body = (await res.json().catch(() => null)) as
+    | { data?: UploadTicket; message?: string }
+    | null;
+  if (!res.ok || !body?.data) {
+    throw new Error(body?.message ?? `Không xin được chữ ký tải ảnh (HTTP ${res.status})`);
+  }
+  return body.data;
+}
+
 /**
  * Tải một ảnh local (`file://…` từ expo-image-picker) lên Cloudinary.
  * @returns `secure_url` — chuỗi HTTPS để lưu xuống BE.
  */
 export async function uploadImage(uri: string): Promise<string> {
   const t0 = Date.now();
+  // Xin chữ ký TRƯỚC khi nén: hỏng vì chưa đăng nhập hay server thiếu cấu hình thì biết ngay,
+  // không bắt người dùng chờ hết một lượt resize rồi mới báo lỗi.
+  const ticket = await fetchTicket();
   const source = await prepare(uri);
   const t1 = Date.now();
   const name = source.split('/').pop() || 'upload.jpg';
@@ -176,9 +242,54 @@ export async function uploadImage(uri: string): Promise<string> {
   // expo-file-system tương thích Blob nên append thẳng được; ép kiểu vì lib DOM của TS
   // khai `Blob | string` chứ không biết class này.
   form.append('file', new File(source) as unknown as Blob, name);
-  form.append('upload_preset', UPLOAD_PRESET);
+  /*
+   * ĐÚNG những trường này, không thừa không thiếu.
+   *
+   * `folder`, `timestamp`, `upload_preset` là ba tham số BE đã ký — gửi lệch một giá trị, bỏ bớt
+   * một trường, hay thêm một trường được ký nữa (`context`, `tags`…) đều làm chữ ký sai và
+   * Cloudinary trả 401. Thêm tham số mới thì phải thêm ở CẢ HAI phía, `upload.service.ts` trước.
+   *
+   * `file` và `api_key` không tham gia ký — Cloudinary loại chúng ra trước khi đối chiếu.
+   */
+  form.append('api_key', ticket.apiKey);
+  form.append('timestamp', String(ticket.timestamp));
+  form.append('signature', ticket.signature);
+  form.append('folder', ticket.folder);
+  form.append('upload_preset', ticket.uploadPreset);
 
-  const res = await fetch(UPLOAD_URL, { method: 'POST', body: form });
+  const uploadUrl = `https://api.cloudinary.com/v1_1/${ticket.cloudName}/image/upload`;
+
+  /*
+   * Cùng lối với `http.ts`, khác NGÂN SÁCH. `fetch` không tự bỏ cuộc, nên Wi-Fi rớt giữa lúc
+   * đẩy ảnh để lại một thumbnail quay vòng tròn vĩnh viễn và form đăng tin không bao giờ bấm
+   * gửi được — người dùng không có cách nào biết chuyện gì đang xảy ra.
+   *
+   * 60s chứ không phải 15s như request thường: ảnh sau `prepare` vẫn cỡ vài trăm KB tới vài MB,
+   * và trên 3G yếu thì một phút là một lượt tải đang chạy bình thường, không phải một lượt hỏng.
+   */
+  const ctrl = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    ctrl.abort();
+  }, UPLOAD_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(uploadUrl, { method: 'POST', body: form, signal: ctrl.signal });
+  } catch (err) {
+    if (timedOut) {
+      throw new Error('Tải ảnh lên quá lâu — kiểm tra mạng rồi thử lại', { cause: err });
+    }
+    // Trước bản này lỗi vận chuyển bay thẳng lên giao diện, và người dùng đọc nguyên văn chuỗi
+    // native. Cùng lý do `networkMessage()` tồn tại bên `http.ts`.
+    throw new Error('Không gửi được ảnh lên máy chủ ảnh. Kiểm tra Wi-Fi hoặc 4G rồi thử lại.', {
+      cause: err,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+
   const json = (await res.json()) as CloudinaryUploadResponse;
   logTiming(uri, source, t0, t1, Date.now());
 

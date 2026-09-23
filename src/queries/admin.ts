@@ -4,7 +4,7 @@ import { adminApi, canModeratePublicAxis, isMaster } from '@/api/admin';
 import type { AdminEvent, ModStatus } from '@/api/admin';
 import type { RerouteListing } from '@/api/generated';
 import { joinAdminRoom, leaveAdminRoom, onSocketEvent } from '@/api/socket';
-import { useIsAuthenticated, useOrgSlug } from '@/stores/auth';
+import { useIsAuthenticated, useOrgId } from '@/stores/auth';
 import { qk } from './keys';
 import { usePagedList } from './paged';
 import { useCategories } from './listings';
@@ -12,30 +12,30 @@ import { useCategories } from './listings';
 /**
  * Bàn quản trị của MỘT tổ chức — tổ chức đang thao tác, không phải tổ chức trong token.
  *
- * BE v2 lấy org từ header `X-Org-Slug` (`api/http.ts`), nên không hook nào ở đây nhận tham số
+ * BE v2 lấy org từ header `X-Org-Id` (`api/http.ts`), nên không hook nào ở đây nhận tham số
  * tổ chức. Hai hệ quả bắt buộc phải xử lý, và cả hai đều nằm ngay dưới:
  *
- * 1. `orgSlug` phải nằm TRONG KEY — nếu không, đổi tổ chức xong vẫn đọc trúng cache của tổ
+ * 1. `orgId` phải nằm TRONG KEY — nếu không, đổi tổ chức xong vẫn đọc trúng cache của tổ
  *    chức cũ. Master là người duy nhất đổi tổ chức, và cũng là người ít có khả năng nhận ra
  *    con số đang thuộc về nơi khác.
  * 2. `enabled` phải chặn khi chưa chọn tổ chức. Master cố ý không thuộc tổ chức nào nên
- *    `activeOrgSlug` khởi đầu là `null`; không chặn thì mọi màn quản trị bắn request rồi ăn
+ *    `activeOrgId` khởi đầu là `null`; không chặn thì mọi màn quản trị bắn request rồi ăn
  *    403 "Chưa xác định được tổ chức" từ `requireOrg`.
  */
 
 /* -------------------------------- queries -------------------------------- */
 
 export function useAdminOverview() {
-  const orgSlug = useOrgSlug();
+  const orgId = useOrgId();
   return useQuery({
-    queryKey: qk.adminOverview(orgSlug ?? '-'),
+    queryKey: qk.adminOverview(orgId ?? '-'),
     queryFn: adminApi.getOverview,
-    enabled: Boolean(orgSlug),
+    enabled: Boolean(orgId),
   });
 }
 
 /**
- * Tổng quan trục danh mục. KHÔNG mang `orgSlug` trong key và không `enabled` theo slug: phạm vi
+ * Tổng quan trục danh mục. KHÔNG mang `orgId` trong key và không `enabled` theo slug: phạm vi
  * tới từ `role_grants` của chính người gọi, đổi tổ chức đang chọn không đổi một dòng số liệu nào.
  */
 export function usePublicOverview() {
@@ -45,11 +45,11 @@ export function usePublicOverview() {
   });
 }
 export function useAdminActivity() {
-  const orgSlug = useOrgSlug();
+  const orgId = useOrgId();
   return useQuery({
-    queryKey: qk.adminActivity(orgSlug ?? '-'),
+    queryKey: qk.adminActivity(orgId ?? '-'),
     queryFn: adminApi.getEvents,
-    enabled: Boolean(orgSlug),
+    enabled: Boolean(orgId),
   });
 }
 
@@ -96,7 +96,7 @@ export function useAdminListings(
   status?: ModStatus,
   filter: { category?: string; q?: string } = {},
 ) {
-  const orgSlug = useOrgSlug();
+  const orgId = useOrgId();
   const master = isMaster(useMyGrants().data);
   const { data: categories } = useCategories();
 
@@ -111,24 +111,24 @@ export function useAdminListings(
 
   const names = new Map((categories ?? []).map((c) => [c.id, c.name]));
   return usePagedList(
-    qk.adminListings(orgSlug ?? '-', status ?? 'all', filter.category ?? 'all', settled),
+    qk.adminListings(orgId ?? '-', status ?? 'all', filter.category ?? 'all', settled),
     (page) => adminApi.getListings(status, names, page, { category: filter.category, q: settled }),
     {
       // `|| master`: BE mở các route ĐỌC này cho master chưa chọn org (`requireOrgReadOrMaster`),
       // nên chặn ở client là tự khoá lại đúng thứ vừa mở.
-      enabled: (Boolean(orgSlug) || master) && categories !== undefined,
+      enabled: (Boolean(orgId) || master) && categories !== undefined,
       keepPrevious: true,
     },
   );
 }
 
 export function useAdminReports() {
-  const orgSlug = useOrgSlug();
+  const orgId = useOrgId();
   const grants = useMyGrants().data;
-  return usePagedList(qk.adminReports(orgSlug ?? '-'), adminApi.getReports, {
+  return usePagedList(qk.adminReports(orgId ?? '-'), adminApi.getReports, {
     // Ba lối vào, không cần org: master đọc xuyên tổ chức; người phụ trách ô trục công khai thấy
     // báo cáo trong ô mình (BE dựng ô từ grant). Quản trị org thì cần slug như cũ.
-    enabled: Boolean(orgSlug) || isMaster(grants) || canModeratePublicAxis(grants),
+    enabled: Boolean(orgId) || isMaster(grants) || canModeratePublicAxis(grants),
   });
 }
 
@@ -213,11 +213,11 @@ export function useResolveReport() {
  */
 export function useAdminActivityStream(): void {
   const qc = useQueryClient();
-  const orgSlug = useOrgSlug();
+  const orgId = useOrgId();
 
   useEffect(() => {
     // Không có tổ chức nào đang chọn thì không có dòng "Vừa diễn ra" nào để đẩy vào.
-    if (!orgSlug) return;
+    if (!orgId) return;
 
     const onActivity = (payload: unknown) => {
       const log = payload as { id?: string; actorName?: string; summary?: string };
@@ -229,14 +229,14 @@ export function useAdminActivityStream(): void {
        */
       if (!log?.id || !log.summary || !log.actorName) return;
 
-      qc.setQueryData<AdminEvent[]>(qk.adminActivity(orgSlug), (old = []) => [
+      qc.setQueryData<AdminEvent[]>(qk.adminActivity(orgId), (old = []) => [
         { id: log.id!, tone: 'info', text: `${log.actorName} · ${log.summary}`, time: 'vừa xong' },
         // Chốt trùng: cùng một sự kiện có thể tới hai lần (nối lại socket, hoặc một lượt
         // refetch chạy xen giữa). Lọc theo id rẻ hơn nhiều so với đi tìm một dòng lặp.
         ...old.filter((e) => e.id !== log.id).slice(0, 19),
       ]);
       // Thẻ số đổi theo mỗi thao tác duyệt — để BE tính lại thay vì đoán ở client.
-      qc.invalidateQueries({ queryKey: qk.adminOverview(orgSlug) });
+      qc.invalidateQueries({ queryKey: qk.adminOverview(orgId) });
     };
 
     joinAdminRoom();
@@ -246,5 +246,5 @@ export function useAdminActivityStream(): void {
       leaveAdminRoom();
       off();
     };
-  }, [qc, orgSlug]);
+  }, [qc, orgId]);
 }

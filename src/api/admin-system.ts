@@ -27,7 +27,7 @@ import { relativeTime, unwrap } from './client';
 import { withAuthRetry } from './http';
 
 /**
- * Nhóm "Hệ thống" của bàn quản trị — phần CHỈ master chạm được và KHÔNG đọc `X-Org-Slug`:
+ * Nhóm "Hệ thống" của bàn quản trị — phần CHỈ master chạm được và KHÔNG đọc `X-Org-Id`:
  * cụm từ cấm, catalog gói tin, số liệu định giá.
  *
  * Ba thứ này từng nằm cứng trong BE (`DEFAULT_BANNED_PHRASES`, `DEFAULT_LISTING_PRODUCTS`) và
@@ -193,7 +193,7 @@ export const adminSystemApi = {
 
   /**
    * Báo cáo đăng tin theo thời gian — chuỗi số theo ngày/tháng/năm. Master không kèm org: cả
-   * sàn; kèm `X-Org-Slug` (quản trị nhóm): tin mang dấu nhóm — nội bộ lẫn công khai do thành
+   * sàn; kèm `X-Org-Id` (quản trị nhóm): tin mang dấu nhóm — nội bộ lẫn công khai do thành
    * viên đăng trong ngữ cảnh nhóm.
    *
    * Khác `getPostingStats` ở câu hỏi: cái kia là ẢNH CHỤP một cửa sổ để chốt giá gói tin,

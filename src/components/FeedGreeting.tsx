@@ -97,7 +97,7 @@ export function FeedGreeting({
           return (
           <Pressable
             key={o.id}
-            onPress={() => onOrg(o.slug)}
+            onPress={() => onOrg(o.id)}
             style={({ pressed }) => [styles.orgChip, pressed && styles.pressed]}
           >
             <GlassSheen />
@@ -109,7 +109,7 @@ export function FeedGreeting({
             {face ? (
               <Image source={{ uri: squareUrl(face, 60) }} style={styles.orgDot} />
             ) : (
-              <View style={[styles.orgDot, styles.orgDotCenter, { backgroundColor: gradOf(o.slug)[1] }]}>
+              <View style={[styles.orgDot, styles.orgDotCenter, { backgroundColor: gradOf(o.id)[1] }]}>
                 <Text style={styles.orgDotText}>{initialsOf(o.name)}</Text>
               </View>
             )}

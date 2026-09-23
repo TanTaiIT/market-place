@@ -26,7 +26,7 @@ import { ToastProvider } from '@/components/Toast';
 import { useSyncAccessToken, useValidateSession } from '@/queries/auth';
 import { useChatSocket, useInboxSignal } from '@/queries/chat';
 import { useNotifSignal } from '@/queries/notifications';
-import { useAuthHydrated, useIsAuthenticated, useOrgSlug } from '@/stores/auth';
+import { useAuthHydrated, useIsAuthenticated, useOrgId } from '@/stores/auth';
 import { C } from '@/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -77,7 +77,7 @@ export default function RootLayout() {
 
   const isAuthenticated = useIsAuthenticated();
   const authHydrated = useAuthHydrated();
-  const orgSlug = useOrgSlug();
+  const orgId = useOrgId();
   // Đẩy token của phiên xuống tầng HTTP trước khi bất kỳ màn con nào mount và gọi query.
   // Truyền thẳng `queryClient` vì ở đây còn ở NGOÀI `<QueryClientProvider>` bên dưới.
   useSyncAccessToken(queryClient);
@@ -187,7 +187,7 @@ export default function RootLayout() {
             {/* Nằm SAU Stack nên phủ lên trên: lúc splash nở ra là thấy luôn app đã dựng sẵn
                 phía dưới, không phải chờ mount thêm một nhịp nữa. */}
             {!splashDone && (
-              <BootSplash ready={ready} boardLabel={orgSlug} onFinish={finishSplash} />
+              <BootSplash ready={ready} boardLabel={orgId} onFinish={finishSplash} />
             )}
           </ToastProvider>
         </SafeAreaProvider>

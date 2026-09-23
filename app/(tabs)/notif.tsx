@@ -230,7 +230,7 @@ export default function Notifications() {
                 time={item.time}
                 unread={item.unread}
                 onPress={() => {
-                  const slug = orgById.get(item.orgId ?? '')?.slug;
+                  const slug = orgById.get(item.orgId ?? '')?.id;
                   if (slug) router.push(`/org/${slug}`);
                 }}
               />

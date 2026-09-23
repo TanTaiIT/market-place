@@ -43,7 +43,7 @@ export default function AdminOverview() {
 
   /*
    * Bàn hệ thống dựng SafeArea/header riêng của nó qua `AdminScreen` ở đây, nhưng KHÔNG nhận
-   * prop `org`: nó không đọc `X-Org-Slug` một dòng nào. Truyền `org` vào sẽ dựng lại đúng cái
+   * prop `org`: nó không đọc `X-Org-Id` một dòng nào. Truyền `org` vào sẽ dựng lại đúng cái
    * cửa 'chọn tổ chức để mở' mà cả thay đổi này sinh ra để bỏ đi.
    */
   if (isMaster(grants)) {

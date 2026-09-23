@@ -58,23 +58,18 @@ type AuthState = {
    * Tổ chức đang thao tác — KHÔNG còn nằm trong phiên đăng nhập.
    *
    * BE v2 bỏ `organizationId` khỏi token: một tài khoản thuộc nhiều org, và org của mỗi request
-   * do chính request chỉ ra (header `X-Org-Id`) rồi được đối chiếu `memberships` ngay lúc đó.
+   * do chính request chỉ ra (header `X-Org-Slug`) rồi được đối chiếu `memberships` ngay lúc đó.
    * Vì vậy nó là lựa chọn của người dùng, đổi được giữa phiên, và phải sống lâu hơn màn hình —
    * đúng chỗ của Zustand chứ không phải TanStack (store.convention §1).
    *
-   * **`_id` chứ không còn slug.** BE đã gỡ hẳn slug khỏi tổ chức
-   * (`scripts/migrate-drop-org-slug.ts`: "định danh của nhóm giờ là `_id`, không còn khoá chữ
-   * nào khác") và đổi header sang `x-org-id`. Giữ tên cũ ở đây thì cái tên nói một đằng, giá
-   * trị một nẻo — đúng loại nhầm lẫn đã khiến app gửi `X-Org-Id` suốt mà không ai thấy lỗi.
-   *
    * `null` = chưa chọn org: vẫn xem được tin công khai, chỉ không thao tác trong org nào.
    */
-  activeOrgId: string | null;
+  activeOrgSlug: string | null;
   /** false cho tới khi đọc xong kho bảo mật — giữ splash để guard không nháy qua màn login */
   hydrated: boolean;
   signIn: (session: Session) => void;
   signOut: () => void;
-  setActiveOrg: (organizationId: string | null) => void;
+  setActiveOrg: (slug: string | null) => void;
   /**
    * Vừa đăng ký xong và chưa được mời xác thực email — cờ MỘT LẦN, đọc rồi xoá.
    *
@@ -95,36 +90,22 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       session: null,
-      activeOrgId: null,
+      activeOrgSlug: null,
       hydrated: false,
       pendingEmailVerify: false,
       signIn: (session) => set({ session }),
       // Đăng xuất dọn luôn org đang chọn: người kế tiếp đăng nhập trên cùng máy không được
       // thừa hưởng tổ chức của người trước.
-      signOut: () => set({ session: null, activeOrgId: null, pendingEmailVerify: false }),
-      setActiveOrg: (activeOrgId) => set({ activeOrgId }),
+      signOut: () => set({ session: null, activeOrgSlug: null, pendingEmailVerify: false }),
+      setActiveOrg: (activeOrgSlug) => set({ activeOrgSlug }),
       markPendingEmailVerify: () => set({ pendingEmailVerify: true }),
       clearPendingEmailVerify: () => set({ pendingEmailVerify: false }),
     }),
     {
       name: 'ghim-auth',
       storage: createJSONStorage(() => secureStorage),
-      /*
-       * v1 = lượt slug → id. Máy đã cài bản cũ đang giữ khoá `activeOrgSlug` với một giá trị
-       * mà BE không còn hiểu; `migrate` bỏ nó đi thay vì để nó nằm lại làm rác không ai đọc.
-       *
-       * KHÔNG cố chuyển slug cũ thành id: slug đã bị `$unset` khỏi mọi bản ghi bên BE, nên
-       * không còn bảng tra nào để dịch. Người dùng rơi về "chưa chọn nhóm" — vẫn xem được nội
-       * dung công khai, và chọn lại nhóm mất đúng một lần chạm.
-       */
-      version: 1,
-      migrate: (persisted, from) => {
-        if (from >= 1) return persisted as Partial<AuthState>;
-        const { session } = (persisted ?? {}) as { session?: Session | null };
-        return { session: session ?? null, activeOrgId: null };
-      },
       // `hydrated` là cờ runtime; ghi xuống đĩa thì lần mở sau sẽ đọc lại đúng giá trị cũ (false)
-      partialize: (s) => ({ session: s.session, activeOrgId: s.activeOrgId }),
+      partialize: (s) => ({ session: s.session, activeOrgSlug: s.activeOrgSlug }),
       // Callback này chạy cả khi đọc đĩa lỗi — luôn mở khoá splash, đừng để app treo ở màn boot.
       //
       // Bản ghi thiếu field thì vứt luôn thay vì mang vào phiên chạy: `useIsAuthenticated` chỉ
@@ -147,6 +128,6 @@ export const useAuthHydrated = () => useAuthStore((s) => s.hydrated);
 export const useSignIn = () => useAuthStore((s) => s.signIn);
 export const usePendingEmailVerify = () => useAuthStore((s) => s.pendingEmailVerify);
 export const useMarkPendingEmailVerify = () => useAuthStore((s) => s.markPendingEmailVerify);
-/** `_id` của tổ chức đang thao tác. `undefined` = chưa chọn, chỉ xem được nội dung công khai. */
-export const useOrgId = () => useAuthStore((s) => s.activeOrgId ?? undefined);
+/** Tổ chức đang thao tác. `null` = chưa chọn org, chỉ xem được nội dung công khai. */
+export const useOrgSlug = () => useAuthStore((s) => s.activeOrgSlug ?? undefined);
 export const useSetActiveOrg = () => useAuthStore((s) => s.setActiveOrg);

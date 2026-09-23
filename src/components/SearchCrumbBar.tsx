@@ -54,7 +54,7 @@ export function SearchCrumbBar({
   // Tên nhóm tra từ danh sách nhóm của chính người xem — chỉ nhóm họ đã vào mới lọc được, nên
   // luôn tra ra. Không ra (cache chưa về) thì "Nhóm", không bịa và không hiện slug kỹ thuật.
   const { data: myOrgs } = useMyOrgs();
-  const org = myOrgs?.find((o) => o.id === filter.orgId);
+  const org = myOrgs?.find((o) => o.slug === filter.orgSlug);
 
   const q = filter.q.trim();
   const price = priceRangeLabel(filter.minPrice, filter.maxPrice);
@@ -75,12 +75,12 @@ export function SearchCrumbBar({
   if (filter.ward && locationApplies(filter)) {
     crumbs.push({ key: 'ward', icon: '🏘️', text: filter.ward, without: { ...filter, ward: null } });
   }
-  if (filter.orgId) {
+  if (filter.orgSlug) {
     crumbs.push({
       key: 'org',
       icon: '👥',
       text: org?.name ?? 'Nhóm',
-      without: { ...filter, orgId: null },
+      without: { ...filter, orgSlug: null },
     });
   }
   if (filter.categoryId) {

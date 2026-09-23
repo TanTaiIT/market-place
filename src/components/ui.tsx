@@ -350,23 +350,6 @@ export function Avatar({
   );
 }
 
-/**
- * Công tắc bật/tắt — CÓ ĐIỀU KHIỂN, không giữ state nào của riêng nó.
- *
- * Thay ô tích vuông ở màn Tài khoản: ô tích nói "chọn một mục trong danh sách", còn đây là
- * bật/tắt một tính năng — hai nghĩa khác nhau mà người dùng đọc ra từ HÌNH trước khi đọc chữ.
- *
- * Vùng chạm thật là cả dòng ở call-site (`Pressable` bọc ngoài), nên bản thân nó không nhận
- * `onPress`: hai vùng chạm lồng nhau cho cùng một hành động là chỗ để bấm trúng cái nhỏ hơn
- * rồi tưởng máy không nhận.
- */
-export function Switch({ on }: { on: boolean }) {
-  return (
-    <View style={[styles.track, on && styles.trackOn]}>
-      <View style={[styles.thumb, on && styles.thumbOn]} />
-    </View>
-  );
-}
 const styles = StyleSheet.create({
   chip: {
     paddingHorizontal: 16,
@@ -467,15 +450,4 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: C.ink,
   },
-  track: {
-    width: 46,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: C.lineInput,
-    padding: 3,
-    justifyContent: 'center',
-  },
-  trackOn: { backgroundColor: C.brand },
-  thumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: C.paperWarm, ...shadow },
-  thumbOn: { transform: [{ translateX: 18 }] },
 });

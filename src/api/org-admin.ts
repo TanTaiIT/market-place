@@ -1,14 +1,22 @@
 import {
+  changeOrganizationSlug,
   createOrganization,
   createRoleGrant,
   listOrganizations,
   organizationManagers,
   organizationGrantAdmin,
+  organizationSlugAvailability,
   revokeRoleGrant,
   setOrganizationStatus,
   setOrganizationVisibility,
 } from './generated';
-import type { CreateRoleGrant, OrgManager, Organization, RoleGrant } from './generated';
+import type {
+  CreateRoleGrant,
+  OrgManager,
+  Organization,
+  RoleGrant,
+  SlugAvailability,
+} from './generated';
 import type { ProvinceName } from './location';
 
 /** Cùng lý do với `OrgUnit` bên `org.ts`: màn hình đi qua `api/**`, không chạm `generated`. */
@@ -62,6 +70,7 @@ export const ORG_TYPES: { value: OrgType; label: string }[] = [
  */
 export type NewOrgInput = {
   name: string;
+  slug: string;
   orgType: OrgType;
   /** Người sẽ phụ trách tổ chức. BE gọi vai này là `admin` từ khi bỏ khái niệm chủ sở hữu. */
   adminEmail: string;
@@ -105,6 +114,18 @@ export type NewGrantInput = {
   /** Chỉ có nghĩa với `category_ward`; đi kèm ĐÚNG một tỉnh ở `provinceCodes`. */
   wardCodes: string[];
 };
+
+/** Vì sao slug không dùng được — BE trả mã, người đọc cần câu chữ. */
+const SLUG_REASON: Record<NonNullable<SlugAvailability['reason']>, string> = {
+  invalid: 'Slug chỉ gồm chữ thường, số và dấu gạch ngang',
+  reserved: 'Slug này hệ thống giữ riêng',
+  taken: 'Đã có tổ chức dùng slug này',
+};
+
+export function slugReasonText(result: SlugAvailability): string {
+  if (result.available) return 'Slug dùng được';
+  return result.reason ? SLUG_REASON[result.reason] : 'Slug này không dùng được';
+}
 
 /**
  * Chỉ giữ field thuộc về scope đang chọn. `createRoleGrant` nhận cả bốn, nhưng đính `unitId`
@@ -174,13 +195,14 @@ export const orgAdminApi = {
    * nếu không thấy, nên đây không phải đường mời người mới vào hệ thống.
    */
   async create(input: NewOrgInput): Promise<Organization> {
-    // Bỏ hẳn field rỗng thay vì gửi chuỗi rỗng — với `district`, `''` là một giá trị và nó sẽ
-    // được lưu, trong khi VẮNG MẶT mới đúng nghĩa "không khai".
+    // Bỏ hẳn field rỗng thay vì gửi chuỗi rỗng: `slug: ''` bị BE đọc là một slug và trả 409
+    // "không hợp lệ", trong khi VẮNG MẶT mới đúng nghĩa "để BE tự sinh slug từ tên".
     const created = await withAuthRetry(() =>
       createOrganization({
         body: {
           name: input.name.trim(),
           orgType: input.orgType,
+          ...(input.slug.trim() ? { slug: input.slug.trim() } : {}),
           ...(input.provinceCode ? { provinceCode: input.provinceCode } : {}),
           ...(input.district.trim() ? { district: input.district.trim() } : {}),
         },
@@ -190,9 +212,8 @@ export const orgAdminApi = {
 
     /*
      * Bước hai hỏng thì tổ chức đã nằm trong DB ở `pending_admin`. Nói rõ điều đó trong lỗi:
-     * người dùng thấy "không tạo được" sẽ bấm lại và tạo ra một tổ chức TRÙNG TÊN thứ hai (tên
-     * không còn unique từ khi slug bị gỡ), không hiểu vì sao — trong khi việc cần làm là trao
-     * quyền cho tổ chức vừa hiện ra trong danh sách.
+     * người dùng thấy "không tạo được" sẽ bấm lại và ăn 409 trùng slug, không hiểu vì sao —
+     * trong khi việc cần làm là trao quyền cho tổ chức vừa hiện ra trong danh sách.
      */
     const granted = await withAuthRetry(() =>
       organizationGrantAdmin({
@@ -229,13 +250,22 @@ export const orgAdminApi = {
     return unwrap(res, 'Không đổi được chế độ hiển thị');
   },
 
-  /*
-   * `changeSlug` và `checkSlug` ĐÃ GỠ — BE không còn hai route đó.
-   *
-   * Tổ chức giờ chỉ định danh bằng `_id` (`scripts/migrate-drop-org-slug.ts` đã `$unset` slug
-   * khỏi mọi bản ghi và gỡ luôn unique index). Không còn khoá chữ nào để đổi, nên đây không
-   * phải một hàm cần sửa kiểu — nó là một tính năng không còn tồn tại.
+  /** Slug cũ tự thành alias redirect 301, nên đường link đã phát ra ngoài không chết. */
+  async changeSlug(id: string, slug: string): Promise<Organization> {
+    const res = await withAuthRetry(() =>
+      changeOrganizationSlug({ path: { organizationId: id }, body: { slug } }),
+    );
+    return unwrap(res, 'Không đổi được slug');
+  },
+
+  /**
+   * Kiểm tra slug. Endpoint công khai và có rate limit, nên `organizationSlugAvailability` gọi
+   * trần (không `withAuthRetry`) như `organizationByCode` — cùng nhóm, cùng lý do.
    */
+  async checkSlug(slug: string): Promise<SlugAvailability> {
+    const res = await organizationSlugAvailability({ query: { slug } });
+    return unwrap(res, 'Không kiểm tra được slug');
+  },
 
   /**
    * Cấp quyền. Không ai tự cấp cho chính mình — BE chặn, app không cần dựng lại chốt đó, chỉ

@@ -58,7 +58,7 @@ export const qk = {
       f.q,
       f.province ?? '',
       f.ward ?? '',
-      f.orgId ?? '',
+      f.orgSlug ?? '',
       f.categoryId ?? '',
       f.minPrice ?? '',
       f.maxPrice ?? '',
@@ -72,8 +72,6 @@ export const qk = {
   savedIds: () => ['saved', 'ids'] as const,
   savedListings: () => ['saved', 'listings'] as const,
   conversations: () => ['conversations'] as const,
-  /** Prefix thuần, cùng vai với `savedRoot`: dọn cả chi tiết lẫn lịch sử của MỌI hội thoại. */
-  conversationRoot: () => ['conversation'] as const,
   conversation: (id: string) => ['conversation', id] as const,
   messages: (conversationId: string) => ['conversation', conversationId, 'messages'] as const,
   notifications: () => ['notifications'] as const,
@@ -113,17 +111,19 @@ export const qk = {
   /** Prefix của cụm đơn xin tham gia — quét cả "đơn của tôi" lẫn hàng đợi của người duyệt. */
   joinRequestsRoot: () => ['join-requests'] as const,
   myJoinRequests: () => ['join-requests', 'mine'] as const,
-  // Cả hai key mang `activeOrgId`: dữ liệu scope theo `X-Org-Id`, thiếu slug trong key thì
+  // Cả hai key mang `activeOrgSlug`: dữ liệu scope theo `X-Org-Slug`, thiếu slug trong key thì
   // đổi tổ chức xong vẫn đọc trúng cache của tổ chức cũ.
-  joinRequestQueue: (orgId: string, status: string) =>
-    ['join-requests', 'queue', orgId, status] as const,
+  joinRequestQueue: (orgSlug: string, status: string) =>
+    ['join-requests', 'queue', orgSlug, status] as const,
   /** Danh bạ thành viên. Theo slug vì đổi tổ chức là đổi hẳn tập người, không phải lọc lại. */
-  orgMembers: (orgId: string) => ['orgs', 'members', orgId] as const,
+  orgMembers: (orgSlug: string) => ['orgs', 'members', orgSlug] as const,
   /**
    * Người phụ trách một org. Khoá theo `id` chứ không `slug`: endpoint nhận id, và slug thì
    * đổi được (`PATCH /:id/slug`) — bám vào nó là cache mồ côi sau mỗi lần đổi tên.
    */
   orgManagers: (orgId: string) => ['orgs', 'managers', orgId] as const,
+  /** Mang cả slug đang gõ, cùng lý do với `orgByCode` — mỗi slug là một câu trả lời khác. */
+  slugAvailability: (slug: string) => ['orgs', 'slug-check', slug] as const,
 
   /*
    * Bàn quản trị. Mọi thao tác duyệt đều đổi nhiều mặt cùng lúc (hàng đợi, bảng tin, thẻ số),
@@ -131,28 +131,28 @@ export const qk = {
    */
   adminRoot: () => ['admin'] as const,
   /*
-   * Bốn key dưới đây mang `orgId` vì dữ liệu của chúng scope theo `X-Org-Id` — cùng lý do
+   * Bốn key dưới đây mang `orgSlug` vì dữ liệu của chúng scope theo `X-Org-Slug` — cùng lý do
    * đã ghi ở `joinRequestQueue`/`orgMembers`. Thiếu slug thì master bấm "Thao tác trong" sang tổ
    * chức khác vẫn đọc trúng cache của tổ chức cũ: thẻ số, hàng đợi và báo cáo của nơi khác hiện
    * dưới tên nơi này, và không có gì trên màn hình nói ra điều đó.
    */
-  adminOverview: (orgId: string) => ['admin', 'overview', orgId] as const,
-  adminActivity: (orgId: string) => ['admin', 'activity', orgId] as const,
+  adminOverview: (orgSlug: string) => ['admin', 'overview', orgSlug] as const,
+  adminActivity: (orgSlug: string) => ['admin', 'activity', orgSlug] as const,
   /** `category`/`q` là bộ lọc SERVER của màn Tin đăng — một tổ hợp lọc là một danh sách trang riêng. */
-  adminListings: (orgId: string, status: string, category = 'all', q = '') =>
-    ['admin', 'listings', orgId, status, category, q] as const,
+  adminListings: (orgSlug: string, status: string, category = 'all', q = '') =>
+    ['admin', 'listings', orgSlug, status, category, q] as const,
   adminPublicQueue: (status: string) => ['admin', 'public-queue', status] as const,
   adminCoverage: () => ['admin', 'coverage'] as const,
   adminPublicOverview: () => ['admin', 'public-overview'] as const,
   /**
    * Bàn của master. Nằm trong cụm `admin` để một lượt duyệt tin quét luôn nó, nhưng KHÔNG mang
-   * `orgId` — số liệu gộp mọi tổ chức, không đổi theo tổ chức đang chọn.
+   * `orgSlug` — số liệu gộp mọi tổ chức, không đổi theo tổ chức đang chọn.
    */
   systemMetrics: () => ['admin', 'system-metrics'] as const,
   // Ngoài cụm `admin` vì nó là quyền của NGƯỜI, không phải dữ liệu của bàn quản trị: một lượt
   // duyệt tin quét sạch `adminRoot()`, mà quyền thì không đổi theo lượt duyệt nào cả.
   myGrants: () => ['me', 'grants'] as const,
-  adminReports: (orgId: string) => ['admin', 'reports', orgId] as const,
+  adminReports: (orgSlug: string) => ['admin', 'reports', orgSlug] as const,
   /** Prefix cho mutation đứng ngoài bàn quản trị (người dùng thường gửi báo cáo). */
   adminReportsRoot: () => ['admin', 'reports'] as const,
   /**
@@ -165,7 +165,7 @@ export const qk = {
   /** Không mang tên trường: danh mục là từ điển dùng chung toàn hệ thống, không thuộc tổ chức nào. */
   adminCategories: () => ['admin', 'categories'] as const,
   /** `scope=managed` đọc theo tổ chức đang thao tác, nên slug phải nằm trong key. */
-  adminNotices: (orgId: string) => ['admin', 'notices', orgId] as const,
+  adminNotices: (orgSlug: string) => ['admin', 'notices', orgSlug] as const,
   adminNoticesRoot: () => ['admin', 'notices'] as const,
   /** Cụm cấm: từ điển toàn hệ thống, không có tham số nào để lọc. */
   adminBannedPhrases: () => ['admin', 'banned-phrases'] as const,
@@ -177,13 +177,13 @@ export const qk = {
    * Báo cáo đăng tin. Cả ba tham số nằm trong key: đổi độ mịn hay đổi khoảng là HỎI BE MỘT CÂU
    * KHÁC, không phải lọc lại dữ liệu cũ — gộp chung một key sẽ hiện số của tháng lên trục ngày.
    */
-  // `orgId` đứng đầu: cùng độ mịn nhưng của HAI nhóm khác nhau (hoặc của cả sàn với master
+  // `orgSlug` đứng đầu: cùng độ mịn nhưng của HAI nhóm khác nhau (hoặc của cả sàn với master
   // chưa chọn org) là hai báo cáo khác — đổi tổ chức xong mà vẫn hiện số cũ là số sai.
-  adminListingReport: (orgId: string, granularity: string, from?: string, to?: string) =>
-    ['admin', 'listing-report', orgId, granularity, from ?? '', to ?? ''] as const,
+  adminListingReport: (orgSlug: string, granularity: string, from?: string, to?: string) =>
+    ['admin', 'listing-report', orgSlug, granularity, from ?? '', to ?? ''] as const,
   /** Báo cáo con thứ hai — khoá RIÊNG, cùng khuôn tham số với báo cáo tin đăng. */
-  adminUserReport: (orgId: string, granularity: string, from?: string, to?: string) =>
-    ['admin', 'user-report', orgId, granularity, from ?? '', to ?? ''] as const,
+  adminUserReport: (orgSlug: string, granularity: string, from?: string, to?: string) =>
+    ['admin', 'user-report', orgSlug, granularity, from ?? '', to ?? ''] as const,
   /** Từ điển field dùng chung — nguồn của bộ chọn field khi soạn template. */
   fieldDefinitions: () => ['admin', 'field-definitions'] as const,
 
@@ -191,7 +191,7 @@ export const qk = {
    * Ý kiến của tổ chức xã hội (cụm TẠM THỜI — công thức gỡ ở `@/api/legal`).
    *
    * Hàng đợi duyệt đứng NGOÀI cụm `admin`: một lượt duyệt tin quét sạch `adminRoot()`, mà hàng
-   * đợi này thì không đổi theo lượt duyệt tin nào cả. Nó cũng KHÔNG mang `orgId` — ý kiến gửi
+   * đợi này thì không đổi theo lượt duyệt tin nào cả. Nó cũng KHÔNG mang `orgSlug` — ý kiến gửi
    * cho pháp nhân vận hành sàn, không cho một nhóm nào (xem `social-feedback.model.ts`).
    */
   socialFeedback: () => ['social-feedback'] as const,

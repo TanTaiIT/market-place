@@ -66,19 +66,14 @@ export default function Post() {
   };
 
   /*
-   * `?org=<id>` — đăng thẳng vào một nhóm, đi từ nút trên trang hồ sơ nhóm.
+   * `?org=<slug>` — đăng thẳng vào một nhóm, đi từ nút trên trang hồ sơ nhóm.
    *
-   * Id đi theo ĐƯỜNG DẪN chứ không mượn `X-Org-Id`: người thuộc nhiều nhóm không phải đổi
-   * "nhóm đang thao tác" chỉ để đăng một tin, và không đăng nhầm vào nhóm đang mở.
+   * Slug đi theo ĐƯỜNG DẪN chứ không mượn `X-Org-Slug`: người thuộc nhiều nhóm không phải
+   * đổi "nhóm đang thao tác" chỉ để đăng một tin, và không đăng nhầm vào nhóm đang mở.
    */
-  const { org: orgId } = useLocalSearchParams<{ org?: string }>();
-  const { data: org } = useOrgProfile(orgId ?? '');
-  /*
-   * `isPublic` đi kèm vì bộ chọn bậc cần nó: `group_open` chỉ hợp lệ dưới nhóm CÔNG KHAI, và
-   * BE trả 400 nếu gửi bậc đó cho nhóm riêng tư (`routeListing`). Bày một lựa chọn chắc chắn
-   * hỏng rồi để người dùng bấm vào mới biết là tệ hơn không bày.
-   */
-  const toGroup = orgId && org ? { id: orgId, name: org.name, isPublic: org.isPublic } : undefined;
+  const { org: orgSlug } = useLocalSearchParams<{ org?: string }>();
+  const { data: org } = useOrgProfile(orgSlug ?? '');
+  const toGroup = orgSlug && org ? { slug: orgSlug, name: org.name } : undefined;
 
   if (quota.isPending || stale.length > 0) {
     return (
@@ -118,7 +113,7 @@ export default function Post() {
             busy={create.isPending}
             onSubmit={({ location, ...values }) =>
               create.mutate(
-                { ...values, ...location, photoUrls: photos.photoUrls, orgId },
+                { ...values, ...location, photoUrls: photos.photoUrls, orgSlug },
                 {
                   onSuccess: () => {
                     // Tin vào BE ở trạng thái `pending`, feed chỉ hiện tin `active` — về feed là

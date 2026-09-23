@@ -7,12 +7,12 @@ import { useListingReport, useUserReport } from '@/queries/admin-system';
 import { useMyGrants } from '@/queries/admin';
 import { isMaster } from '@/api/admin';
 import type { ReportGranularity } from '@/api/admin-system';
-import { useOrgId } from '@/stores/auth';
+import { useOrgSlug } from '@/stores/auth';
 import { C, F } from '@/theme';
 
 /**
  * Thống kê — KHUNG chứa nhiều báo cáo con. Master không chọn org thấy cả sàn; quản trị nhóm
- * (hoặc master đang đứng trong một org) thấy bản CỦA NHÓM — BE scope theo `X-Org-Id`, màn này
+ * (hoặc master đang đứng trong một org) thấy bản CỦA NHÓM — BE scope theo `X-Org-Slug`, màn này
  * chỉ đổi nhãn cho đúng thứ đang đếm (thành viên vào nhóm, không phải tài khoản mới của sàn).
  *
  * Một màn thay vì mỗi báo cáo một mục menu: hai câu hỏi "tin đăng thế nào" và "người dùng thế
@@ -42,7 +42,7 @@ export default function AdminAnalytics() {
   const [tab, setTab] = useState('listings');
   const [granularity, setGranularity] = useState<ReportGranularity>('day');
   const master = isMaster(useMyGrants().data);
-  const orgScoped = Boolean(useOrgId());
+  const orgScoped = Boolean(useOrgSlug());
 
   /*
    * Gọi CẢ HAI hook — quy tắc hook cấm gọi có điều kiện — và tắt cái không dùng bằng `enabled`.

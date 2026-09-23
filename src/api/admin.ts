@@ -366,7 +366,7 @@ export const canModeratePublicAxis = (grants: RoleGrant[] | undefined) =>
  * → `canModerateAnyInOrg` của BE: grant phạm vi `org`/`org_unit`, hoặc master.
  *
  * Không kiểm `orgId` như BE: app chỉ cần biết có nên hiện mục menu, còn tổ chức nào thì
- * `X-Org-Id` quyết định lúc gọi. Kiểm chặt hơn ở đây sẽ giấu mất mục menu của chính tổ chức
+ * `X-Org-Slug` quyết định lúc gọi. Kiểm chặt hơn ở đây sẽ giấu mất mục menu của chính tổ chức
  * mà người dùng vừa chuyển sang.
  */
 export const canModerateOrg = (grants: RoleGrant[] | undefined) =>

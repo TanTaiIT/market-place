@@ -123,12 +123,121 @@ export type UserReport = {
     };
 };
 
+export type Organization = {
+    id: string;
+    name: string;
+    slug: string;
+    joinCode: string;
+    avatarUrl: string | null;
+    description: string;
+    orgType: 'school' | 'company' | 'community' | 'generic';
+    verificationTier: 'unverified' | 'claimed' | 'verified';
+    provinceCode: string | null;
+    status: 'active' | 'suspended' | 'pending_admin';
+    isPublic: boolean;
+};
+
+export type OrganizationLookup = {
+    name: string;
+    slug: string;
+    joinCode: string;
+    avatarUrl: string | null;
+    coverUrl: string | null;
+    memberCount: number;
+    district: string | null;
+    provinceCode: string | null;
+    allowJoinRequests: boolean;
+    allowOutsiderPosts: boolean;
+};
+
+export type OrganizationProfile = {
+    name: string;
+    slug: string;
+    joinCode: string;
+    avatarUrl: string | null;
+    coverUrl: string | null;
+    description: string;
+    provinceCode: string | null;
+    district: string | null;
+    memberCount: number;
+    postsThisWeek: number;
+    rules: Array<string>;
+    feedLayout: 'feed' | 'grid';
+    allowJoinRequests: boolean;
+    allowOutsiderPosts: boolean;
+    joined: boolean;
+};
+
+export type MyOrganization = {
+    id: string;
+    name: string;
+    slug: string;
+    avatarUrl: string | null;
+    coverUrl: string | null;
+    provinceCode: string | null;
+    role: string;
+    unitId: string | null;
+    feedLayout: 'feed' | 'grid';
+    status: 'active' | 'suspended' | 'pending_admin';
+};
+
+export type UpdateOrganization = {
+    name?: string;
+    description?: string;
+    avatarUrl?: string | null;
+    coverUrl?: string | null;
+    allowJoinRequests?: boolean;
+    allowOutsiderPosts?: boolean;
+    rules?: Array<string>;
+    feedLayout?: 'feed' | 'grid';
+};
+
+export type OrganizationCard = {
+    name: string;
+    avatarUrl: string | null;
+    description: string;
+    provinceCode: string | null;
+    district: string | null;
+    memberCount: number;
+    allowJoinRequests: boolean;
+};
+
+export type SlugAvailability = {
+    slug: string;
+    available: boolean;
+    reason?: 'invalid' | 'reserved' | 'taken';
+    suggestions?: Array<string>;
+};
+
+export type CreateOrganization = {
+    name: string;
+    slug?: string;
+    orgType?: 'school' | 'company' | 'community' | 'generic';
+    provinceCode?: string;
+    district?: string;
+};
+
+export type SetOrganizationStatus = {
+    status: 'active' | 'suspended';
+};
+
+export type ChangeOrganizationSlug = {
+    slug: string;
+};
+
+export type OrgManager = {
+    userId: string;
+    name: string | null;
+    email: string | null;
+    avatar: string | null;
+    grantedAt: string;
+};
+
 export type CreateListing = {
     title: string;
     description: string;
     price: number;
     isNegotiable?: boolean;
-    canDeliver?: boolean;
     condition?: 'new' | 'like_new' | 'used';
     categoryId: string;
     images: Array<string>;
@@ -140,9 +249,9 @@ export type CreateListing = {
     attributes?: {
         [key: string]: string | number | boolean | Array<string>;
     };
-    reach?: 'members' | 'group_open' | 'marketplace';
+    visibility?: 'org_internal' | 'public';
     provinceCode?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
-    orgId?: string;
+    orgSlug?: string;
 };
 
 export type PostingFee = {
@@ -227,7 +336,6 @@ export type UpdateListing = {
     description?: string;
     price?: number;
     isNegotiable?: boolean;
-    canDeliver?: boolean;
     condition?: 'new' | 'like_new' | 'used';
     categoryId?: string;
     images?: Array<string>;
@@ -239,24 +347,21 @@ export type UpdateListing = {
     attributes?: {
         [key: string]: string | number | boolean | Array<string>;
     };
+    visibility?: 'org_internal' | 'public';
+    provinceCode?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
+    orgSlug?: string;
 };
 
 export type Listing = {
     _id: string;
     organizationId: string | null;
-    org?: {
-        id: string;
-        name: string;
-        avatarUrl: string | null;
-    } | null;
-    reach: 'members' | 'group_open' | 'marketplace';
+    visibility: 'org_internal' | 'public';
     provinceCode: string;
     title: string;
     slug: string;
     description: string;
     price: number;
     isNegotiable: boolean;
-    canDeliver: boolean;
     condition: 'new' | 'like_new' | 'used';
     images: Array<string>;
     category: string;
@@ -315,108 +420,9 @@ export type FavoriteStatus = {
     favorited: boolean;
 };
 
-export type Organization = {
-    id: string;
-    name: string;
-    joinCode: string;
-    avatarUrl: string | null;
-    description: string;
-    orgType: 'school' | 'company' | 'community' | 'generic';
-    verificationTier: 'unverified' | 'claimed' | 'verified';
-    provinceCode: string | null;
-    status: 'active' | 'suspended' | 'pending_admin';
-    isPublic: boolean;
-};
-
-export type OrganizationLookup = {
-    id: string;
-    name: string;
-    joinCode: string;
-    avatarUrl: string | null;
-    coverUrl: string | null;
-    memberCount: number;
-    district: string | null;
-    provinceCode: string | null;
-    allowJoinRequests: boolean;
-    allowOutsiderPosts: boolean;
-};
-
-export type OrganizationProfile = {
-    id: string;
-    name: string;
-    joinCode: string;
-    avatarUrl: string | null;
-    coverUrl: string | null;
-    description: string;
-    provinceCode: string | null;
-    district: string | null;
-    memberCount: number;
-    postsThisWeek: number;
-    rules: Array<string>;
-    feedLayout: 'feed' | 'grid';
-    allowJoinRequests: boolean;
-    allowOutsiderPosts: boolean;
-    isPublic: boolean;
-    joined: boolean;
-};
-
-export type MyOrganization = {
-    id: string;
-    name: string;
-    avatarUrl: string | null;
-    coverUrl: string | null;
-    provinceCode: string | null;
-    role: string;
-    unitId: string | null;
-    isPublic: boolean;
-    feedLayout: 'feed' | 'grid';
-    status: 'active' | 'suspended' | 'pending_admin';
-};
-
-export type UpdateOrganization = {
-    name?: string;
-    description?: string;
-    avatarUrl?: string | null;
-    coverUrl?: string | null;
-    allowJoinRequests?: boolean;
-    allowOutsiderPosts?: boolean;
-    rules?: Array<string>;
-    feedLayout?: 'feed' | 'grid';
-};
-
-export type OrganizationCard = {
-    name: string;
-    avatarUrl: string | null;
-    description: string;
-    provinceCode: string | null;
-    district: string | null;
-    memberCount: number;
-    allowJoinRequests: boolean;
-};
-
-export type CreateOrganization = {
-    name: string;
-    orgType?: 'school' | 'company' | 'community' | 'generic';
-    provinceCode?: string;
-    district?: string;
-};
-
-export type SetOrganizationStatus = {
-    status: 'active' | 'suspended';
-};
-
-export type OrgManager = {
-    grantId: string;
-    userId: string;
-    name: string | null;
-    email: string | null;
-    avatar: string | null;
-    grantedAt: string;
-};
-
 export type CreateJoinRequest = {
     code?: string;
-    orgId?: string;
+    slug?: string;
     claimedName: string;
     claimedUnit?: string;
     note?: string;
@@ -509,7 +515,7 @@ export type InvitePreview = {
 };
 
 export type AcceptInviteResult = {
-    organizationId: string;
+    organizationSlug: string;
 };
 
 export type CreateRoleGrant = {
@@ -520,13 +526,6 @@ export type CreateRoleGrant = {
     orgId?: string;
     unitId?: string;
     categoryId?: string;
-    provinceCodes?: Array<string>;
-    wardCodes?: Array<string>;
-};
-
-export type UpdateRoleGrant = {
-    scopeType: 'category_province' | 'category_ward';
-    categoryId: string;
     provinceCodes?: Array<string>;
     wardCodes?: Array<string>;
 };
@@ -543,13 +542,6 @@ export type RoleGrant = {
     wardCodes: Array<string>;
     grantedBy: string | null;
     grantedAt: string;
-};
-
-export type CategoryAxisGrant = RoleGrant & {
-    holderName: string;
-    holderEmail: string;
-    holderActive: boolean;
-    categoryName: string;
 };
 
 export type FieldOption = {
@@ -871,9 +863,8 @@ export type SystemMetrics = {
         total: number;
         new7d: number;
         new30d: number;
-        marketplace: number;
-        groupOpen: number;
-        members: number;
+        publicAxis: number;
+        orgInternal: number;
         active: number;
         pending: number;
         hidden: number;
@@ -898,46 +889,6 @@ export type SystemMetrics = {
         totalCells: number;
         coverageBacklog: number;
     };
-};
-
-export type SubmitKyc = {
-    subjectType: 'individual';
-    fullName: string;
-    birthDate: string | null;
-    idNumber: string;
-} | {
-    subjectType: 'company';
-    companyName: string;
-    companyAddress: string;
-    companyTaxCode: string;
-    fullName: string;
-    birthDate: string | null;
-    idNumber: string;
-};
-
-export type RejectKyc = {
-    reason: string;
-};
-
-export type KycProfile = {
-    id: string;
-    userId: string;
-    subjectType: 'individual' | 'company';
-    status: 'pending' | 'approved' | 'rejected';
-    fullName: string;
-    birthDate: string;
-    companyName?: string;
-    companyAddress?: string;
-    companyTaxCode?: string;
-    rejectReason: string | null;
-    reviewedAt: string | null;
-    createdAt: string;
-};
-
-export type KycDetail = KycProfile & {
-    idNumber: string;
-    accountName: string;
-    accountEmail: string;
 };
 
 export type MySupportThread = {
@@ -982,25 +933,6 @@ export type VerifyEmail = {
     code: string;
 };
 
-export type ForgotPassword = {
-    email: string;
-};
-
-export type ResetPassword = {
-    email: string;
-    resetToken: string;
-    password: string;
-};
-
-export type ResetTicket = {
-    resetToken: string;
-};
-
-export type VerifyResetCode = {
-    email: string;
-    code: string;
-};
-
 export type ClearRejections = {
     reason: string;
 };
@@ -1028,15 +960,6 @@ export type GrantOrganizationAdmin = {
 
 export type SetOrgVisibility = {
     isPublic: boolean;
-};
-
-export type UploadSignature = {
-    cloudName: string;
-    apiKey: string;
-    timestamp: number;
-    signature: string;
-    folder: string;
-    uploadPreset: string;
 };
 
 export type BannedPhrase = {
@@ -1138,7 +1061,7 @@ export type AuthRegisterErrors = {
      */
     400: ErrorResponse;
     /**
-     * Email đã có tài khoản
+     * Organization slug đã tồn tại
      */
     409: ErrorResponse;
     /**
@@ -1171,9 +1094,13 @@ export type AuthLoginData = {
 
 export type AuthLoginErrors = {
     /**
-     * Sai thông tin đăng nhập hoặc tài khoản bị khoá
+     * Sai thông tin đăng nhập, tài khoản bị khoá, hoặc thiếu organization
      */
     401: ErrorResponse;
+    /**
+     * Organization không tồn tại hoặc đã bị khoá
+     */
+    403: ErrorResponse;
     /**
      * Quá nhiều request
      */
@@ -1363,105 +1290,6 @@ export type AuthVerifyEmailResponses = {
 };
 
 export type AuthVerifyEmailResponse = AuthVerifyEmailResponses[keyof AuthVerifyEmailResponses];
-
-export type AuthForgotPasswordData = {
-    body?: ForgotPassword;
-    path?: never;
-    query?: never;
-    url: '/auth/password/forgot';
-};
-
-export type AuthForgotPasswordErrors = {
-    /**
-     * Email sai định dạng
-     */
-    400: ErrorResponse;
-    /**
-     * Quá nhiều request
-     */
-    429: ErrorResponse;
-};
-
-export type AuthForgotPasswordError = AuthForgotPasswordErrors[keyof AuthForgotPasswordErrors];
-
-export type AuthForgotPasswordResponses = {
-    /**
-     * Đã tiếp nhận
-     */
-    200: {
-        success: true;
-        message: string;
-        data: unknown;
-    };
-};
-
-export type AuthForgotPasswordResponse = AuthForgotPasswordResponses[keyof AuthForgotPasswordResponses];
-
-export type AuthResetPasswordData = {
-    body?: ResetPassword;
-    path?: never;
-    query?: never;
-    url: '/auth/password/reset';
-};
-
-export type AuthResetPasswordErrors = {
-    /**
-     * Mã không đúng hoặc đã hết hạn
-     */
-    400: ErrorResponse;
-    /**
-     * Quá nhiều request
-     */
-    429: ErrorResponse;
-};
-
-export type AuthResetPasswordError = AuthResetPasswordErrors[keyof AuthResetPasswordErrors];
-
-export type AuthResetPasswordResponses = {
-    /**
-     * Đã đặt lại mật khẩu
-     */
-    200: {
-        success: true;
-        message: string;
-        data: unknown;
-    };
-};
-
-export type AuthResetPasswordResponse = AuthResetPasswordResponses[keyof AuthResetPasswordResponses];
-
-export type AuthVerifyResetCodeData = {
-    body?: VerifyResetCode;
-    path?: never;
-    query?: never;
-    url: '/auth/password/verify-code';
-};
-
-export type AuthVerifyResetCodeErrors = {
-    /**
-     * Mã không đúng hoặc đã hết hạn
-     */
-    400: ErrorResponse;
-    /**
-     * Quá nhiều request
-     */
-    429: ErrorResponse;
-};
-
-export type AuthVerifyResetCodeError = AuthVerifyResetCodeErrors[keyof AuthVerifyResetCodeErrors];
-
-export type AuthVerifyResetCodeResponses = {
-    /**
-     * Mã hợp lệ
-     */
-    200: {
-        success: true;
-        message: string;
-        data: ResetTicket;
-    };
-};
-
-export type AuthVerifyResetCodeResponse = AuthVerifyResetCodeResponses[keyof AuthVerifyResetCodeResponses];
 
 export type UserDeleteMeData = {
     body?: never;
@@ -1934,8 +1762,7 @@ export type ListingListData = {
         province?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
         ward?: string;
         condition?: 'new' | 'like_new' | 'used';
-        reach?: Array<'members' | 'group_open' | 'marketplace'>;
-        orgId?: string;
+        visibility?: 'org_internal' | 'public';
         minPrice?: number | null;
         maxPrice?: number | null;
         attrs?: string;
@@ -2060,8 +1887,7 @@ export type ListingMineData = {
         province?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
         ward?: string;
         condition?: 'new' | 'like_new' | 'used';
-        reach?: Array<'members' | 'group_open' | 'marketplace'>;
-        orgId?: string;
+        visibility?: 'org_internal' | 'public';
         minPrice?: number | null;
         maxPrice?: number | null;
         attrs?: string;
@@ -2188,7 +2014,7 @@ export type ListingGetByIdData = {
 
 export type ListingGetByIdErrors = {
     /**
-     * Không tìm thấy tin, tin chưa được public, hoặc tin nội bộ của nhóm mà bạn không thuộc về
+     * Không tìm thấy tin hoặc tin chưa được public
      */
     404: ErrorResponse;
 };
@@ -2658,7 +2484,7 @@ export type CreateOrganizationErrors = {
      */
     404: ErrorResponse;
     /**
-     * Không sinh được mã nhóm, thử lại
+     * Slug đã tồn tại hoặc bị cấm
      */
     409: ErrorResponse;
 };
@@ -2822,20 +2648,53 @@ export type SetOrganizationVisibilityResponses = {
 
 export type SetOrganizationVisibilityResponse = SetOrganizationVisibilityResponses[keyof SetOrganizationVisibilityResponses];
 
-export type OrganizationPublicProfileData = {
-    body?: never;
+export type ChangeOrganizationSlugData = {
+    body?: ChangeOrganizationSlug;
     path: {
         organizationId: string;
     };
-    query?: {
-        code?: string;
+    query?: never;
+    url: '/organizations/{organizationId}/slug';
+};
+
+export type ChangeOrganizationSlugErrors = {
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Slug mới đã tồn tại hoặc bị cấm
+     */
+    409: ErrorResponse;
+};
+
+export type ChangeOrganizationSlugError = ChangeOrganizationSlugErrors[keyof ChangeOrganizationSlugErrors];
+
+export type ChangeOrganizationSlugResponses = {
+    /**
+     * Đã đổi slug
+     */
+    200: {
+        success: true;
+        message: string;
+        data: Organization;
     };
-    url: '/organizations/profile/{organizationId}';
+};
+
+export type ChangeOrganizationSlugResponse = ChangeOrganizationSlugResponses[keyof ChangeOrganizationSlugResponses];
+
+export type OrganizationPublicProfileData = {
+    body?: never;
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/organizations/profile/{slug}';
 };
 
 export type OrganizationPublicProfileErrors = {
     /**
-     * Không tìm thấy nhóm ở id này, hoặc mã không đúng
+     * Không tìm thấy nhóm công khai nào ở slug này
      */
     404: ErrorResponse;
     /**
@@ -2889,6 +2748,39 @@ export type OrganizationLookupResponses = {
 };
 
 export type OrganizationLookupResponse = OrganizationLookupResponses[keyof OrganizationLookupResponses];
+
+export type OrganizationSlugAvailabilityData = {
+    body?: never;
+    path?: never;
+    query: {
+        slug: string;
+        district?: string;
+        provinceCode?: string;
+    };
+    url: '/organizations/slug-availability';
+};
+
+export type OrganizationSlugAvailabilityErrors = {
+    /**
+     * Tra cứu quá nhiều lần
+     */
+    429: ErrorResponse;
+};
+
+export type OrganizationSlugAvailabilityError = OrganizationSlugAvailabilityErrors[keyof OrganizationSlugAvailabilityErrors];
+
+export type OrganizationSlugAvailabilityResponses = {
+    /**
+     * Kết quả kiểm tra
+     */
+    200: {
+        success: true;
+        message: string;
+        data: SlugAvailability;
+    };
+};
+
+export type OrganizationSlugAvailabilityResponse = OrganizationSlugAvailabilityResponses[keyof OrganizationSlugAvailabilityResponses];
 
 export type ListJoinRequestsData = {
     body?: never;
@@ -3481,38 +3373,6 @@ export type CreateRoleGrantResponses = {
 
 export type CreateRoleGrantResponse = CreateRoleGrantResponses[keyof CreateRoleGrantResponses];
 
-export type CategoryAxisGrantsData = {
-    body?: never;
-    path?: never;
-    query?: {
-        categoryId?: string;
-        province?: string;
-    };
-    url: '/role-grants/category-axis';
-};
-
-export type CategoryAxisGrantsErrors = {
-    /**
-     * Cần quyền master
-     */
-    403: ErrorResponse;
-};
-
-export type CategoryAxisGrantsError = CategoryAxisGrantsErrors[keyof CategoryAxisGrantsErrors];
-
-export type CategoryAxisGrantsResponses = {
-    /**
-     * Phụ trách trục danh mục
-     */
-    200: {
-        success: true;
-        message: string;
-        data: Array<CategoryAxisGrant>;
-    };
-};
-
-export type CategoryAxisGrantsResponse = CategoryAxisGrantsResponses[keyof CategoryAxisGrantsResponses];
-
 export type MyRoleGrantsData = {
     body?: never;
     path?: never;
@@ -3567,45 +3427,6 @@ export type RevokeRoleGrantResponses = {
 };
 
 export type RevokeRoleGrantResponse = RevokeRoleGrantResponses[keyof RevokeRoleGrantResponses];
-
-export type UpdateRoleGrantScopeData = {
-    body?: UpdateRoleGrant;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/role-grants/{id}';
-};
-
-export type UpdateRoleGrantScopeErrors = {
-    /**
-     * Không phải grant trục danh mục, hoặc phạm vi không hợp lệ
-     */
-    400: ErrorResponse;
-    /**
-     * Cần quyền master, hoặc đang sửa quyền của chính mình
-     */
-    403: ErrorResponse;
-    /**
-     * Không tìm thấy quyền này
-     */
-    404: ErrorResponse;
-};
-
-export type UpdateRoleGrantScopeError = UpdateRoleGrantScopeErrors[keyof UpdateRoleGrantScopeErrors];
-
-export type UpdateRoleGrantScopeResponses = {
-    /**
-     * Đã sửa phạm vi phụ trách
-     */
-    200: {
-        success: true;
-        message: string;
-        data: RoleGrant;
-    };
-};
-
-export type UpdateRoleGrantScopeResponse = UpdateRoleGrantScopeResponses[keyof UpdateRoleGrantScopeResponses];
 
 export type CategoryGetTemplateData = {
     body?: never;
@@ -4133,37 +3954,6 @@ export type DefaultTemplatePublishResponses = {
 
 export type DefaultTemplatePublishResponse = DefaultTemplatePublishResponses[keyof DefaultTemplatePublishResponses];
 
-export type ChatRemoveAllData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/chats';
-};
-
-export type ChatRemoveAllErrors = {
-    /**
-     * Thiếu hoặc sai access token
-     */
-    401: ErrorResponse;
-};
-
-export type ChatRemoveAllError = ChatRemoveAllErrors[keyof ChatRemoveAllErrors];
-
-export type ChatRemoveAllResponses = {
-    /**
-     * Đã xoá
-     */
-    200: {
-        success: true;
-        message: string;
-        data: {
-            deleted: number;
-        };
-    };
-};
-
-export type ChatRemoveAllResponse = ChatRemoveAllResponses[keyof ChatRemoveAllResponses];
-
 export type ChatListData = {
     body?: never;
     path?: never;
@@ -4244,41 +4034,6 @@ export type ChatOpenResponses = {
 };
 
 export type ChatOpenResponse = ChatOpenResponses[keyof ChatOpenResponses];
-
-export type ChatRemoveData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/chats/{id}';
-};
-
-export type ChatRemoveErrors = {
-    /**
-     * Thiếu hoặc sai access token
-     */
-    401: ErrorResponse;
-    /**
-     * Không tìm thấy hội thoại, hoặc bạn không thuộc hội thoại này
-     */
-    404: ErrorResponse;
-};
-
-export type ChatRemoveError = ChatRemoveErrors[keyof ChatRemoveErrors];
-
-export type ChatRemoveResponses = {
-    /**
-     * Đã xoá
-     */
-    200: {
-        success: true;
-        message: string;
-        data: unknown;
-    };
-};
-
-export type ChatRemoveResponse = ChatRemoveResponses[keyof ChatRemoveResponses];
 
 export type ChatGetByIdData = {
     body?: never;
@@ -4438,72 +4193,6 @@ export type ChatMarkReadResponses = {
 };
 
 export type ChatMarkReadResponse = ChatMarkReadResponses[keyof ChatMarkReadResponses];
-
-export type UploadSignatureData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/uploads/signature';
-};
-
-export type UploadSignatureErrors = {
-    /**
-     * Chưa đăng nhập
-     */
-    401: ErrorResponse;
-    /**
-     * Quá nhiều lượt xin chữ ký
-     */
-    429: ErrorResponse;
-    /**
-     * Server chưa cấu hình CLOUDINARY_*
-     */
-    501: ErrorResponse;
-};
-
-export type UploadSignatureError = UploadSignatureErrors[keyof UploadSignatureErrors];
-
-export type UploadSignatureResponses = {
-    /**
-     * Chữ ký upload
-     */
-    200: {
-        success: true;
-        message: string;
-        data: UploadSignature;
-    };
-};
-
-export type UploadSignatureResponse = UploadSignatureResponses[keyof UploadSignatureResponses];
-
-export type NotificationClearData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/notifications';
-};
-
-export type NotificationClearErrors = {
-    /**
-     * Thiếu hoặc sai access token
-     */
-    401: ErrorResponse;
-};
-
-export type NotificationClearError = NotificationClearErrors[keyof NotificationClearErrors];
-
-export type NotificationClearResponses = {
-    /**
-     * Đã xoá
-     */
-    200: {
-        success: true;
-        message: string;
-        data: unknown;
-    };
-};
-
-export type NotificationClearResponse = NotificationClearResponses[keyof NotificationClearResponses];
 
 export type NotificationListData = {
     body?: never;
@@ -5576,197 +5265,6 @@ export type MetricsSystemResponses = {
 };
 
 export type MetricsSystemResponse = MetricsSystemResponses[keyof MetricsSystemResponses];
-
-export type MyKycData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/kyc/me';
-};
-
-export type MyKycResponses = {
-    /**
-     * Hồ sơ của tôi
-     */
-    200: {
-        success: true;
-        message: string;
-        data: KycProfile & unknown;
-    };
-};
-
-export type MyKycResponse = MyKycResponses[keyof MyKycResponses];
-
-export type SubmitKycData = {
-    body?: SubmitKyc;
-    path?: never;
-    query?: never;
-    url: '/kyc/me';
-};
-
-export type SubmitKycErrors = {
-    /**
-     * Thông tin không hợp lệ
-     */
-    400: ErrorResponse;
-    /**
-     * Hồ sơ đã được duyệt
-     */
-    409: ErrorResponse;
-};
-
-export type SubmitKycError = SubmitKycErrors[keyof SubmitKycErrors];
-
-export type SubmitKycResponses = {
-    /**
-     * Đã nộp hồ sơ
-     */
-    201: {
-        success: true;
-        message: string;
-        data: KycProfile;
-    };
-};
-
-export type SubmitKycResponse = SubmitKycResponses[keyof SubmitKycResponses];
-
-export type ListKycData = {
-    body?: never;
-    path?: never;
-    query?: {
-        status?: 'pending' | 'approved' | 'rejected';
-        page?: number;
-        limit?: number;
-    };
-    url: '/kyc';
-};
-
-export type ListKycErrors = {
-    /**
-     * Cần quyền master
-     */
-    403: ErrorResponse;
-};
-
-export type ListKycError = ListKycErrors[keyof ListKycErrors];
-
-export type ListKycResponses = {
-    /**
-     * Hồ sơ định danh
-     */
-    200: {
-        success: true;
-        message: string;
-        data: Array<KycProfile>;
-    };
-};
-
-export type ListKycResponse = ListKycResponses[keyof ListKycResponses];
-
-export type KycDetailData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/kyc/{id}';
-};
-
-export type KycDetailErrors = {
-    /**
-     * Cần quyền master
-     */
-    403: ErrorResponse;
-    /**
-     * Không tìm thấy hồ sơ
-     */
-    404: ErrorResponse;
-};
-
-export type KycDetailError = KycDetailErrors[keyof KycDetailErrors];
-
-export type KycDetailResponses = {
-    /**
-     * Chi tiết hồ sơ
-     */
-    200: {
-        success: true;
-        message: string;
-        data: KycDetail;
-    };
-};
-
-export type KycDetailResponse = KycDetailResponses[keyof KycDetailResponses];
-
-export type ApproveKycData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/kyc/{id}/approve';
-};
-
-export type ApproveKycErrors = {
-    /**
-     * Cần quyền master
-     */
-    403: ErrorResponse;
-    /**
-     * Không tìm thấy hồ sơ
-     */
-    404: ErrorResponse;
-};
-
-export type ApproveKycError = ApproveKycErrors[keyof ApproveKycErrors];
-
-export type ApproveKycResponses = {
-    /**
-     * Duyệt hồ sơ định danh (master)
-     */
-    200: {
-        success: true;
-        message: string;
-        data: KycProfile;
-    };
-};
-
-export type ApproveKycResponse = ApproveKycResponses[keyof ApproveKycResponses];
-
-export type RejectKycData = {
-    body?: RejectKyc;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/kyc/{id}/reject';
-};
-
-export type RejectKycErrors = {
-    /**
-     * Cần quyền master
-     */
-    403: ErrorResponse;
-    /**
-     * Không tìm thấy hồ sơ
-     */
-    404: ErrorResponse;
-};
-
-export type RejectKycError = RejectKycErrors[keyof RejectKycErrors];
-
-export type RejectKycResponses = {
-    /**
-     * Từ chối hồ sơ định danh (master)
-     */
-    200: {
-        success: true;
-        message: string;
-        data: KycProfile;
-    };
-};
-
-export type RejectKycResponse = RejectKycResponses[keyof RejectKycResponses];
 
 export type SupportMyThreadData = {
     body?: never;

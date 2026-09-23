@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminContentApi } from '@/api/admin-content';
-import { useOrgId } from '@/stores/auth';
+import { useOrgSlug } from '@/stores/auth';
 import { qk } from './keys';
 import { usePagedList } from './paged';
 
@@ -45,10 +45,10 @@ export function useEditCategory() {
 /* ------------------------------- thông báo ------------------------------- */
 
 export function useSentNotices() {
-  const orgId = useOrgId();
-  return usePagedList(qk.adminNotices(orgId ?? '-'), adminContentApi.getNotices, {
+  const orgSlug = useOrgSlug();
+  return usePagedList(qk.adminNotices(orgSlug ?? '-'), adminContentApi.getNotices, {
     // `scope=managed` đọc theo tổ chức đang thao tác — chưa chọn thì không có gì để hỏi.
-    enabled: Boolean(orgId),
+    enabled: Boolean(orgSlug),
   });
 }
 

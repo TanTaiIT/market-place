@@ -6,7 +6,7 @@ import { AdminNav } from './AdminNav';
 import { AdminOrgPicker } from './AdminOrgPicker';
 import { useToast } from './Toast';
 import { PinButton } from './ui';
-import { useOrgId } from '@/stores/auth';
+import { useOrgSlug } from '@/stores/auth';
 import { useMyOrgs } from '@/queries/org';
 import { useMyGrants } from '@/queries/admin';
 import { isMaster } from '@/api/admin';
@@ -31,12 +31,12 @@ export function AdminScreen({
   /** Câu viết tay trên tiêu đề, giữ đúng giọng của prototype. */
   note: string;
   /**
-   * Màn này đọc `X-Org-Id` — khớp đúng cờ `org: true` của `AdminNav.GROUPS`.
+   * Màn này đọc `X-Org-Slug` — khớp đúng cờ `org: true` của `AdminNav.GROUPS`.
    *
    * Bật thì khi chưa chọn tổ chức, màn hiện lối đi tiếp thay vì ruột của nó. Master cố ý không
    * thuộc tổ chức nào, nên đây là trạng thái BÌNH THƯỜNG của họ lúc mới vào, không phải lỗi:
    * trước đó mọi màn trong nhóm này ném nguyên văn câu của `requireOrg` — "gửi header
-   * X-Org-Id hoặc truy cập qua subdomain" — cho người vừa bấm một mục menu.
+   * X-Org-Slug hoặc truy cập qua subdomain" — cho người vừa bấm một mục menu.
    *
    * `'optional'` = có đọc slug nhưng KHÔNG đòi (màn Phân quyền): bộ chọn của master vẫn còn,
    * còn người không thuộc tổ chức nào vẫn vào được ruột màn thay vì gặp bức tường.
@@ -54,7 +54,7 @@ export function AdminScreen({
 }) {
   const toast = useToast();
   const router = useRouter();
-  const orgId = useOrgId();
+  const orgSlug = useOrgSlug();
   const [navOpen, setNavOpen] = useState(false);
   const [pickOrg, setPickOrg] = useState(false);
   const grants = useMyGrants();
@@ -63,12 +63,12 @@ export function AdminScreen({
 
   /*
    * BE tự suy ra tổ chức khi người dùng có ĐÚNG MỘT membership (`tenant.middleware`), nên
-   * "chưa bấm chọn" KHÔNG đồng nghĩa "chưa có tổ chức". Chặn bằng riêng `orgId` sẽ dựng
+   * "chưa bấm chọn" KHÔNG đồng nghĩa "chưa có tổ chức". Chặn bằng riêng `orgSlug` sẽ dựng
    * một bức tường trước mặt đúng nhóm dùng bàn quản trị nhiều nhất: quản trị của một
    * trường duy nhất, người chưa từng mở bộ chuyển tổ chức lần nào.
    */
   const needsOrg =
-    org === true && !orgId && (myOrgs ?? []).length !== 1 && !(master && masterReadsAll);
+    org === true && !orgSlug && (myOrgs ?? []).length !== 1 && !(master && masterReadsAll);
 
   /*
    * Chưa biết người này có phải master thì CHƯA vẽ lối thoát: `isMaster(undefined)` là
@@ -95,7 +95,7 @@ export function AdminScreen({
 
             Vế thứ hai là bắt buộc từ khi bộ chuyển ở trang cá nhân thành master-only: thiếu
             nó, người quản trị hai nhóm mà không phải master không còn đường nào đặt
-            `X-Org-Id` — tức là không quản trị được nhóm nào cả.
+            `X-Org-Slug` — tức là không quản trị được nhóm nào cả.
 
             Thuộc đúng một nhóm thì không dựng: BE tự suy ra org trong ca đó, không có gì để chọn.
           */}

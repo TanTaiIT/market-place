@@ -3,14 +3,14 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { orgApi, type OrgPatch } from '@/api/org';
 import { api } from '@/api/client';
 import { useMyOrgs } from './org';
-import { useOrgId } from '@/stores/auth';
+import { useOrgSlug } from '@/stores/auth';
 import { qk } from './keys';
 
 /**
  * Khám phá nhóm — tìm, gợi ý, hồ sơ nhóm công khai.
  *
  * Tách khỏi `org.ts` (query.convention §8): cụm này chạy TRƯỚC khi người dùng có bất kỳ quan
- * hệ nào với nhóm, không cần `X-Org-Id`, và không đòi đăng nhập. Phần còn lại của `org.ts`
+ * hệ nào với nhóm, không cần `X-Org-Slug`, và không đòi đăng nhập. Phần còn lại của `org.ts`
  * là đường của người đã ở trong nhóm.
  */
 
@@ -74,7 +74,7 @@ export function useUpdateOrg(slug: string) {
  * Gộp về một chỗ vì việc tra ra nó có hai luật ngầm, và cả hai đều đã bị viết sai một lần:
  *
  * 1. **Thuộc đúng một nhóm thì không cần bấm chọn.** `tenant.middleware` bên BE tự suy ra
- *    org trong ca đó, nên `activeOrgId` là `undefined` một cách bình thường. Tra `find`
+ *    org trong ca đó, nên `activeOrgSlug` là `undefined` một cách bình thường. Tra `find`
  *    theo một slug `undefined` sẽ không khớp ai.
  * 2. **`/organizations/mine` chỉ có nhóm mình LÀ THÀNH VIÊN.** Master cố ý không thuộc
  *    nhóm nào, nên với họ nguồn đó luôn rỗng. Hồ sơ nhóm công khai cũng trả `feedLayout`
@@ -84,13 +84,13 @@ export function useUpdateOrg(slug: string) {
  * nhóm cụ thể, mà lúc đó không có nhóm nào để hỏi.
  */
 export function useActiveOrg() {
-  const activeSlug = useOrgId();
+  const activeSlug = useOrgSlug();
   const { data: myOrgs, isPending: minePending } = useMyOrgs();
 
   const only = (myOrgs ?? []).length === 1 ? myOrgs?.[0] : undefined;
-  const slug = activeSlug ?? only?.id;
+  const slug = activeSlug ?? only?.slug;
 
-  const mine = (myOrgs ?? []).find((o) => o.id === slug);
+  const mine = (myOrgs ?? []).find((o) => o.slug === slug);
   const profile = useOrgProfile(slug ?? '');
 
   return {

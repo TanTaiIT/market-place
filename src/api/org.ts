@@ -36,13 +36,13 @@ import { ORG_HEADER, withAuthRetry } from './http';
 
 /**
  * Tổ chức + đơn xin tham gia. Tách khỏi `client.ts` vì file đó đã sát trần và cụm này có vòng
- * đời riêng: nó chạy TRƯỚC khi người dùng thuộc tổ chức nào, tức là trước khi có `X-Org-Id`.
+ * đời riêng: nó chạy TRƯỚC khi người dùng thuộc tổ chức nào, tức là trước khi có `X-Org-Slug`.
  */
 
 /**
  * Thẻ xem trước tổ chức, tra bằng mã tham gia.
  *
- * Thay cho `OrgSuggestion` của dropdown tra-theo-tên cũ: BE đã bỏ `orgId` khỏi đơn xin gia
+ * Thay cho `OrgSuggestion` của dropdown tra-theo-tên cũ: BE đã bỏ `orgSlug` khỏi đơn xin gia
  * nhập, nên tra theo tên không còn đường dẫn tới việc gửi đơn nữa.
  */
 export type OrgCard = {
@@ -174,17 +174,17 @@ export const orgApi = {
     return unwrap(res, 'Không tìm được nhóm nào');
   },
 
-  /** Hồ sơ nhóm công khai. Nhóm riêng tư trả 404 — không phân biệt được với id không có thật. */
-  async profile(organizationId: string): Promise<OrgProfile> {
-    const res = await organizationPublicProfile({ path: { organizationId } });
+  /** Hồ sơ nhóm công khai. Nhóm riêng tư trả 404 — không phân biệt được với slug không có thật. */
+  async profile(slug: string): Promise<OrgProfile> {
+    const res = await organizationPublicProfile({ path: { slug } });
     return unwrap(res, 'Không tìm thấy nhóm này');
   },
 
   /**
    * Sửa hồ sơ nhóm — ảnh bìa, mô tả, nội quy.
    *
-   * BE lấy nhóm từ header `X-Org-Id` chứ không từ đường dẫn (`PATCH /organizations/current`),
-   * nên phải gắn id cho RIÊNG lượt gọi này: người đang sửa nhóm B không có nghĩa là họ muốn
+   * BE lấy nhóm từ header `X-Org-Slug` chứ không từ đường dẫn (`PATCH /organizations/current`),
+   * nên phải gắn slug cho RIÊNG lượt gọi này: người đang sửa nhóm B không có nghĩa là họ muốn
    * chuyển org đang thao tác của cả app sang B. Cùng lập luận với `memberPreview` ngay dưới.
    *
    * `requireOrgAdmin` của BE đứng nguyên — không phải thành viên quản trị thì nhận 403, phần
@@ -192,9 +192,9 @@ export const orgApi = {
    *
    * Field không gửi = giữ nguyên. `rules: []` là XOÁ HẾT nội quy, khác hẳn với không gửi.
    */
-  async update(organizationId: string, patch: UpdateOrganization): Promise<void> {
+  async update(slug: string, patch: UpdateOrganization): Promise<void> {
     const res = await withAuthRetry(() =>
-      organizationUpdate({ body: patch, headers: { [ORG_HEADER]: organizationId } }),
+      organizationUpdate({ body: patch, headers: { [ORG_HEADER]: slug } }),
     );
     unwrap(res, 'Không lưu được thông tin nhóm');
   },
@@ -202,29 +202,26 @@ export const orgApi = {
   /**
    * Vài thành viên đầu của MỘT nhóm cụ thể — hàng avatar trên hồ sơ nhóm.
    *
-   * Gắn `X-Org-Id` cho riêng lượt gọi này thay vì đổi org đang thao tác của cả app: người
+   * Gắn `X-Org-Slug` cho riêng lượt gọi này thay vì đổi org đang thao tác của cả app: người
    * dùng mở hồ sơ một nhóm khác không có nghĩa là họ muốn chuyển sang làm việc ở đó.
    *
-   * `requireMembership` của BE vẫn đứng nguyên — gửi id của nhóm mình không thuộc về thì
+   * `requireMembership` của BE vẫn đứng nguyên — gửi slug của nhóm mình không thuộc về thì
    * nhận 403, nên chỉ gọi khi hồ sơ trả `joined: true`.
    */
-  async memberPreview(organizationId: string, take: number): Promise<Member[]> {
+  async memberPreview(slug: string, take: number): Promise<Member[]> {
     const res = await withAuthRetry(() =>
-      membershipList({ query: { limit: take }, headers: { [ORG_HEADER]: organizationId } }),
+      membershipList({ query: { limit: take }, headers: { [ORG_HEADER]: slug } }),
     );
     return unwrap(res, 'Không đọc được danh bạ nhóm');
   },
 
   /**
-   * Một trang danh bạ của MỘT nhóm theo id — ngăn chi tiết tổ chức của master. Cùng cách gắn
-   * `X-Org-Id` riêng cho lượt gọi như `memberPreview`, nhưng phân trang thay vì lấy `take` dòng.
+   * Một trang danh bạ của MỘT nhóm theo slug — ngăn chi tiết tổ chức của master. Cùng cách gắn
+   * `X-Org-Slug` riêng cho lượt gọi như `memberPreview`, nhưng phân trang thay vì lấy `take` dòng.
    */
-  async memberPage(organizationId: string, page: number): Promise<Page<Member>> {
+  async memberPage(slug: string, page: number): Promise<Page<Member>> {
     const res = await withAuthRetry(() =>
-      membershipList({
-        query: { page, limit: PAGE_SIZE },
-        headers: { [ORG_HEADER]: organizationId },
-      }),
+      membershipList({ query: { page, limit: PAGE_SIZE }, headers: { [ORG_HEADER]: slug } }),
     );
     return unwrapPage(res, 'Không đọc được danh bạ nhóm', (m) => m);
   },
@@ -258,12 +255,11 @@ export const orgApi = {
   },
 
   /**
-   * Gửi đơn bằng MÃ THAM GIA, hoặc bằng `_id` khi đi từ hồ sơ nhóm công khai.
+   * Gửi đơn bằng MÃ THAM GIA, không còn bằng slug.
    *
-   * BE đổi khoá tra sang `joinCode` vì slug là địa chỉ đoán được: ai đoán ra slug cũng gửi được
+   * BE đổi khoá tra sang `joinCode` vì slug là địa chỉ công khai: ai đoán ra slug cũng gửi được
    * đơn, và hàng đợi duyệt trở thành bề mặt spam mở. Mã do tổ chức phát ra và xoay được
-   * (`organizationRotateJoinCode`), nên phát nhầm thì thu lại được — slug thì không. Slug nay
-   * đã bị gỡ hẳn khỏi tổ chức, nên vế còn lại là `orgId`.
+   * (`organizationRotateJoinCode`), nên phát nhầm thì thu lại được — slug thì không.
    *
    * Muốn xem trước tên tổ chức trước khi gửi thì gọi `orgApi.byCode` — cùng mã, không cần đăng nhập.
    */
@@ -277,8 +273,7 @@ export const orgApi = {
    */
   async requestJoin(input: {
     code?: string;
-    /** `_id` của nhóm — đường vào từ hồ sơ nhóm công khai, nơi người dùng đã thấy tên nhóm rồi. */
-    orgId?: string;
+    slug?: string;
     claimedName: string;
     claimedUnit?: string;
     note?: string;
@@ -287,7 +282,7 @@ export const orgApi = {
       createJoinRequest({
         body: {
           // Đúng MỘT trong hai — BE `.refine()` từ chối nếu gửi cả hai hoặc không gửi gì.
-          ...(input.code ? { code: input.code.trim() } : { orgId: input.orgId }),
+          ...(input.code ? { code: input.code.trim() } : { slug: input.slug }),
           claimedName: input.claimedName,
           claimedUnit: input.claimedUnit || undefined,
           note: input.note || undefined,

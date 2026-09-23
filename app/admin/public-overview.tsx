@@ -10,7 +10,7 @@ import { C, F } from '@/theme';
 /**
  * Tổng quan của TRỤC DANH MỤC — bản đối xứng của `app/admin/index.tsx` cho ô (danh mục × phường).
  *
- * KHÔNG khai cờ `org`: phạm vi tới từ `role_grants` của chính người gọi, không từ `X-Org-Id`.
+ * KHÔNG khai cờ `org`: phạm vi tới từ `role_grants` của chính người gọi, không từ `X-Org-Slug`.
  * Người phụ trách một phường thường chẳng thuộc tổ chức nào, nên bắt họ chọn tổ chức là dựng
  * tường trước màn của chính họ.
  *

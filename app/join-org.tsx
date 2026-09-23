@@ -40,21 +40,21 @@ export default function JoinOrg() {
   const join = useRequestJoin();
 
   const myOrgs = mine ?? [];
-  const mySlugs = new Set(myOrgs.map((o) => o.id));
-  const rows = (data ?? []).filter((o) => !mySlugs.has(o.id));
+  const mySlugs = new Set(myOrgs.map((o) => o.slug));
+  const rows = (data ?? []).filter((o) => !mySlugs.has(o.slug));
   /* Gõ trúng mã thì BE trả đúng một dòng — dấu hiệu đủ chắc để tô đậm nó. */
   const exactCode = term.trim().length >= 4 && rows.length === 1;
 
   const open = (slug: string) => router.push(`/org/${slug}`);
 
   /*
-   * Gửi đơn thẳng từ danh sách bằng `_id` — chỉ nhóm công khai mới có mặt ở đây, và BE nhận id
-   * cho đúng nhóm đó. Tên khai báo lấy từ hồ sơ: bắt gõ lại tên mình ngay trong một danh sách
-   * đang lướt là chặn đúng thao tác vừa mở ra cho nhanh.
+   * Gửi đơn thẳng từ danh sách bằng SLUG — chỉ nhóm công khai mới có mặt ở đây, và BE nhận
+   * slug cho đúng nhóm đó. Tên khai báo lấy từ hồ sơ: bắt gõ lại tên mình ngay trong một danh
+   * sách đang lướt là chặn đúng thao tác vừa mở ra cho nhanh.
    */
   const requestJoin = (org: OrgRow) =>
     join.mutate(
-      { orgId: org.id, claimedName: profile?.name ?? '' },
+      { slug: org.slug, claimedName: profile?.name ?? '' },
       {
         // Nhóm công khai vào ngay, nhóm riêng tư mới có đơn chờ — xem `orgApi.requestJoin`.
         onSuccess: (res) =>
@@ -92,7 +92,7 @@ export default function JoinOrg() {
 
       <FlatList
         data={rows}
-        keyExtractor={(o) => o.id}
+        keyExtractor={(o) => o.slug}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
@@ -106,15 +106,15 @@ export default function JoinOrg() {
                 // được vai của mình, và đó là thứ đúng nhất có ở đây.
                 <OrgRowCard
                   key={o.id}
-                  slug={o.id}
+                  slug={o.slug}
                   name={o.name}
                   // Thiếu hai dòng này là nhóm CỦA MÌNH hiện dải màu trơn, trong khi nhóm
                   // người lạ ngay dưới lại có ảnh — nhìn như nhóm mình bị lỗi.
                   avatarUrl={o.avatarUrl}
                   coverUrl={o.coverUrl}
-                  meta={`${o.role === 'admin' ? 'Quản trị nhóm' : 'Thành viên'} · /${o.id}`}
+                  meta={`${o.role === 'admin' ? 'Quản trị nhóm' : 'Thành viên'} · /${o.slug}`}
                   action="joined"
-                  onPress={() => open(o.id)}
+                  onPress={() => open(o.slug)}
                 />
               ))}
               <Text style={[styles.section, { marginTop: 8 }]}>GỢI Ý CHO BẠN</Text>
@@ -126,13 +126,13 @@ export default function JoinOrg() {
             exact={exactCode}
             // Nhóm riêng tư chỉ lọt vào đây qua đường gõ đúng mã, nên ổ khoá đi cùng ca đó.
             locked={exactCode && !item.allowJoinRequests}
-            slug={item.id}
+            slug={item.slug}
             name={item.name}
             avatarUrl={item.avatarUrl}
             coverUrl={item.coverUrl}
             meta={metaOf(item)}
             action={item.allowJoinRequests ? 'join' : 'closed'}
-            onPress={() => open(item.id)}
+            onPress={() => open(item.slug)}
             onJoin={() => requestJoin(item)}
           />
         )}

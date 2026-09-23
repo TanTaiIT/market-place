@@ -24,7 +24,7 @@ import { BootSplash } from '@/components/BootSplash';
 import { ErrorScreen } from '@/components/ErrorScreen';
 import { ToastProvider } from '@/components/Toast';
 import { useSyncAccessToken, useValidateSession } from '@/queries/auth';
-import { useChatSocket, useInboxSignal } from '@/queries/chat-socket';
+import { useChatSocket, useInboxSignal } from '@/queries/chat';
 import { useNotifSignal } from '@/queries/notifications';
 import { useAuthHydrated, useIsAuthenticated } from '@/stores/auth';
 import { C } from '@/theme';
@@ -132,8 +132,6 @@ export default function RootLayout() {
                 <Stack.Protected guard={!isAuthenticated}>
                   <Stack.Screen name="login" options={{ animation: 'fade' }} />
                   <Stack.Screen name="register" options={{ animation: 'fade' }} />
-                  {/* Người quên mật khẩu theo định nghĩa là người không đăng nhập được. */}
-                  <Stack.Screen name="forgot-password" />
                 </Stack.Protected>
 
                 {/*

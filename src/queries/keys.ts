@@ -86,8 +86,6 @@ export const qk = {
   savedIds: () => ['saved', 'ids'] as const,
   savedListings: () => ['saved', 'listings'] as const,
   conversations: () => ['conversations'] as const,
-  /** Prefix thuần, cùng vai với `savedRoot`: dọn cả chi tiết lẫn lịch sử của MỌI hội thoại. */
-  conversationRoot: () => ['conversation'] as const,
   conversation: (id: string) => ['conversation', id] as const,
   messages: (conversationId: string) => ['conversation', conversationId, 'messages'] as const,
   notifications: () => ['notifications'] as const,

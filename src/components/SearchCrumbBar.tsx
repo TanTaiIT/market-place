@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { CATEGORY_FALLBACK } from './CategoryLogo';
 import { useCategories } from '@/queries/listings';
 import { useCategoryTemplate } from '@/queries/templates';
 import { useMyOrgs } from '@/queries/org';
@@ -52,7 +53,7 @@ export function SearchCrumbBar({
   const { data: template } = useCategoryTemplate(filter.categoryId ?? '');
   const category = categories?.find((c) => c.id === filter.categoryId);
   // Tên nhóm tra từ danh sách nhóm của chính người xem — chỉ nhóm họ đã vào mới lọc được, nên
-  // luôn tra ra. Không ra (cache chưa về) thì "Nhóm", không bịa và không hiện slug kỹ thuật.
+  // luôn tra ra. Không ra (cache chưa về) thì "Nhóm", không bịa và không hiện id kỹ thuật.
   const { data: myOrgs } = useMyOrgs();
   const org = myOrgs?.find((o) => o.id === filter.orgId);
 
@@ -86,7 +87,10 @@ export function SearchCrumbBar({
   if (filter.categoryId) {
     crumbs.push({
       key: 'category',
-      icon: category?.icon ?? '🏷️',
+      // Glyph trần chứ không phải `CategoryLogo`: các mẩu bên cạnh (👥 nhóm, 💰 giá, 📍 khu vực)
+      // đều là emoji 11px trong một hàng chữ, và một ô màu chen vào giữa sẽ đọc ra là mẩu này
+      // quan trọng hơn. Fallback vẫn dùng chung để không đẻ ra bản thứ hai.
+      icon: category?.icon || CATEGORY_FALLBACK,
       text: category?.name ?? 'Danh mục',
       // Bỏ danh mục là xoá sạch `attrs`, y như form đăng tin: không có template thì không còn
       // tập key hợp lệ nào để đối chiếu, và BE trả 400 cho `attrs` không kèm `category`.

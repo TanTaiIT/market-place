@@ -100,12 +100,6 @@ export default function Login() {
               style={{ marginTop: 8 }}
             />
 
-            {/* Ngay dưới nút đăng nhập, không lẫn vào chân màn: người bấm vào đây vừa gõ sai
-                mật khẩu xong, nên lối thoát phải nằm đúng chỗ mắt họ đang nhìn. */}
-            <Text style={styles.forgot} onPress={() => router.push('/forgot-password')}>
-              Quên mật khẩu?
-            </Text>
-
             <View style={styles.divider}>
               <View style={styles.line} />
               <Text style={styles.dividerText}>hoặc</Text>
@@ -187,7 +181,6 @@ const styles = StyleSheet.create({
   line: { flex: 1, height: 1, backgroundColor: '#E3DCC6' },
   dividerText: { fontFamily: F.ui, fontSize: 12, color: '#B7AE95' },
   switch: { textAlign: 'center', marginTop: 18, fontFamily: F.ui, fontSize: 12.5, color: C.inkSoft },
-  forgot: { alignSelf: 'center', marginTop: 14, fontFamily: F.uiSemi, fontSize: 13, color: C.brandTx },
   link: { color: C.pin, fontFamily: F.uiBold },
   /** Vùng chạm rộng hơn hẳn phần chữ: đây là lối thoát, hụt tay ở đây là kẹt lại trong màn. */
   escape: { alignSelf: 'center', marginTop: 20, paddingVertical: 12, paddingHorizontal: 18 },

@@ -13,7 +13,7 @@ import {
   useSetListingStatus,
 } from '@/queries/admin';
 import { canAdminOrg } from '@/api/admin';
-import { useActiveOrg } from '@/queries/org-discover';
+import { useAdminOrgId } from '@/components/AdminOrgScope';
 import { useCategories } from '@/queries/listings';
 import type { ModListing } from '@/api/admin';
 import { C, F } from '@/theme';
@@ -46,8 +46,7 @@ export default function AdminListings() {
    * 403, cùng cách `public-queue` ẩn nút chuyển ô khỏi manager.
    */
   const { data: grants } = useMyGrants();
-  const { id: activeOrgId } = useActiveOrg();
-  const canBump = canAdminOrg(grants, activeOrgId);
+  const canBump = canAdminOrg(grants, useAdminOrgId());
 
   /*
    * Lọc ở SERVER (danh mục + từ khoá, BE khớp cả tên người đăng). Danh sách đã phân trang: lọc ở
@@ -75,7 +74,7 @@ export default function AdminListings() {
     );
 
   return (
-    <AdminScreen title="Tin đăng" note="tất cả những gì trên bảng" org masterReadsAll>
+    <AdminScreen title="Tin đăng" note="tất cả những gì trên bảng" org>
       <View style={styles.search}>
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput

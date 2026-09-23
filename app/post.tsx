@@ -68,17 +68,14 @@ export default function Post() {
   /*
    * `?org=<id>` — đăng thẳng vào một nhóm, đi từ nút trên trang hồ sơ nhóm.
    *
-   * Id đi theo ĐƯỜNG DẪN chứ không mượn `X-Org-Id`: người thuộc nhiều nhóm không phải đổi
-   * "nhóm đang thao tác" chỉ để đăng một tin, và không đăng nhầm vào nhóm đang mở.
+   * Id đi theo ĐƯỜNG DẪN chứ không mượn `X-Org-Id`: người thuộc nhiều nhóm không phải
+   * đổi "nhóm đang thao tác" chỉ để đăng một tin, và không đăng nhầm vào nhóm đang mở.
    */
   const { org: orgId } = useLocalSearchParams<{ org?: string }>();
   const { data: org } = useOrgProfile(orgId ?? '');
-  /*
-   * `isPublic` đi kèm vì bộ chọn bậc cần nó: `group_open` chỉ hợp lệ dưới nhóm CÔNG KHAI, và
-   * BE trả 400 nếu gửi bậc đó cho nhóm riêng tư (`routeListing`). Bày một lựa chọn chắc chắn
-   * hỏng rồi để người dùng bấm vào mới biết là tệ hơn không bày.
-   */
-  const toGroup = orgId && org ? { id: orgId, name: org.name, isPublic: org.isPublic } : undefined;
+  // `isPublic` đi kèm vì thang phủ sóng cần nó: nhóm kín không có bậc "Ai cũng xem được".
+  const toGroup =
+    orgId && org ? { id: orgId, name: org.name, isPublic: org.isPublic } : undefined;
 
   if (quota.isPending || stale.length > 0) {
     return (
@@ -117,8 +114,10 @@ export default function Post() {
             busyLabel="Đang ghim..."
             busy={create.isPending}
             onSubmit={({ location, ...values }) =>
+              // Nhóm đích nằm TRONG `values` — `ListingReachField` chọn nó cùng lúc với bậc, vì
+              // một bậc dưới `marketplace` mà không có nhóm là vô nghĩa.
               create.mutate(
-                { ...values, ...location, photoUrls: photos.photoUrls, orgId },
+                { ...values, ...location, photoUrls: photos.photoUrls },
                 {
                   onSuccess: () => {
                     // Tin vào BE ở trạng thái `pending`, feed chỉ hiện tin `active` — về feed là

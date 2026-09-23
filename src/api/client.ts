@@ -2,9 +2,6 @@ import {
   authLogin,
   authLogout,
   authRefresh,
-  authForgotPassword,
-  authResetPassword,
-  authVerifyResetCode,
   authSendEmailCode,
   authVerifyEmail,
   authRegister,
@@ -13,8 +10,6 @@ import {
   chatGetById,
   chatList,
   chatMarkRead,
-  chatRemove,
-  chatRemoveAll,
   chatMessages,
   chatOpen,
   chatSend,
@@ -36,7 +31,6 @@ import {
   locationWards,
   moderationGetListing,
   notificationList,
-  notificationClear,
   notificationMarkRead,
   userGetById,
   userGetMe,
@@ -45,8 +39,6 @@ import {
 import type {
   AuthResponse,
   Conversation as ConversationDto,
-  CreateListing,
-  UpdateListing,
   Listing as ListingDto,
   MeProfile,
   Message as MessageDto,
@@ -69,8 +61,8 @@ import type {
   PublicProfile,
   SearchFilter,
 } from './db';
-import {
-  ORG_HEADER, getCurrentUserId, withAuthRetry } from './http';
+import { getCurrentUserId, withAuthRetry } from './http';
+import { REVIEW_MODE } from '@/compliance';
 
 /**
  * Lớp truy cập dữ liệu — toàn bộ đi qua SDK generated (BE `market` thật), không còn stub local.
@@ -105,8 +97,37 @@ export function unwrap<TPayload>(res: SdkResult<TPayload>, fallback: string): TP
   return res.data.data;
 }
 
+/**
+ * `GET /listings/{id}` trả 404 cho tin không xem được, và 404 đó CỐ Ý không phân biệt được hai
+ * ca: tin đã gỡ / id sai, và tin NỘI BỘ của một nhóm mình không thuộc về. Phân biệt ở BE là
+ * cho người ngoài dò id để lập danh sách tin nội bộ của nhóm khác (market §8).
+ *
+ * Nên việc nói ra các khả năng thuộc về FE, và màn hình cần biết đây là 404 chứ không phải mất
+ * mạng — `unwrap` ném `Error` trần nên không đủ, và trước đó màn in thẳng "Listing not found"
+ * của BE dưới icon 📡. Lỗi có TÊN để `instanceof` được; thông điệp là bản chung, màn hình nối
+ * thêm gợi ý đăng nhập cho khách.
+ */
+export class ListingHiddenError extends Error {
+  constructor() {
+    super(
+      'Không mở được tin này. Tin có thể đã được gỡ, hoặc là tin nội bộ của một nhóm mà bạn ' +
+        'chưa tham gia.',
+    );
+    this.name = 'ListingHiddenError';
+  }
+}
+
 /** Mỗi trang xin ĐÚNG trần của BE (`PAGINATION.MAX_LIMIT`) — xin hơn là 400, không phải bị kẹp. */
 export const PAGE_SIZE = 10;
+
+/**
+ * Bậc của bảng tin CHUNG.
+ *
+ * Hằng riêng vì nó lặp ở ba dải tin đẩy thẳng vào mặt người dùng — bảng tin, "Có thể bạn thích",
+ * "Gợi ý cho bạn". Ba chuỗi rời nhau là ba chỗ có thể sót đúng một, và chỗ sót đó không đỏ ở
+ * đâu cả: nó chỉ lặng lẽ thả tin của nhóm lên bảng tin chung.
+ */
+const MARKETPLACE = 'marketplace' as const;
 
 /** Một trang của danh sách cuộn-tới-đâu-tải-tới-đó — hình dạng duy nhất mọi API list trả về. */
 export type Page<T> = { items: T[]; hasNext: boolean; total: number };
@@ -233,6 +254,7 @@ function toListing(dto: OwnerListingDto, names: Map<string, string>): Listing {
     title: dto.title,
     price: formatPrice(dto.price),
     priceValue: dto.price,
+    canDeliver: dto.canDeliver,
     // BE trả `category` là ObjectId; tên hiển thị tra từ từ điển danh mục. Không tra được
     // thì để rỗng — `NoteCard` tự giấu pill, tin vẫn đọc được bình thường.
     cat: names.get(dto.category) ?? '',
@@ -243,6 +265,7 @@ function toListing(dto: OwnerListingDto, names: Map<string, string>): Listing {
     reach: dto.reach,
     meta: relativeTime(dto.createdAt),
     organizationId: dto.organizationId,
+    org: dto.org ?? null,
     photo: gradOf(dto._id),
     photoUrls: dto.images,
     seller: sellerName,
@@ -267,8 +290,8 @@ function toListing(dto: OwnerListingDto, names: Map<string, string>): Listing {
  * Cả ba endpoint auth (`login`/`register`/`refresh`) trả cùng `AuthResponse`, nên phiên chỉ được
  * dựng ở đây — ba bản copy là ba chỗ có thể quên `refreshToken` mới sau khi BE rotate.
  *
- * Phiên KHÔNG mang tổ chức nữa: v2 tách org khỏi danh tính. Org là lựa chọn theo từng request
- * (`X-Org-Id`) và sống ở `stores/auth.activeOrgId`.
+ * Phiên KHÔNG mang tổ chức nữa: v2 tách org khỏi danh tính, và org là lựa chọn của TỪNG LƯỢT
+ * GỌI (`X-Org-Id`, do chính hàm api đặt) chứ không phải một trạng thái toàn cục nào.
  */
 function toSession(auth: AuthResponse): AuthSession {
   return {
@@ -300,7 +323,15 @@ function toProfile(dto: MeProfile): Profile {
     posted: '—',
     sold: '—',
     email: dto.email,
-    emailVerified: dto.isEmailVerified,
+    /*
+     * MỘT dòng tắt cả bốn bề mặt xác thực email — xem `REVIEW_MODE`.
+     *
+     * Tắt ở đây thay vì gác từng màn: dải nhắc ở Cá nhân, mục ở Cài đặt và cổng
+     * `useRequireVerifiedEmail` đều đọc đúng cờ này, nên một chỗ là đủ và gỡ cũng chỉ một chỗ.
+     * BE đã đặt `emailVerifiedAt` ngay lúc tạo (`SKIP_EMAIL_VERIFICATION`), nên đây không phải
+     * nói dối giao diện — nó chỉ khớp lại với sự thật phía server.
+     */
+    emailVerified: REVIEW_MODE ? true : dto.isEmailVerified,
     rating: dto.ratingCount > 0 ? dto.ratingAvg.toFixed(1) : '—',
   };
 }
@@ -399,42 +430,42 @@ async function categoryNames(): Promise<Map<string, string>> {
 
 /**
  * Thứ người đăng gõ ra ở form tin — chung cho cả tạo mới lẫn sửa. `price` là chuỗi vì nó tới
- * thẳng từ `TextInput`; chuẩn hoá thành số là việc của `toUpdateBody`, không phải của màn hình.
+ * thẳng từ `TextInput`; chuẩn hoá thành số là việc của `toEditableBody`, không phải của màn hình.
  */
 type ListingInput = {
   title: string;
   price: string;
   desc: string;
   categoryId: string;
+  /** Người bán nhận giao tận nơi. Sửa được sau khi đăng — nó là thuộc tính món hàng, không
+   *  phải khoá định tuyến như `reach`/`provinceCode`. */
+  canDeliver?: boolean;
   photoUrls?: string[];
   address?: string | null;
   province?: ProvinceName | null;
   ward?: string | null;
   /**
-   * BẬC PHỦ SÓNG — nơi tin hiển thị, và qua đó là AI DUYỆT nó (`routeListing`).
-   *
-   * Ba bậc, thay cho cặp `org_internal`/`public` cũ:
-   *  - `members` — chỉ thành viên nhóm đọc được; nhóm duyệt.
-   *  - `group_open` — vẫn trong nhóm nhưng ai cũng đọc; nhóm duyệt. CHỈ hợp lệ ở nhóm công
-   *    khai, BE trả 400 nếu nhóm riêng tư.
-   *  - `marketplace` — lên bảng tin chung; manager danh mục theo (danh mục × tỉnh) duyệt.
+   * Bậc phủ sóng — ai đọc được tin, và cũng là thứ quyết định AI DUYỆT nó: `marketplace` về
+   * hàng đợi manager danh mục theo (danh mục × tỉnh), `members`/`group_open` về hàng đợi của
+   * chính nhóm.
    *
    * Bỏ trống thì BE tự chọn theo nhóm đích (`defaultReachFor`): nhóm công khai → `group_open`,
-   * nhóm riêng tư → `members`, không nhóm → `marketplace`.
+   * nhóm kín → `members`, không nhóm → `marketplace`. Để BE quyết là đúng — chỉ nó biết
+   * `isPublic` của nhóm đích tại thời điểm đăng.
    */
   reach?: 'members' | 'group_open' | 'marketplace';
   /**
    * Nhóm đích, khi người đăng đi từ TRANG HỒ SƠ NHÓM thay vì từ nút đăng chung.
    *
-   * Không gửi thì BE lấy nhóm đang thao tác (`X-Org-Id`) — đường cũ, và nó buộc người thuộc
-   * nhiều nhóm phải chuyển nhóm đang thao tác trước khi đăng. Gửi id thì tin vào ĐÚNG nhóm
-   * đó, bất kể họ đang đứng ở đâu.
+   * Không gửi thì BE lấy nhóm đang thao tác (`X-Org-Id`) — đường cũ, và nó buộc người
+   * thuộc nhiều nhóm phải chuyển nhóm đang thao tác trước khi đăng. Gửi id thì tin vào
+   * ĐÚNG nhóm đó, bất kể họ đang đứng ở đâu.
    *
-   * BE tự tra tư cách thành viên với id này (`resolveTargetOrg`), nên đây KHÔNG phải đường
-   * vòng qua phân quyền: gửi id của nhóm mình không thuộc thì tin rơi vào hàng đợi người-ngoài
-   * của nhóm đó, và nhóm đóng cửa thì 400.
+   * BE tự tra tư cách thành viên với id này (`resolveTargetOrg`), nên đây KHÔNG phải
+   * đường vòng qua phân quyền: gửi id của nhóm mình không thuộc thì tin rơi vào hàng đợi
+   * người-ngoài của nhóm đó, và nhóm đóng cửa thì 400.
    */
-  orgId?: string;
+  orgId?: string | null;
   /**
    * Thuộc tính động theo template của danh mục. Gửi thô — BE ép kiểu và loại key lạ ở
    * `validateAttributes`, app không đoán trước luật đó (nó nằm trong DB, không trong bundle).
@@ -454,7 +485,7 @@ type ListingInput = {
  * `address` là số nhà / tên đường tự gõ, nằm dưới xã trong mô hình 2 cấp — không phải cấp
  * quận/huyện đã bỏ từ 01/07/2025.
  */
-function toUpdateBody(input: ListingInput): UpdateListing {
+function toEditableBody(input: ListingInput) {
   // Ô giá là `number-pad` nhưng vẫn lọt dấu phân cách người dùng tự gõ; BE nhận `number`.
   const price = Number(input.price.replace(/\D/g, ''));
 
@@ -471,6 +502,7 @@ function toUpdateBody(input: ListingInput): UpdateListing {
     title: input.title.trim(),
     description: input.desc.trim(),
     price,
+    canDeliver: input.canDeliver ?? false,
     categoryId: input.categoryId,
     images: input.photoUrls ?? [],
     // `location: {}` rỗng qua được `.strict()` của BE nhưng tạo ra bản ghi không lọc
@@ -485,30 +517,20 @@ function toUpdateBody(input: ListingInput): UpdateListing {
 }
 
 /**
- * Thân của lượt TẠO = thân của lượt sửa, cộng ba field chỉ có nghĩa lúc khai sinh.
+ * Thân của lượt ĐĂNG — phần sửa được, cộng ba khoá định tuyến.
  *
- * Tách đôi vì `updateListingSchema` bên BE là `.pick().partial().strict()` — nó KHÔNG có
- * `reach`/`orgId`/`provinceCode`, và `.strict()` trả 400 cho key lạ. Một hàm dùng chung sẽ
- * đính `reach` vào cả lượt sửa và làm hỏng mọi lượt sửa tin.
- *
- * TypeScript KHÔNG bắt được lỗi đó: giá trị đi vào `body:` là kết quả một hàm, không phải object
- * literal tại chỗ gọi, nên phép kiểm dư-thừa-thuộc-tính không chạy. Kiểu trả về khai tường minh
- * ở cả hai hàm chính là thứ thay cho phép kiểm đã mất đó.
+ * Ba khoá đó chỉ tồn tại ở đây chứ không ở `toEditableBody`, vì `updateListingSchema` bên BE
+ * không nhận chúng: `routeListing` đọc chúng đúng một lần lúc tạo để chọn hàng đợi duyệt, và
+ * cho sửa sau là đường để một tin nội bộ đã được nhóm duyệt tự nhảy lên bảng tin chung.
+ * Gộp chung một hàm như bản trước thì lượt sửa gửi thừa ba field và ăn 400 từ `.strict()`.
  */
-function toCreateBody(input: ListingInput): CreateListing {
+function toCreateBody(input: ListingInput) {
   return {
-    ...toUpdateBody(input),
-    // Bắt buộc ở `CreateListing`, optional ở `UpdateListing` — `toUpdateBody` có thể bỏ trống.
-    title: input.title.trim(),
-    description: input.desc.trim(),
-    price: Number(input.price.replace(/\D/g, '')),
-    categoryId: input.categoryId,
-    images: input.photoUrls ?? [],
+    ...toEditableBody(input),
     ...(input.reach ? { reach: input.reach } : {}),
     ...(input.orgId ? { orgId: input.orgId } : {}),
-    // Tin LÊN SÀN bắt buộc có tỉnh: nó là thứ chọn ra người duyệt (ô danh mục × tỉnh). Gửi kèm
-    // tường minh thay vì để BE suy từ tổ chức — người đăng lên sàn có thể không thuộc nhóm nào.
-    // Hai bậc trong nhóm không cần: nhóm duyệt tin của mình, không cần tra theo tỉnh.
+    // CHỈ `marketplace` mới bắt buộc tỉnh: tỉnh là thứ chọn ra manager duyệt tin. `group_open`
+    // tuy ai cũng đọc được nhưng không lên bàn danh mục, ép nó mang tỉnh là đòi thừa.
     ...(input.reach === 'marketplace' && input.province ? { provinceCode: input.province } : {}),
   };
 }
@@ -592,36 +614,6 @@ export const api = {
     unwrap(res, 'Mã không đúng hoặc đã hết hạn');
   },
 
-  /* ---------------- quên mật khẩu ---------------- */
-
-  /**
-   * Xin mã đặt lại. KHÔNG `withAuthRetry`: người quên mật khẩu chưa đăng nhập được, nên một
-   * vòng refresh ở đây chỉ tốn thời gian rồi vẫn hỏng.
-   *
-   * BE trả 200 cho cả địa chỉ không có tài khoản — cố ý, để endpoint không thành máy dò. App
-   * vì thế KHÔNG được hứa "mã đã gửi tới hộp thư của bạn": câu đó sai với người gõ nhầm địa
-   * chỉ, và đúng thứ cái 200 kia sinh ra để không nói.
-   */
-  async forgotPassword(email: string): Promise<void> {
-    const res = await authForgotPassword({ body: { email } });
-    unwrap(res, 'Không gửi được mã đặt lại');
-  },
-
-  /**
-   * Đổi mã lấy VÉ. Bước riêng vì trần 5 lần gõ sai: gộp với bước đặt mật khẩu thì mỗi lần gõ
-   * nhầm mã bắt người dùng gõ lại cả mật khẩu — một ô họ không nhìn thấy để soát — và vẫn đốt
-   * một lượt trong năm lượt đó.
-   */
-  async verifyResetCode(email: string, code: string): Promise<string> {
-    const res = await authVerifyResetCode({ body: { email, code } });
-    return unwrap(res, 'Mã không đúng hoặc đã hết hạn').resetToken;
-  },
-
-  async resetPassword(email: string, resetToken: string, password: string): Promise<void> {
-    const res = await authResetPassword({ body: { email, resetToken, password } });
-    unwrap(res, 'Phiên đặt lại đã hết hạn');
-  },
-
   /* ---------------- categories ---------------- */
   /** Từ điển dùng chung toàn hệ thống — BE chỉ trả danh mục đang bật. */
   async getCategories(): Promise<Category[]> {
@@ -659,12 +651,23 @@ export const api = {
   },
 
   /* ---------------- listings ---------------- */
-  /** `categoryId` bỏ trống = tất cả. Lọc chạy ở BE, app không tự cắt mảng sau khi tải về. */
+  /**
+   * Bảng tin chung. `categoryId` bỏ trống = tất cả. Lọc chạy ở BE, app không tự cắt mảng.
+   *
+   * Ghim `reach=marketplace`, và đây là chốt giữ cho bậc `marketplace` CÓ NGHĨA: thiếu nó thì
+   * tin `group_open` của mọi nhóm công khai tràn lên bảng tin chung mà chưa từng qua manager
+   * danh mục, và người đăng chẳng còn lý do gì để chọn bậc trên nữa. `group_open` ra mặt ở tìm
+   * kiếm và hồ sơ nhóm — hai chỗ người xem đã chủ động hỏi tới nhóm đó.
+   */
   async getListings(categoryId?: string): Promise<Listing[]> {
     // Không gửi `status`: `listingQuerySchema` của BE không khai field đó (chỉ caller nội bộ mới
     // được ép status), và `buildFilter` đã mặc định ACTIVE. Gửi thêm chỉ bị zod strip im lặng.
     const [res, names] = await Promise.all([
-      withAuthRetry(() => listingList({ query: { limit: PAGE_SIZE, category: categoryId } })),
+      withAuthRetry(() =>
+        listingList({
+          query: { limit: PAGE_SIZE, category: categoryId, reach: [MARKETPLACE] },
+        }),
+      ),
       categoryNames(),
     ]);
     return unwrap(res, 'Không tải được bảng tin').map((l) => toListing(l, names));
@@ -677,24 +680,28 @@ export const api = {
    * cả app sang làm việc ở đó. BE vẫn đối chiếu membership với id nhận được, nên gọi
    * cho nhóm mình không thuộc về sẽ 403 — chỉ gọi khi hồ sơ trả `joined: true`.
    */
-  async getOrgListings(organizationId: string, take: number): Promise<Listing[]> {
+  async getOrgListings(orgId: string, take: number, q?: string): Promise<Listing[]> {
     const [res, names] = await Promise.all([
       withAuthRetry(() =>
         listingList({
           /*
-           * HAI bộ lọc, mỗi cái chặn một thứ khác nhau — bỏ cái nào cũng sai.
+           * `?orgId=` là thứ thu hẹp về đúng nhóm này, thay cho mẹo cũ "ghim
+           * `visibility: org_internal`".
            *
-           * `orgId` chặn tin KHÔNG thuộc nhóm. Scope đọc của BE là "nhánh org HOẶC nhánh công
-           * khai", đúng cho bảng tin chính nhưng ở mục "Tin trong nhóm" thì không lọc gì nghĩa
-           * là hứng luôn cả sàn: triệu chứng đã gặp là một nhóm vừa tạo, chưa có tin nào, vẫn
-           * bày ra 6 tin `organizationId: null` chẳng liên quan.
+           * Dưới thang phủ sóng không còn giá trị nào nghĩa là "mọi thứ của nhóm này": tin ở
+           * bậc `marketplace` VẪN thuộc bảng tin nhóm. Lọc theo bậc là giấu mất đúng những tin
+           * nổi nhất của nhóm.
            *
-           * `reach` chặn tin của nhóm nhưng đã LÊN SÀN. Chúng vẫn mang `organizationId` làm
-           * badge, nên `orgId` một mình vẫn kéo chúng về — mà chỗ của chúng là bảng tin chung,
-           * không phải bảng tin nhóm. Hai bậc còn lại mới đúng nghĩa "ở trong nhóm này".
+           * Và `?orgId=` phục vụ được cả người NGOÀI — họ ăn nhánh công khai `AND organizationId`
+           * nên thấy đúng phần nhóm đã mở (`group_open`). Header thì không làm nổi vế đó, vì
+           * người ngoài không có chỗ đứng nào trên trục org để mà thu hẹp.
            */
-          query: { limit: take, orgId: organizationId, reach: ['members', 'group_open'] },
-          headers: { [ORG_HEADER]: organizationId },
+          /*
+           * `q` do BE khớp (tiêu đề + tên người đăng), KHÔNG lọc lại ở client: khối này chỉ
+           * tải `take` tin đầu, nên lọc trên mảng đó là tìm trong ba tin thay vì trong nhóm —
+           * đúng thứ vô dụng nhất ở một nhóm nhiều tin.
+           */
+          query: { limit: take, orgId, ...(q ? { q } : {}) },
         }),
       ),
       categoryNames(),
@@ -716,7 +723,13 @@ export const api = {
   async getSuggestions(current: Pick<Listing, 'id' | 'categoryId' | 'province'>, take: number) {
     const [res, names] = await Promise.all([
       withAuthRetry(() => // Trần trang của BE là 10 — dải gợi ý vẽ 3–4 tin nên 10 vẫn đủ để lọc và xếp.
-        listingList({ query: { limit: Math.min(take * 3, PAGE_SIZE), category: current.categoryId } })),
+        listingList({
+          query: {
+            limit: Math.min(take * 3, PAGE_SIZE),
+            category: current.categoryId,
+            reach: [MARKETPLACE],
+          },
+        })),
       categoryNames(),
     ]);
 
@@ -757,7 +770,11 @@ export const api = {
       Promise.all(
         input.probes
           .slice(0, 2)
-          .map((p) => withAuthRetry(() => listingList({ query: { ...p, limit: PAGE_SIZE } }))),
+          .map((p) =>
+            withAuthRetry(() =>
+              listingList({ query: { ...p, limit: PAGE_SIZE, reach: [MARKETPLACE] } }),
+            ),
+          ),
       ),
       categoryNames(),
     ]);
@@ -814,6 +831,9 @@ export const api = {
       withAuthRetry(() => listingGetById({ path: { id } })),
       categoryNames(),
     ]);
+    // Bắt 404 TRƯỚC `unwrap`: nó là câu trả lời có nghĩa riêng (xem `ListingHiddenError`), không
+    // phải một lỗi chung để dồn về thông điệp của BE.
+    if (res.response?.status === 404) throw new ListingHiddenError();
     return toListing(unwrap(res, 'Không tìm thấy tin này'), names);
   },
 
@@ -833,9 +853,12 @@ export const api = {
      */
     const term = filter.q.trim();
     /*
-     * Lọc theo nhóm = đúng cách `getOrgListings` đang làm: `X-Org-Id` cho lượt gọi này thôi
-     * (không chuyển cả app sang nhóm đó), `orgId` để chỉ lấy tin CỦA nhóm, và `reach` để loại
-     * tin của nhóm đã lên sàn. Danh mục, giá, `q`, `attrs` vẫn `AND` lên trên trong
+     * Lọc theo nhóm = `?orgId=`, đúng cách `getOrgListings` đang làm — không phải `X-Org-Id`.
+     *
+     * Header nói "tôi đang đứng trong nhóm nào", không phải "chỉ tìm trong nhóm này"; và người
+     * NGOÀI nhóm thì không có chỗ đứng nào để mà đặt header. `?orgId=` thu hẹp được cho cả hai
+     * loại người xem vì plugin vẫn `$and` scope lên trên: thành viên thấy cả `members`, người
+     * ngoài chỉ thấy phần nhóm đã mở. Danh mục, giá, `q`, `attrs` vẫn `AND` tiếp trong
      * `buildFilter`. Riêng tỉnh/xã thì KHÔNG đi cùng nhóm — xem `locationApplies`.
      */
     const org = filter.orgId;
@@ -851,7 +874,7 @@ export const api = {
             ...(term ? { q: term } : {}),
             ...(province ? { province } : {}),
             ...(province && filter.ward ? { ward: filter.ward } : {}),
-            ...(org ? { orgId: org, reach: ['members', 'group_open'] as const } : {}),
+            ...(org ? { orgId: org } : {}),
             ...(filter.categoryId ? { category: filter.categoryId } : {}),
             ...(filter.minPrice !== null ? { minPrice: filter.minPrice } : {}),
             ...(filter.maxPrice !== null ? { maxPrice: filter.maxPrice } : {}),
@@ -861,7 +884,6 @@ export const api = {
               ? { attrs: JSON.stringify(filter.attrs) }
               : {}),
           },
-          ...(org ? { headers: { [ORG_HEADER]: org } } : {}),
         }),
       ),
       categoryNames(),
@@ -903,7 +925,7 @@ export const api = {
    */
   async updateListing({ id, ...input }: ListingInput & { id: string }): Promise<Listing> {
     const [res, names] = await Promise.all([
-      withAuthRetry(() => listingUpdate({ path: { id }, body: toUpdateBody(input) })),
+      withAuthRetry(() => listingUpdate({ path: { id }, body: toEditableBody(input) })),
       categoryNames(),
     ]);
     return toListing(unwrap(res, 'Không lưu được thay đổi'), names);
@@ -1067,24 +1089,6 @@ export const api = {
     return toConversation(unwrap(res, 'Không cập nhật được trạng thái đã đọc'));
   },
 
-  /**
-   * Xoá hội thoại khỏi hộp thư của MÌNH. Người kia không mất gì — BE chỉ ẩn phía người gọi và
-   * cắt lịch sử tại thời điểm này (`IParticipant.hidden` / `clearedAt`).
-   *
-   * Hệ quả cần nói rõ ở chỗ xác nhận: người kia nhắn tiếp thì hội thoại quay lại, nhưng phần
-   * tin nhắn đã xoá thì không.
-   */
-  async deleteConversation(conversationId: string): Promise<void> {
-    const res = await withAuthRetry(() => chatRemove({ path: { id: conversationId } }));
-    unwrap(res, 'Không xoá được hội thoại');
-  },
-
-  /** Dọn cả hộp thư. Trả về số hội thoại đã xoá để câu thông báo nói đúng con số. */
-  async deleteAllConversations(): Promise<number> {
-    const res = await withAuthRetry(() => chatRemoveAll());
-    return unwrap(res, 'Không xoá được hội thoại')?.deleted ?? 0;
-  },
-
   /* ---------------- misc ---------------- */
   /**
    * BE đã lọc sẵn theo người gọi: thông báo cả tổ chức + thông báo của đúng nhóm con họ thuộc.
@@ -1109,18 +1113,6 @@ export const api = {
   async markNotificationRead(id: string): Promise<void> {
     const res = await withAuthRetry(() => notificationMarkRead({ path: { id } }));
     unwrap(res, 'Không đánh dấu được đã đọc');
-  },
-
-  /**
-   * Xoá tất cả thông báo — một LẰN RANH THỜI GIAN, không phải xoá từng dòng.
-   *
-   * BE đẩy mốc `notificationsClearedAt` lên hiện tại vì thông báo phát chung là một document
-   * dùng chung cho cả nhóm; xoá document là xoá của mọi người. Vì vậy không có đường xoá chọn
-   * lọc, cũng không hoàn tác được — chỗ xác nhận phải nói ra điều đó.
-   */
-  async clearNotifications(): Promise<void> {
-    const res = await withAuthRetry(() => notificationClear());
-    unwrap(res, 'Không xoá được thông báo');
   },
 
   async getProfile(): Promise<Profile> {

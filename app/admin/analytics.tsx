@@ -1,19 +1,24 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AdminFilter, AdminPanel, AdminScreen } from '@/components/AdminScreen';
+import { AdminOrgPicker } from '@/components/AdminOrgPicker';
 import { ListingReportPanels, UserReportPanels } from '@/components/ReportPanels';
 import { EmptyState, Loading } from '@/components/ui';
 import { useListingReport, useUserReport } from '@/queries/admin-system';
 import { useMyGrants } from '@/queries/admin';
 import { isMaster } from '@/api/admin';
 import type { ReportGranularity } from '@/api/admin-system';
-import { useOrgId } from '@/stores/auth';
+import { useAdminOrgId } from '@/components/AdminOrgScope';
 import { C, F } from '@/theme';
 
 /**
- * Thống kê — KHUNG chứa nhiều báo cáo con. Master không chọn org thấy cả sàn; quản trị nhóm
- * (hoặc master đang đứng trong một org) thấy bản CỦA NHÓM — BE scope theo `X-Org-Id`, màn này
- * chỉ đổi nhãn cho đúng thứ đang đếm (thành viên vào nhóm, không phải tài khoản mới của sàn).
+ * Thống kê — KHUNG chứa nhiều báo cáo con.
+ *
+ * Hai người dùng, hai cách chọn phạm vi:
+ * - Quản trị nhóm luôn xem bản CỦA NHÓM — nhóm đang mở của bàn quản trị (`useAdminOrgId`).
+ * - Master mặc định xem CẢ SÀN; muốn nhìn một nhóm thì dùng bộ lọc CỤC BỘ ngay trên màn này.
+ *   Cục bộ chứ không ghi vào phạm vi của cả cụm quản trị: master không "đứng trong" nhóm nào,
+ *   họ chỉ đang LỌC một bảng số.
  *
  * Một màn thay vì mỗi báo cáo một mục menu: hai câu hỏi "tin đăng thế nào" và "người dùng thế
  * nào" luôn được hỏi cùng lúc và luôn cùng một khoảng thời gian. Tách ra thì người xem phải
@@ -22,7 +27,7 @@ import { C, F } from '@/theme';
  * KHÁC hai màn dễ nhầm: `/admin/reports` là ĐƠN TỐ CÁO của người dùng, `/admin/posting-stats`
  * là ảnh chụp một cửa sổ để chốt giá gói tin. Màn này là XU HƯỚNG theo thời gian.
  *
- * Ruột từng báo cáo con nằm ở `ReportPanels` — màn này chỉ giữ hai bộ chọn và ba trạng thái
+ * Ruột từng báo cáo con nằm ở `ReportPanels` — màn này chỉ giữ các bộ chọn và ba trạng thái
  * dùng chung (đang tải / lỗi / rỗng), nên thêm báo cáo con thứ ba là thêm một nhánh, không
  * phải thêm một đoạn dài.
  */
@@ -42,15 +47,30 @@ export default function AdminAnalytics() {
   const [tab, setTab] = useState('listings');
   const [granularity, setGranularity] = useState<ReportGranularity>('day');
   const master = isMaster(useMyGrants().data);
-  const orgScoped = Boolean(useOrgId());
+  const adminOrgId = useAdminOrgId();
+
+  /*
+   * Bộ lọc nhóm của master sống Ở ĐÂY. `null` = toàn sàn (mặc định). Không đọc vào store, không
+   * gắn header cho request nào ngoài hai báo cáo bên dưới — xem docblock đầu file.
+   */
+  const [scopeOrgId, setScopeOrgId] = useState<string | null>(null);
+  const [pickOrg, setPickOrg] = useState(false);
+  // Một tham số cho cả hai người: master lấy bộ lọc cục bộ, quản trị nhóm lấy nhóm đang mở.
+  // `null` nghĩa là TOÀN SÀN, nên quản trị nhóm chưa chọn nhóm phải ra `null` và `enabled` tắt
+  // ngay dưới — để lọt là họ hỏi số liệu cả sàn.
+  const pin = master ? scopeOrgId : (adminOrgId ?? null);
+  const orgScoped = master ? scopeOrgId !== null : Boolean(adminOrgId);
 
   /*
    * Gọi CẢ HAI hook — quy tắc hook cấm gọi có điều kiện — và tắt cái không dùng bằng `enabled`.
    * Thiếu vế thứ hai là mỗi lần đổi độ mịn có hai aggregate quét cả bảng chạy song song, một
    * trong hai không ai nhìn.
    */
-  const listings = useListingReport({ granularity }, tab === 'listings');
-  const users = useUserReport({ granularity }, tab === 'users');
+  // `orgScoped || master`: quản trị nhóm chưa chọn nhóm thì `pin` là `null` = toàn sàn, một
+  // câu hỏi BE chỉ trả lời cho master. Tắt hẳn còn hơn bắn đi để nhận 403.
+  const ready = master || orgScoped;
+  const listings = useListingReport({ granularity }, ready && tab === 'listings', pin);
+  const users = useUserReport({ granularity }, ready && tab === 'users', pin);
   const active = tab === 'listings' ? listings : users;
 
   const meta = active.data ? (
@@ -65,11 +85,25 @@ export default function AdminAnalytics() {
     <AdminScreen
       title="Thống kê"
       note={orgScoped ? 'xu hướng của nhóm theo thời gian' : 'xu hướng theo thời gian'}
-      // Quản trị nhóm phải đứng trong một org (BE 403 nếu không); master thì tuỳ — không chọn là
-      // toàn sàn, chọn một org là xem bản của nhóm đó.
-      org={master ? 'optional' : true}
-      masterReadsAll
+      // Quản trị nhóm phải đứng trong một org (BE 403 nếu không). Master thì KHÔNG khai `org`:
+      // họ lọc bằng bộ chọn cục bộ bên dưới, không qua "org đang thao tác".
+      org={master ? undefined : true}
     >
+      {master && (
+        <View style={styles.scope}>
+          <Text style={styles.scopeLabel}>PHẠM VI</Text>
+          <AdminOrgPicker
+            open={pickOrg}
+            onOpen={() => setPickOrg(true)}
+            onClose={() => setPickOrg(false)}
+            value={scopeOrgId}
+            onChange={setScopeOrgId}
+            title="Xem số liệu của"
+            emptyLabel="Toàn sàn"
+          />
+        </View>
+      )}
+
       <AdminFilter options={TABS} value={tab} onChange={setTab} />
       <AdminFilter
         options={GRAINS}
@@ -125,5 +159,7 @@ export default function AdminAnalytics() {
 
 const styles = StyleSheet.create({
   body: { padding: 16, paddingBottom: 32, gap: 12 },
+  scope: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 12 },
+  scopeLabel: { fontFamily: F.mono, fontSize: 9, letterSpacing: 1, color: C.deskTxtDim },
   tz: { fontFamily: F.mono, fontSize: 9, color: C.deskTxtDim, marginTop: 8 },
 });

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { categoryLabel } from './CategoryLogo';
 import { CategoryPicker } from './CategoryPicker';
 import { useCategories } from '@/queries/listings';
 import { C, F, S, shadow } from '@/theme';
@@ -67,9 +68,7 @@ export function CategoryField({
         >
           <View style={{ flex: 1 }}>
             <Text style={styles.rowLabel}>Danh mục</Text>
-            <Text style={styles.rowValue}>
-              {picked ? `${picked.icon || ''} ${picked.name}`.trim() : '—'}
-            </Text>
+            <Text style={styles.rowValue}>{picked ? categoryLabel(picked) : '—'}</Text>
           </View>
           <Text style={styles.change}>Đổi ›</Text>
         </Pressable>

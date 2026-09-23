@@ -2,9 +2,7 @@ import { useEffect } from 'react';
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import {
-  setActiveOrgId,
   setHttpSession,
-  setOrgGoneHandler,
   setSessionRefresher,
 } from '@/api/http';
 import { useAuthStore } from '@/stores/auth';
@@ -45,29 +43,6 @@ export function useVerifyEmail() {
     // `isEmailVerified` sống trong hồ sơ, và BE cố tình không trả hồ sơ ở đường này để không
     // có hai nguồn cho cùng một dữ liệu — nên phải đọc lại.
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.profile() }),
-  });
-}
-
-/**
- * Quên mật khẩu — hai bước, không hook nào đụng tới phiên đang có.
- *
- * Không invalidate gì: người dùng ở đây chưa đăng nhập, nên không có cache nào của họ để làm
- * mới. Sau khi đặt lại xong, màn đẩy họ sang đăng nhập và luồng đăng nhập tự dựng phiên.
- */
-export function useForgotPassword() {
-  return useMutation({ mutationFn: (email: string) => api.forgotPassword(email) });
-}
-
-export function useVerifyResetCode() {
-  return useMutation({
-    mutationFn: (v: { email: string; code: string }) => api.verifyResetCode(v.email, v.code),
-  });
-}
-
-export function useResetPassword() {
-  return useMutation({
-    mutationFn: (v: { email: string; resetToken: string; password: string }) =>
-      api.resetPassword(v.email, v.resetToken, v.password),
   });
 }
 
@@ -137,19 +112,12 @@ function refreshSession(qc: QueryClient): Promise<string | null> {
  */
 export function useSyncAccessToken(qc: QueryClient): void {
   const session = useAuthStore((s) => s.session);
-  // Org đang chọn cũng phải xuống tầng HTTP: v2 gửi nó theo header ở MỌI request, và nó đổi
-  // được giữa phiên (người dùng chuyển tổ chức) mà không hề đụng tới token.
-  const activeOrgId = useAuthStore((s) => s.activeOrgId);
 
   // Ghi ngay trong render, KHÔNG qua useEffect: effect của màn con chạy trước effect của
   // layout cha, nên query đầu tiên sau khi mở lại app sẽ bay đi lúc token còn null và nhận
   // 401. Layout cha render trước con, nên ghi ở đây là kịp. An toàn vì lệnh này idempotent.
   setHttpSession(session ? { accessToken: session.accessToken, userId: session.userId } : null);
-  setActiveOrgId(activeOrgId);
   setSessionRefresher(() => refreshSession(qc));
-  // Org bị khoá giữa lúc dùng: bỏ chọn nó, đừng đăng xuất. Phiên vẫn tốt nguyên — người dùng
-  // chỉ mất tổ chức đang thao tác, và vẫn xem được nội dung công khai như lúc chưa chọn org.
-  setOrgGoneHandler(() => useAuthStore.getState().setActiveOrg(null));
 }
 
 /**

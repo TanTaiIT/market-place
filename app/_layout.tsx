@@ -24,9 +24,9 @@ import { BootSplash } from '@/components/BootSplash';
 import { ErrorScreen } from '@/components/ErrorScreen';
 import { ToastProvider } from '@/components/Toast';
 import { useSyncAccessToken, useValidateSession } from '@/queries/auth';
-import { useChatSocket, useInboxSignal } from '@/queries/chat-socket';
+import { useChatSocket, useInboxSignal } from '@/queries/chat';
 import { useNotifSignal } from '@/queries/notifications';
-import { useAuthHydrated, useIsAuthenticated, useOrgId } from '@/stores/auth';
+import { useAuthHydrated, useIsAuthenticated } from '@/stores/auth';
 import { C } from '@/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -77,7 +77,6 @@ export default function RootLayout() {
 
   const isAuthenticated = useIsAuthenticated();
   const authHydrated = useAuthHydrated();
-  const orgId = useOrgId();
   // Đẩy token của phiên xuống tầng HTTP trước khi bất kỳ màn con nào mount và gọi query.
   // Truyền thẳng `queryClient` vì ở đây còn ở NGOÀI `<QueryClientProvider>` bên dưới.
   useSyncAccessToken(queryClient);
@@ -133,8 +132,6 @@ export default function RootLayout() {
                 <Stack.Protected guard={!isAuthenticated}>
                   <Stack.Screen name="login" options={{ animation: 'fade' }} />
                   <Stack.Screen name="register" options={{ animation: 'fade' }} />
-                  {/* Người quên mật khẩu theo định nghĩa là người không đăng nhập được. */}
-                  <Stack.Screen name="forgot-password" />
                 </Stack.Protected>
 
                 {/*
@@ -153,7 +150,7 @@ export default function RootLayout() {
                 <Stack.Screen name="search/results" />
                 <Stack.Screen name="listing/[id]" />
                 <Stack.Screen name="user/[id]" />
-                <Stack.Screen name="org/[slug]/index" />
+                <Stack.Screen name="org/[id]/index" />
                 {/* Bài viết pháp lý — cụm tạm thời, công thức gỡ ở `@/api/legal`. Công khai
                     có chủ ý: cả điểm của nó là cho người chưa có tài khoản đọc. */}
                 <Stack.Screen name="legal/[slug]" />
@@ -172,12 +169,18 @@ export default function RootLayout() {
                   {/* Cần đăng nhập vì BE lấy địa chỉ nhận mã từ TOKEN, không từ body — xem
                       `auth.routes.ts`. Khách chưa có tài khoản thì chưa có gì để xác thực. */}
                   <Stack.Screen name="verify-email" />
-                  {/* Cần đăng nhập nhưng KHÔNG cần thuộc tổ chức nào — đây chính là đường vào
-                      tổ chức đầu tiên của một tài khoản mới. */}
+                  {/* TẠM THỜI — màn định danh cho vòng kiểm duyệt Bộ Công Thương; gỡ cùng lớp
+                      phủ KYC. `gestureEnabled: false` vì vuốt về là thoát khỏi đúng cái cổng
+                      vừa đưa họ tới, rồi vòng lại ngay ở lượt render sau. */}
+                  <Stack.Screen name="kyc" options={{ gestureEnabled: false }} />
+                  {/* Cần đăng nhập nhưng KHÔNG cần thuộc tổ chức nào — `find-org` chính là đường
+                      vào tổ chức đầu tiên của một tài khoản mới; `join-org` là danh sách nhóm
+                      mình đang ở, rỗng cũng mở được. */}
+                  <Stack.Screen name="find-org" />
                   <Stack.Screen name="join-org" />
-                  {/* `org/[slug]/` là thư mục không có `_layout` riêng, nên hai file trong đó thành
-                      hai route NGANG HÀNG ở stack này — khai `org/[slug]` không còn khớp gì. */}
-                  <Stack.Screen name="org/[slug]/edit" />
+                  {/* `org/[id]/` là thư mục không có `_layout` riêng, nên hai file trong đó thành
+                      hai route NGANG HÀNG ở stack này — khai `org/[id]` không còn khớp gì. */}
+                  <Stack.Screen name="org/[id]/edit" />
                   <Stack.Screen name="listing/edit/[id]" />
                   <Stack.Screen name="chat/[id]" />
                   {/* Khai cả cụm `admin` một lần: `app/admin/_layout.tsx` giữ Stack riêng bên trong */}
@@ -189,7 +192,7 @@ export default function RootLayout() {
             {/* Nằm SAU Stack nên phủ lên trên: lúc splash nở ra là thấy luôn app đã dựng sẵn
                 phía dưới, không phải chờ mount thêm một nhịp nữa. */}
             {!splashDone && (
-              <BootSplash ready={ready} boardLabel={orgId} onFinish={finishSplash} />
+              <BootSplash ready={ready} onFinish={finishSplash} />
             )}
           </ToastProvider>
         </SafeAreaProvider>

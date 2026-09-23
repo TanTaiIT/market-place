@@ -13,7 +13,6 @@ import {
 } from '@/components/FeedHighlights';
 import { FeedSuggested } from '@/components/FeedSuggested';
 import { SiteFooter } from '@/components/SiteFooter';
-import { EmptyState } from '@/components/ui';
 import { useRequireAuth } from '@/components/GuestGate';
 import { useCollapsingHeader } from '@/components/useCollapsingHeader';
 import { useCategories, useListings, useProfile } from '@/queries/listings';
@@ -39,19 +38,7 @@ export default function Feed() {
   const { data: categories } = useCategories();
   // Vẫn cần bảng tin (không lọc) làm NGUỒN SỐ LIỆU cho "Tin nổi bật" và "Khu vực sôi nổi",
   // dù không còn bày nó ra thành danh sách.
-  /*
-   * `error` phải được đọc, không chỉ `data`.
-   *
-   * Mọi dải trên trang này đều rơi về `?? []` hoặc tự ẩn khi chưa có dữ liệu (`FeedSuggested`
-   * trả `null`), nên một lượt gọi hỏng vẽ ra đúng cái mà một hệ thống rỗng vẽ ra: vài khối
-   * giới thiệu và không một tin nào, không lời giải thích. Đó là màn "loading mãi không báo gì"
-   * mà người dùng gặp — trang chủ là màn duy nhất không có nhánh lỗi.
-   *
-   * Khoá vào `useListings()` chứ không gộp lỗi của cả năm query: nó là NGUỒN của hai dải nội
-   * dung thật (Tin nổi bật, Danh mục). Bốn query kia hỏng thì dải của chúng tự ẩn và trang vẫn
-   * đọc được — dựng một câu báo lỗi cho từng cái là phủ kín màn bằng thông báo.
-   */
-  const { data: allListings, error: listingsError, isRefetching, refetch } = useListings();
+  const { data: allListings, isRefetching, refetch } = useListings();
   const { data: profile } = useProfile();
   const { data: myOrgs } = useMyOrgs();
   // Nhóm công khai cho dải "Nhóm quanh bạn" — cùng nguồn với màn khám phá nhóm (từ khoá
@@ -107,23 +94,6 @@ export default function Feed() {
           />
         }
       >
-        {/*
-          Đứng TRƯỚC mọi dải: nó là lời giải thích cho việc phần còn lại của trang trống, nên
-          đọc sau nội dung trống thì đã muộn.
-
-          Không thay cả trang bằng màn lỗi: ba khối cuối là chữ giới thiệu hardcode trong
-          `api/placeholders`, chúng vẫn đúng khi mất mạng — và người dùng vẫn vào được tìm kiếm,
-          hồ sơ, tin đã lưu từ thanh đầu. Xoá sạch màn vì một query hỏng là lấy đi nhiều hơn thứ
-          thật sự hỏng.
-        */}
-        {!!listingsError && (
-          <EmptyState
-            icon="📡"
-            text={(listingsError as Error).message}
-            onRetry={() => void refetch()}
-          />
-        )}
-
         <PromoStrip />
         <FeaturedStrip
           listings={allListings ?? []}
@@ -138,7 +108,7 @@ export default function Feed() {
         <OrgNearbyStrip
           orgs={orgs ?? []}
           area={profile?.area ?? null}
-          onOpen={(slug) => router.push(`/org/${slug}`)}
+          onOpen={(id) => router.push(`/org/${id}`)}
         />
         <FeedSuggested onOpen={(id) => router.push(`/listing/${id}`)} />
 
@@ -191,8 +161,8 @@ export default function Feed() {
           onMyListings={() =>
             requireAuth(() => router.push('/mylistings'), 'Đăng nhập để xem tin của bạn')
           }
-          onOrg={(slug) => router.push(`/org/${slug}`)}
-          onFindOrg={() => requireAuth(() => router.push('/join-org'), 'Đăng nhập để vào nhóm')}
+          onOrg={(id) => router.push(`/org/${id}`)}
+          onFindOrg={() => requireAuth(() => router.push('/find-org'), 'Đăng nhập để vào nhóm')}
         />
       </Animated.View>
     </Surface>

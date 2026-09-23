@@ -5,7 +5,11 @@ import { AdminSmallBtn } from '@/components/AdminPicker';
 import { Avatar, EmptyState, Loading, PagedFooter, nearEnd } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { initialsOf } from '@/api/client';
-import { useOrgRoster, useRemoveMember } from '@/queries/org';
+import { useRemoveMember } from '@/queries/org';
+import { useOrgMemberList } from '@/queries/org-admin';
+import { useAdminOrgId } from '@/components/AdminOrgScope';
+import { useMyGrants } from '@/queries/admin';
+import { canModerateOrg } from '@/api/admin';
 import type { Member } from '@/api/org';
 import { C, F } from '@/theme';
 
@@ -29,7 +33,10 @@ const ROLE_LABEL: Record<Member['role'], string> = {
 
 export default function AdminMembers() {
   const toast = useToast();
-  const roster = useOrgRoster();
+  // Cổng grant, không phải chỉ có org: endpoint đòi quyền quản trị, staff nhóm con mở màn
+  // này mà thiếu cổng là một cú 403 ngay khi vào.
+  const { data: grants } = useMyGrants();
+  const roster = useOrgMemberList(useAdminOrgId() ?? '', canModerateOrg(grants));
   const remove = useRemoveMember();
 
   const confirmRemove = (m: Member) =>

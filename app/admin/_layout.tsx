@@ -1,8 +1,12 @@
 import React from 'react';
 import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
+import { AdminOrgScope } from '@/components/AdminOrgScope';
 import { ErrorScreen } from '@/components/ErrorScreen';
 import { qk } from '@/queries/keys';
+import { useSoleOrgId } from '@/queries/org';
+import { useMyGrants } from '@/queries/admin';
+import { isMaster } from '@/api/admin';
 import { C } from '@/theme';
 
 /**
@@ -37,13 +41,28 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
  * `guard={isAuthenticated}`, nên mọi màn thêm vào thư mục này được bảo vệ sẵn (HARD#17).
  */
 export default function AdminLayout() {
+  /*
+   * Mặc định "một nhóm thì khỏi bấm chọn" — nhưng KHÔNG cho master.
+   *
+   * Master cố ý không thuộc nhóm nào; một membership lạc (lỡ bấm "Tham gia" lúc thử) không
+   * được biến thành phạm vi quản trị mặc định của họ. Bản trước để `useMyOrgs` tự ghi luật này
+   * vào store bằng một effect, và chính effect đó chạy ở mọi màn có gọi hook — kể cả những màn
+   * chẳng liên quan gì tới quản trị.
+   */
+  const sole = useSoleOrgId();
+  const master = isMaster(useMyGrants().data);
+
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: C.desk },
-        animation: 'slide_from_right',
-      }}
-    />
+    // Phạm vi nhóm bọc NGOÀI `Stack`: nó phải sống qua mọi lần chuyển màn trong cụm quản trị,
+    // và chết cùng cụm khi người dùng rời đi. Đặt trong một màn là mất lựa chọn mỗi lần điều hướng.
+    <AdminOrgScope fallback={master ? null : sole}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: C.desk },
+          animation: 'slide_from_right',
+        }}
+      />
+    </AdminOrgScope>
   );
 }

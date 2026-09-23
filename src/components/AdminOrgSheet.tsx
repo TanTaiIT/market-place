@@ -1,10 +1,11 @@
 import React from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Loading, PagedFooter, nearEnd } from './ui';
+import { useToast } from './Toast';
 import { initialsOf } from '@/api/client';
-import { useOrgManagers, useOrgMemberList } from '@/queries/org-admin';
+import { useOrgManagers, useOrgMemberList, useRevokeGrant } from '@/queries/org-admin';
 import type { Organization } from '@/api/org-admin';
 import { C, F } from '@/theme';
 
@@ -56,7 +57,36 @@ export function AdminOrgSheet({ org, onClose }: { org: Organization | null; onCl
    * Hook phải gọi TRƯỚC mọi nhánh return (luật hooks), nên khoá bằng chuỗi rỗng thay vì bằng
    * điều kiện: ngăn đóng thì `enabled: false` và không lượt nào bay đi.
    */
+  const toast = useToast();
   const managers = useOrgManagers(org?.id ?? '');
+  const revoke = useRevokeGrant();
+
+  /*
+   * Gỡ người phụ trách nhóm. `grantId` chứ không `userId`: một người giữ được nhiều grant, và
+   * `DELETE /role-grants/:id` nhận đúng id của grant.
+   *
+   * KHÔNG tự kiểm "còn mấy người phụ trách" ở đây: BE đã giữ bất biến "org đang chạy phải có
+   * ít nhất một quản trị dùng được" (`usableOrgAdmins`) và từ chối kèm câu giải thích. Kiểm ở
+   * hai nơi là hai luật sẽ lệch — và bên lệch sai là bên này, vì nó đếm trên một danh sách
+   * có thể đã cũ.
+   */
+  const confirmRevoke = (m: { grantId: string; name: string | null }) =>
+    Alert.alert(
+      'Gỡ người phụ trách?',
+      `${m.name ?? 'Tài khoản đã xoá'} sẽ mất quyền quản nhóm này ngay lập tức.`,
+      [
+        { text: 'Thôi', style: 'cancel' },
+        {
+          text: 'Gỡ',
+          style: 'destructive',
+          onPress: () =>
+            revoke.mutate(m.grantId, {
+              onSuccess: () => toast('✓ Đã gỡ người phụ trách'),
+              onError: (e: Error) => toast(`⚠️ ${e.message}`),
+            }),
+        },
+      ],
+    );
   const members = useOrgMemberList(org?.id ?? '');
 
   return (
@@ -92,8 +122,8 @@ export function AdminOrgSheet({ org, onClose }: { org: Organization | null; onCl
               />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.name}>{org.name}</Text>
-                <Text style={styles.slug}>
-                  /{org.id} · {STATUS_LABEL[org.status]}
+                <Text style={styles.meta}>
+                  {STATUS_LABEL[org.status]}
                   {org.isPublic ? '' : ' · 🙈 riêng tư'}
                 </Text>
               </View>
@@ -140,6 +170,13 @@ export function AdminOrgSheet({ org, onClose }: { org: Organization | null; onCl
                       {m.email ?? '—'} · từ {dayOf(m.grantedAt)}
                     </Text>
                   </View>
+                  <Pressable
+                    onPress={() => confirmRevoke(m)}
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.revoke, pressed && { opacity: 0.6 }]}
+                  >
+                    <Text style={styles.revokeGlyph}>✕</Text>
+                  </Pressable>
                 </View>
               ))
             )}
@@ -255,7 +292,7 @@ const styles = StyleSheet.create({
 
   identity: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   name: { fontFamily: F.uiBold, fontSize: 16, color: C.paper },
-  slug: { fontFamily: F.mono, fontSize: 11, color: C.deskTxtDim, marginTop: 3 },
+  meta: { fontFamily: F.mono, fontSize: 11, color: C.deskTxtDim, marginTop: 3 },
   desc: { fontFamily: F.ui, fontSize: 12.5, lineHeight: 19, color: C.deskTxtSoft, marginTop: 12 },
 
   dl: { marginTop: 14, gap: 1 },
@@ -275,6 +312,8 @@ const styles = StyleSheet.create({
   sectionRule: { flex: 1, height: 1, backgroundColor: C.deskLine },
 
   person: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
+  revoke: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  revokeGlyph: { fontFamily: F.uiBold, fontSize: 14, color: C.badText },
   personName: { fontFamily: F.uiSemi, fontSize: 12.5, color: C.paper },
   personSub: { fontFamily: F.ui, fontSize: 10.5, color: C.deskTxtDim, marginTop: 2 },
 

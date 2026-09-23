@@ -33,7 +33,6 @@ const T = {
   rule: 720,
   pin: 800,
   tagline: 860,
-  board: 940,
   loader: 1000,
   status: 1060,
   version: 1180,
@@ -52,13 +51,10 @@ const PIN_SIZE = 23;
 
 export function BootSplash({
   ready,
-  boardLabel,
   onFinish,
 }: {
   /** Font + phiên đăng nhập đã hydrate xong chưa. */
   ready: boolean;
-  /** Nhãn băng dính: mã trường của phiên hiện tại. Bỏ trống thì giấu hẳn mẩu băng. */
-  boardLabel?: string;
   onFinish: () => void;
 }) {
   const still = useReducedMotion();
@@ -176,14 +172,6 @@ export function BootSplash({
           <Rise delay={T.tagline} still={still}>
             <Text style={styles.tagline}>Bảng tin mua bán{'\n'}trong trường bạn</Text>
           </Rise>
-
-          {!!boardLabel && (
-            <Rise delay={T.board} still={still}>
-              <View style={styles.board}>
-                <Text style={styles.boardText}>{boardLabel}</Text>
-              </View>
-            </Rise>
-          )}
         </Animated.View>
       </View>
 
@@ -299,22 +287,6 @@ const styles = StyleSheet.create({
     color: C.inkSoft,
     textAlign: 'center',
   },
-  board: {
-    marginTop: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: C.tape,
-    transform: [{ rotate: '-1.4deg' }],
-    ...shadow,
-  },
-  boardText: {
-    fontFamily: F.monoBold,
-    fontSize: 9,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-    color: C.tapeInk,
-  },
-
   footer: { position: 'absolute', bottom: 40, alignItems: 'center', gap: 14 },
   loader: {
     width: 148,

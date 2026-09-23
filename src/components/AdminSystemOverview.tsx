@@ -129,16 +129,10 @@ export function AdminSystemOverview() {
           </View>
         </View>
 
-        {/*
-          BA bậc, không còn hai trục. BE đã thay `visibility` (công khai / nội bộ) bằng `reach`,
-          và bậc giữa — `group_open`: nằm trong nhóm nhưng ai cũng đọc được — chính là thứ mô
-          hình cũ không diễn đạt nổi. Gộp nó vào một trong hai cột cũ là giấu mất bậc đó khỏi
-          người đang nhìn số liệu để ra quyết định.
-        */}
         <AdminPanel title="Chia theo bậc phủ sóng" note="tin đăng">
           <Split
             rows={[
-              { label: 'Lên sàn', value: listings.marketplace },
+              { label: 'Trên sàn', value: listings.marketplace },
               { label: 'Nhóm mở', value: listings.groupOpen },
               { label: 'Chỉ thành viên', value: listings.members },
             ]}
@@ -159,7 +153,7 @@ export function AdminSystemOverview() {
           <SectionTitle title="Nhịp hoạt động" note="14 ngày gần nhất" />
           <AdminPanel title="Tin đăng mỗi ngày" note="liền: đã duyệt · đứt: chờ duyệt">
             <TrendChart
-              data={listings.trend.map((d) => ({ approved: d.approved, pending: d.pending }))}
+              data={listings.trend}
             />
           </AdminPanel>
         </View>

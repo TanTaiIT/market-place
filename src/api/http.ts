@@ -26,33 +26,10 @@ type HttpSession = {
  * Cố tình KHÔNG giữ refresh token ở đây: nó chỉ cần cho đúng một lời gọi và store đã là SoT,
  * nhân bản thêm một bản nữa chỉ tăng chỗ có thể lệch.
  */
-/**
- * Tên header org, dùng chung để chỗ ghi đè và chỗ mặc định không lệch nhau.
- *
- * `X-Org-Id`, KHÔNG phải `X-Org-Id`. BE đọc `x-org-id` (`tenant.middleware.ts`) từ lượt gỡ
- * slug khỏi tổ chức. Gửi sai tên header không tạo ra lỗi nào cả — BE chỉ coi như request không
- * chỉ ra org, rồi trả về scope công khai; hệ quả là bảng tin nội bộ của nhóm trống trơn mà
- * không màn nào báo gì. Đó chính là trạng thái app đã chạy trong suốt thời gian header sai.
- */
+/** Tên header org. Mỗi lượt gọi tự gắn — xem `adminApi`/`orgApi`, tầng này không gắn hộ. */
 export const ORG_HEADER = 'X-Org-Id';
 
 let session: HttpSession | null = null;
-
-/**
- * `_id` của tổ chức đang thao tác, gắn vào MỌI request dưới dạng header `X-Org-Id`.
- *
- * BE v2 không còn đọc org từ token: nó lấy theo subdomain (web) hoặc header này (app), rồi đối
- * chiếu `memberships` ngay tại request đó. Hệ quả cần nhớ khi đọc code này: rời tổ chức là mất
- * quyền NGAY, không phải chờ token hết hạn.
- *
- * `null` = chưa chọn org. Không gửi header rỗng: BE sẽ coi chuỗi rỗng là "không chỉ ra org" và
- * tự suy ra khi người dùng chỉ thuộc đúng một org — gửi `''` chỉ làm nhiễu log.
- */
-let activeOrgId: string | null = null;
-
-export function setActiveOrgId(next: string | null): void {
-  activeOrgId = next;
-}
 
 /**
  * Tăng mỗi khi access token đổi. `withAuthRetry` chụp mốc này TRƯỚC khi gửi để phân biệt hai
@@ -70,19 +47,6 @@ export function setHttpSession(next: HttpSession | null): void {
 /** `null` khi chưa đăng nhập hoặc store chưa hydrate xong. */
 export function getCurrentUserId(): string | null {
   return session?.userId ?? null;
-}
-
-/**
- * Access token của phiên, cho lượt gọi HIẾM phải tự dựng request thay vì đi qua SDK generated.
- *
- * Đúng một chỗ dùng: `cloudinary.ts` xin chữ ký upload. Nó ở ngoài SDK vì bản thân lượt upload
- * đi thẳng tới Cloudinary chứ không qua BE, nên hàm đó vốn đã là `fetch` tay.
- *
- * KHÔNG phải cửa để né SDK. Endpoint bình thường đi qua `client.ts` + `withAuthRetry`, thứ biết
- * làm mới phiên khi token hết hạn — tự cầm token là tự bỏ mất việc đó.
- */
-export function getAccessToken(): string | null {
-  return session?.accessToken ?? null;
 }
 
 // ── LÀM MỚI PHIÊN ───────────────────────────────────────────────────
@@ -124,21 +88,23 @@ function refreshOnce(): Promise<string | null> {
  */
 const ORG_GONE_ERRORS = ['Organization đã bị khoá', 'Organization không tồn tại'];
 
-/**
- * Bỏ chọn org đang thao tác. Do `queries/auth` đẩy vào — `src/api/**` không được import
- * `stores/**` (folder.convention §6), cùng cách `setSessionRefresher` làm.
- */
-let orgGoneHandler: (() => void) | null = null;
-
-export function setOrgGoneHandler(next: (() => void) | null): void {
-  orgGoneHandler = next;
-}
-
 /** Org đang chọn đã bị khoá/xoá — LỰA CHỌN cũ, không phải phiên chết. */
 function isOrgGone(outcome: SdkOutcome): boolean {
   if (outcome.response?.status !== 403) return false;
   const message = errorMessage(outcome);
   return ORG_GONE_ERRORS.some((s) => message.includes(s));
+}
+
+/**
+ * Cùng phán quyết, nhưng đọc từ `Error` mà tầng query nhận được.
+ *
+ * PREDICATE chứ không phải callback đăng ký: bản trước là `setOrgGoneHandler`, một hàm toàn cục
+ * do `queries/auth` bơm vào để bỏ chọn "org đang thao tác". Không còn org toàn cục nào để bỏ
+ * chọn — phạm vi giờ sống trong `AdminOrgScope`, và nó tự hỏi câu này khi thấy lỗi, thay vì
+ * tầng HTTP với tay vào state của màn hình.
+ */
+export function isOrgGoneError(error: unknown): boolean {
+  return error instanceof Error && ORG_GONE_ERRORS.some((s) => error.message.includes(s));
 }
 
 /**
@@ -200,13 +166,10 @@ export async function withAuthRetry<T extends SdkOutcome>(call: () => Promise<T>
    * `refreshSession` dọn phiên và app đăng xuất người dùng vì một lý do không liên quan gì
    * tới phiên của họ. (BE giờ cũng miễn tenant cho `/auth/*`; đây là chốt thứ hai.)
    *
-   * Không gọi lại ngay: header org đọc từ `activeOrgId` của module này, mà giá trị đó chỉ
-   * đổi sau khi store re-render đẩy xuống — gọi lại lập tức là gửi đúng slug vừa bị từ chối.
+   * Không gọi lại ngay: id org nằm trong chính lượt gọi vừa hỏng, nên gọi lại là gửi đúng cái
+   * id vừa bị từ chối. Call-site phải bỏ chọn nhóm rồi mới thử lại.
    */
-  if (isOrgGone(first)) {
-    orgGoneHandler?.();
-    return first;
-  }
+  if (isOrgGone(first)) return first;
 
   // Chưa đăng nhập thì 401/404 là lỗi thật của request, không phải phiên hỏng.
   if (!session || !isDeadSession(first)) return first;
@@ -238,43 +201,8 @@ export async function withAuthRetry<T extends SdkOutcome>(call: () => Promise<T>
  * không hiện: người dùng không cần biết địa chỉ nội bộ, và nó chỉ làm câu thông báo rối.
  */
 function networkMessage(): string {
-  return withTarget('Không kết nối được tới server. Kiểm tra Wi-Fi hoặc 4G rồi thử lại.');
-}
-
-/** Gắn địa chỉ đang gọi khi ở dev — xem lý do ở docblock của `networkMessage`. */
-const withTarget = (base: string): string =>
-  __DEV__ ? `${base}\n(đang gọi ${API_BASE_URL})` : base;
-
-/**
- * Trần thời gian CHỜ PHẢN HỒI của một lượt gọi — tính tới lúc header về, không phải tới lúc tải
- * xong thân phản hồi.
- *
- * Ranh giới đó là cố ý và là thứ `finally` bên dưới chốt: đồng hồ dừng ngay khi `fetch` resolve.
- * Một phản hồi đã bắt đầu về mà thân của nó tải chậm thì server vẫn đang sống và đang trả lời —
- * cắt nó là cắt nhầm. Cái cần bắt là server KHÔNG nói gì cả.
- *
- * Không có nó thì hai kiểu "server chết" cho hai trải nghiệm khác hẳn nhau, và chỉ một kiểu là
- * dùng được:
- *
- *  - Máy chủ **từ chối** kết nối (tiến trình tắt trên một host còn sống) → `fetch` ném ngay,
- *    `networkMessage()` chạy, người dùng đọc được chuyện gì xảy ra.
- *  - Máy chủ **im lặng** (tiến trình treo, LAN IP cũ sau khi DHCP cấp lại, Wi-Fi đổi mạng giữa
- *    chừng, VPN nuốt gói) → promise KHÔNG BAO GIỜ settle. Không có gì để `catch`, query đứng ở
- *    `isPending` vĩnh viễn, và mọi màn quay vòng tròn không một lời giải thích.
- *
- * Ca thứ hai là thứ người dùng báo lại. Nó không sửa được ở tầng màn hình — màn nào cũng đã có
- * nhánh lỗi sẵn, chỉ là nhánh đó không bao giờ tới lượt chạy.
- *
- * 15s chứ không ngắn hơn: 3G lúc yếu vẫn trả về trong khoảng 8–10s, cắt sớm là biến một lượt
- * tải chậm thành một lỗi giả — và lỗi giả thì người dùng bấm "Thử lại" vào đúng cái mạng vẫn
- * đang chạy được.
- */
-const REQUEST_TIMEOUT_MS = 15_000;
-
-function timeoutMessage(): string {
-  return withTarget(
-    `Server không phản hồi sau ${REQUEST_TIMEOUT_MS / 1000} giây. Mạng đang chậm hoặc server đang bận — thử lại giúp mình.`,
-  );
+  const base = 'Không kết nối được tới server. Kiểm tra Wi-Fi hoặc 4G rồi thử lại.';
+  return __DEV__ ? `${base}\n(đang gọi ${API_BASE_URL})` : base;
 }
 
 export const createClientConfig: CreateClientConfig = (config) => ({
@@ -294,61 +222,18 @@ export const createClientConfig: CreateClientConfig = (config) => ({
   // Hàm chứ không phải giá trị: token đổi giữa các request, phải đọc lúc gửi mới đúng.
   auth: () => session?.accessToken,
   /**
-   * Gắn org đang chọn qua `fetch` chứ không qua `headers` của config: `headers` chỉ nhận giá
-   * trị TĨNH, đọc một lần lúc dựng client — mà org thì đổi giữa phiên (người dùng chuyển tổ
-   * chức) nên phải đọc đúng lúc gửi. Đây cũng là chỗ duy nhất làm được việc đó mà không phải
-   * import `client.gen.ts` vào đây: file đó import ngược lại chính `http.ts` làm runtime config.
+   * Chỉ còn gánh lỗi mạng. Header org KHÔNG gắn ở đây nữa: mỗi hàm api tự đặt `X-Org-Id` cho
+   * lượt gọi của nó.
+   *
+   * Cái mặc định cũ tiện nhưng nói dối — nó biến "nhóm tôi đang đứng" thành một BỘ LỌC ĐỌC ngầm
+   * trên mọi request, nên người thuộc hai nhóm chỉ bao giờ thấy được tin của một nhóm, và chẳng
+   * có chữ ký hàm nào cho thấy điều đó. Muốn thu hẹp theo nhóm thì dùng `?orgId=`, một tham số
+   * nhìn thấy được.
    */
   fetch: async (request) => {
-    // Kiểu khai của hey-api rộng hơn thực tế (`string | URL | Request`), nhưng client-fetch
-    // luôn dựng sẵn `Request` trước khi gọi. Thu hẹp bằng `instanceof` thay vì ép kiểu: nếu
-    // một bản sau đổi cách gọi, header chỉ đơn giản không được gắn thay vì nổ lúc chạy.
-    /*
-     * KHÔNG ghi đè header người gọi đã tự đặt. Org hoạt động là mặc định của cả app, nhưng
-     * vài chỗ cần đọc dữ liệu của MỘT tổ chức khác mà không kéo cả app sang đó — hồ sơ nhóm
-     * hiện danh bạ và tin của chính nhóm đang mở, trong khi người dùng vẫn đang thao tác ở
-     * nhóm khác. BE vẫn đối chiếu membership với slug nhận được, nên đây không phải lối vòng
-     * qua phân quyền: gửi slug của nhóm mình không thuộc về thì vẫn 403 như thường.
-     */
-    if (activeOrgId && request instanceof Request && !request.headers.has(ORG_HEADER)) {
-      request.headers.set(ORG_HEADER, activeOrgId);
-    }
-
-    /*
-     * Một `AbortController` của RIÊNG lượt gọi này, đứng giữa người gọi và `fetch`.
-     *
-     * Không dùng thẳng `request.signal`: signal đó thuộc về TanStack (nó huỷ khi component
-     * unmount hoặc query key đổi) và mình không kích được. Cần một nguồn huỷ thứ hai cho đồng
-     * hồ đếm giờ, rồi nối hai nguồn đó lại — nên `upstream` được tiếp sóng xuống `ctrl`.
-     */
-    const ctrl = new AbortController();
-    /*
-     * Cờ riêng chứ không đọc `signal.reason`: `reason` không đi qua được ranh giới native của
-     * mọi bản fetch mà app này có thể chạy trên (`expo/fetch` và fetch cũ của RN), nên dựa vào
-     * nó là hẹn một ngày lỗi hết giờ hiện ra thành "Aborted" mà không ai sửa nổi.
-     */
-    let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      ctrl.abort();
-    }, REQUEST_TIMEOUT_MS);
-
-    const upstream = request instanceof Request ? request.signal : null;
-    const relay = () => ctrl.abort();
-    if (upstream?.aborted) ctrl.abort();
-    else upstream?.addEventListener('abort', relay);
-
     try {
-      // `{ signal }` trong init THẮNG signal của `request` — đó là hợp đồng của `fetch`, và là
-      // cách duy nhất chen được đồng hồ vào một `Request` do SDK generated dựng sẵn.
-      return await globalThis.fetch(request, { signal: ctrl.signal });
+      return await globalThis.fetch(request);
     } catch (err) {
-      /*
-       * HẾT GIỜ phải đọc ra hết giờ. Nhánh `AbortError` ngay bên dưới sẽ nuốt nó thành một lượt
-       * huỷ hợp lệ, và query lại đứng im không báo gì — đúng cái bug mà `REQUEST_TIMEOUT_MS`
-       * sinh ra để sửa. Thứ tự hai nhánh này vì thế không đảo được.
-       */
-      if (timedOut) throw new Error(timeoutMessage(), { cause: err });
       /*
        * Request bị HUỶ không phải lỗi mạng: TanStack cancel khi component unmount hoặc khi
        * query key đổi giữa lúc đang bay. Đổi nó thành lỗi mạng là hiện "mất kết nối" cho một
@@ -358,11 +243,6 @@ export const createClientConfig: CreateClientConfig = (config) => ({
       // `cause` giữ nguyên lỗi gốc của tầng native: giao diện đọc `message` đã dịch, còn log
       // và màn ErrorScreen vẫn lần được về đúng chuỗi mà `expo/fetch` ném ra.
       throw new Error(networkMessage(), { cause: err });
-    } finally {
-      // Dọn cả hai chiều: đồng hồ còn chạy sau khi request xong là giữ timer sống vô ích, còn
-      // listener không gỡ là một tham chiếu tới `ctrl` nằm lại trên signal của TanStack.
-      clearTimeout(timer);
-      upstream?.removeEventListener('abort', relay);
     }
   },
 });

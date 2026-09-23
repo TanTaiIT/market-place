@@ -15,10 +15,25 @@ import { C, F } from '@/theme';
 /** Chia cho `length - 1`; kẹp sàn 1 để mảng một phần tử không cho ra NaN trong path. */
 const stepOf = (length: number) => Math.max(1, length - 1);
 
+/**
+ * MẢNG RỖNG LÀ MỘT ĐẦU VÀO HỢP LỆ, và phải chặn ở NGAY ĐẦU mỗi hình.
+ *
+ * Không phải phòng thủ thừa: `/moderation/overview` dựng `trend` bằng một `$group` theo ngày,
+ * nên nhóm chưa có tin nào trả về `[]`. Lúc đó `TrendChart` ghép ra chuỗi path mở đầu bằng
+ * `L` thay vì `M` (` L-490 170 L30 170 Z`) — và RNSVGPathParser ném `UnexpectedData` ở tầng
+ * NATIVE, tức là đỏ cả app chứ không phải trống một ô biểu đồ. `Sparkline` hỏng theo kiểu
+ * khác nhưng cùng gốc: `xy[xy.length - 1]` là `undefined`, destructure nó là TypeError.
+ *
+ * Người dùng gặp nó bằng cách bình thường nhất có thể: mở bàn quản trị một nhóm mới lập.
+ */
+const EMPTY_NOTE = 'Chưa có dữ liệu trong khoảng này';
+
 /** Đường gấp khúc mini nằm trong thẻ số — không trục, không nhãn. */
 export function Sparkline({ points, color }: { points: number[]; color: string }) {
   const w = 62;
   const h = 22;
+  // Không vẽ gì còn hơn vẽ một chấm ở toạ độ không tồn tại — xem `EMPTY_NOTE`.
+  if (points.length === 0) return null;
   const min = Math.min(...points);
   const span = Math.max(...points) - min || 1;
   const xy = points.map(
@@ -43,10 +58,21 @@ export function Sparkline({ points, color }: { points: number[]; color: string }
   );
 }
 
-const DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+const DAYS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+
+/**
+ * Nhãn trục x của MỘT cột, đọc từ chính ngày của cột đó.
+ *
+ * `T+00:00` để `Date` không diễn giải `YYYY-MM-DD` theo giờ máy: BE đã cắt cột theo múi giờ
+ * thị trường rồi, nên ở đây chỉ cần đọc lại đúng ký tự đó chứ không quy đổi lần nữa — quy đổi
+ * thêm một lần là lệch cột ở những máy đặt múi giờ khác.
+ */
+const tickOf = (day: string) => DAYS[new Date(`${day}T00:00:00Z`).getUTCDay()];
 
 /** Tin đã duyệt (đường liền + vùng tô) so với tin còn chờ (đường đứt) theo 14 ngày. */
 export function TrendChart({ data }: { data: TrendPoint[] }) {
+  if (data.length === 0) return <Text style={styles.empty}>{EMPTY_NOTE}</Text>;
+
   const W = 560;
   const H = 196;
   const pad = { top: 14, right: 10, bottom: 26, left: 30 };
@@ -99,7 +125,7 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
       {data.map((d, i) => (
         <Circle key={`dot${x(i)}`} cx={x(i)} cy={y(d.approved)} r={2.4} fill={C.mossBright} />
       ))}
-      {data.map((_, i) =>
+      {data.map((d, i) =>
         i % 2 ? null : (
           <SvgText
             key={`day${x(i)}`}
@@ -110,7 +136,7 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
             fontSize={8.5}
             fill={C.deskTxtDim}
           >
-            {DAYS[i % DAYS.length]}
+            {tickOf(d.day)}
           </SvgText>
         ),
       )}
@@ -147,6 +173,13 @@ export function CategoryBars({ data }: { data: CatShare[] }) {
 }
 
 const styles = StyleSheet.create({
+  empty: {
+    fontFamily: F.ui,
+    fontSize: 12.5,
+    color: C.deskTxtDim,
+    textAlign: 'center',
+    paddingVertical: 34,
+  },
   bars: { gap: 13 },
   barTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   barLabel: { fontFamily: F.uiSemi, fontSize: 12.5, color: C.deskTxt },

@@ -1,16 +1,8 @@
 import React from 'react';
-import {
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { CategoryLogo } from './CategoryLogo';
 import { ListingSlide, SlideRow } from './ListingSlide';
-import { squareUrl } from '@/api/cloudinary';
-import { gradOf, initialsOf } from '@/api/client';
+import { OrgFace } from './OrgFace';
 import type { Category, Listing, Profile } from '@/api/db';
 import type { OrgRow } from '@/api/org';
 import { SectionHead } from './SectionHead';
@@ -120,20 +112,10 @@ export function CategoryStrip({
             onPress={() => onOpen(cat.id)}
             style={({ pressed }) => [styles.circleItem, pressed && { opacity: 0.75 }]}
           >
-            {/*
-              KHÔNG có nền: emoji đứng trần trên giấy.
-
-              Bản trước là một ô gradient suy từ `cat.id`, với lý do "hai dải cùng một ngôn ngữ
-              story". Lý do đó đã bị chính chỗ này phủ định: emoji danh mục vốn đã có màu, nên
-              đặt nó lên một ô màu nữa là hai lớp màu tranh nhau trong 74px, và sáu ô sáu màu
-              ngẫu nhiên đứng cạnh nhau đọc ra ồn chứ không ra thứ tự.
-
-              Ô giữ nguyên 74×74 dù trong suốt: nó là thứ giữ nhịp ngang với dải "Nhóm quanh
-              bạn" ngay dưới, và giữ mọi dòng chữ thẳng hàng. Xoá kích thước đi thì hai dải lệch
-              nhau một quãng mà không ai chỉ ra được vì sao.
-            */}
-            <View style={[styles.circle, styles.circleCenter, styles.bare]}>
-              <Text style={styles.circleIcon}>{cat.icon}</Text>
+            {/* Nền, cỡ và bóng đổ của vòng tròn đều do `CategoryLogo` giữ — cùng sắc mà danh
+                mục này mang ở hàng chip và ở màn đăng tin. */}
+            <View style={styles.circleWrap}>
+              <CategoryLogo category={cat} size="lg" />
             </View>
             <Text numberOfLines={1} style={styles.circleName}>
               {cat.name}
@@ -162,7 +144,7 @@ export function OrgNearbyStrip({
   area: Profile['area'];
   orgs: OrgRow[];
   grid?: boolean;
-  onOpen: (slug: string) => void;
+  onOpen: (orgId: string) => void;
 }) {
   if (!area) return null;
 
@@ -188,48 +170,28 @@ export function OrgNearbyStrip({
         }
       />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-        {nearby.map((org) => {
-          // Avatar nếu có, không thì ảnh bìa. Tính MỘT lần: gọi hai lần rồi `!` để dập cảnh
-          // báo null là tự tay tắt đúng thứ đang bảo vệ mình.
-          const face = org.avatarUrl || org.coverUrl;
-          return (
+        {nearby.map((org) => (
           <Pressable
             key={org.id}
             onPress={() => onOpen(org.id)}
             style={({ pressed }) => [styles.circleItem, pressed && { opacity: 0.75 }]}
           >
-            {/*
-              Ba bậc: avatar → ẢNH BÌA → chữ viết tắt.
-
-              Bìa làm bậc hai vì màn sửa hồ sơ nhóm hỏi bìa TRƯỚC avatar, nên nhóm có ảnh mà
-              chưa đặt avatar là ca thường gặp nhất — bỏ bậc này là hiện chữ viết tắt cho một
-              nhóm đang có ảnh hẳn hoi. `squareUrl` cắt theo chủ thể, không cắt giữa mù.
-            */}
-            {face ? (
-              <View style={styles.circle}>
-                <Image
-                  source={{ uri: squareUrl(face, 200) }}
-                  style={StyleSheet.absoluteFill}
-                  resizeMode="cover"
-                />
-              </View>
-            ) : (
-              <LinearGradient
-                colors={gradOf(org.id)}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.circle, styles.circleCenter]}
-              >
-                <Text style={styles.circleInitials}>{initialsOf(org.name)}</Text>
-              </LinearGradient>
-            )}
+            {/* Chuỗi ba bậc avatar → bìa → chữ viết tắt nằm trong `OrgFace` — cùng một bản với
+                hai thẻ nhóm ở màn khám phá, nên một nhóm hiện ra giống nhau ở mọi bề mặt. */}
+            <OrgFace
+              seed={org.id}
+              name={org.name}
+              avatarUrl={org.avatarUrl}
+              coverUrl={org.coverUrl}
+              style={[styles.circle, styles.circleWrap]}
+              initialsSize={24}
+            />
             <Text numberOfLines={1} style={styles.circleName}>
               {org.name}
             </Text>
             <Text style={styles.circleCount}>{org.memberCount} thành viên</Text>
           </Pressable>
-          );
-        })}
+        ))}
       </ScrollView>
     </View>
   );
@@ -254,32 +216,9 @@ const styles = StyleSheet.create({
     marginBottom: S.sm,
     ...shadow,
   },
-  circleCenter: { alignItems: 'center', justifyContent: 'center' },
-  /**
-   * Ô danh mục: giữ KÍCH THƯỚC của `circle`, bỏ mọi thứ vẽ ra được.
-   *
-   * Ghi đè bằng style riêng thay vì sửa `circle`: `circle` là của CẢ hai dải, đổi ở đó là đổi
-   * luôn vòng tròn của "Nhóm quanh bạn" — mà avatar nhóm thì vẫn cần nền, nó là ảnh thật hoặc
-   * chữ viết tắt trên gradient.
-   *
-   * `shadow` phải tắt tường minh: nó tới từ `circle` và đổ bóng cho một ô trong suốt thì bóng
-   * vẫn hiện, thành một vệt xám lơ lửng không có vật nào đổ ra nó. Trên Android là `elevation`,
-   * nên đặt `0` cho cả hai đường.
-   */
-  bare: {
-    backgroundColor: 'transparent',
-    shadowOpacity: 0,
-    elevation: 0,
-    // `circle` cắt theo đường tròn (`overflow: 'hidden'` + bo 37). Không còn nền để cắt, nhưng
-    // cái kéo đó vẫn cắt cả emoji — mở ra để lần sau phóng to icon không bị xén mất góc.
-    overflow: 'visible',
-  },
-
-  /* Hai dòng này là HÌNH, không phải chữ — emoji danh mục và chữ cái đầu trong vòng tròn 74px.
-     Chúng cố tình đứng ngoài thang `T`: buộc chúng vào thang chữ là để một vòng tròn trang trí
-     kéo theo cả phân cấp tiêu đề. */
-  circleIcon: { fontSize: 30 },
-  circleInitials: { fontFamily: F.uiBold, fontSize: 24, color: '#fff' },
+  /* Khoảng thở dưới vòng tròn. Phải ở lớp bọc chứ không nhét vào `CategoryLogo`/`OrgFace`: cùng
+     cỡ đó cũng dùng ở chỗ khác, và lề là việc của bố cục quanh nó. */
+  circleWrap: { marginBottom: S.sm },
   circleName: { fontFamily: F.uiBold, ...T.sm, color: C.ink, maxWidth: 96 },
   circleCount: { fontFamily: F.ui, ...T.xs, color: C.muted },
 });

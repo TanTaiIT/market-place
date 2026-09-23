@@ -45,7 +45,6 @@ export default function AdminReports() {
       // Người phụ trách ô trục công khai thường không thuộc org nào — với họ màn này không đòi
       // chọn tổ chức (BE dựng ô từ grant). Quản trị org vẫn phải đứng trong org như cũ.
       org={publicAxis ? 'optional' : true}
-      masterReadsAll
     >
       <FlatList
         data={data ?? []}

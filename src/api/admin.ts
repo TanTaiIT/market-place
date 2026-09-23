@@ -17,12 +17,13 @@ import type { Listing as ListingDto, RerouteListing, RoleGrant } from './generat
 import { reportKindLabel } from './report';
 import { PAGE_SIZE, formatPrice, gradOf, initialsOf, relativeTime, unwrap, unwrapPage } from './client';
 import type { Page } from './client';
-import { withAuthRetry } from './http';
+import { ORG_HEADER, withAuthRetry } from './http';
 import type { Grad } from '@/theme';
 
 /**
- * Bàn quản trị của **một trường**. BE tự scope theo organization trong JWT nên ở đây không có
- * tham số trường nào cả — quản trị đăng nhập bằng tài khoản trường nào thì thấy trường đó.
+ * Bàn quản trị của **một nhóm**. Nhóm đi vào bằng THAM SỐ `orgId` ở từng hàm, không phải bằng
+ * một "nhóm đang thao tác" toàn cục: tầng HTTP không gắn `X-Org-Id` hộ nữa, nên nhìn chữ ký
+ * hàm là biết lượt gọi này đứng ở nhóm nào.
  *
  * Ba màn Tổng quan / Duyệt tin / Báo cáo đã chạy dữ liệu thật. Danh mục · Gửi thông báo ·
  * Người dùng · Trường & hệ thống · Cài đặt vẫn là fixture — xem
@@ -100,7 +101,14 @@ export type AdminKpi = {
   trend: number[];
 };
 
-export type TrendPoint = { approved: number; pending: number };
+/**
+ * Một cột của biểu đồ nhịp. `day` là `YYYY-MM-DD` theo MÚI GIỜ THỊ TRƯỜNG, do BE cắt.
+ *
+ * Mang `day` chứ không để biểu đồ tự đoán: bản trước bỏ field này và dán nhãn bằng
+ * `DAYS[i % 7]` — tức là đếm theo chỉ số mảng. Nhãn đó chỉ đúng khi mảng có đủ cột liên tiếp
+ * VÀ cột đầu rơi đúng thứ Hai; cả hai điều kiện đều không ai bảo đảm.
+ */
+export type TrendPoint = { day: string; approved: number; pending: number };
 export type CatShare = { cat: string; count: number };
 
 type Overview = {
@@ -145,10 +153,19 @@ const tail = (series: number[], last: number) =>
 
 // ── API ─────────────────────────────────────────────────────────────
 
+/**
+ * Header org cho ĐÚNG một lượt gọi.
+ *
+ * Bỏ trống khi không có `orgId`, chứ không gửi chuỗi rỗng: BE coi `''` là "không chỉ ra nhóm"
+ * và vẫn tự suy ra được, nên gửi nó chỉ làm nhiễu log. Các route `requireOrgReadOrMaster` đọc
+ * xuyên tổ chức đúng ở trạng thái vắng header này — đó là tính năng, không phải thiếu sót.
+ */
+const orgHeader = (orgId?: string) => (orgId ? { headers: { [ORG_HEADER]: orgId } } : {});
+
 export const adminApi = {
   /** Thẻ số + hai biểu đồ. BE trả số thật, không còn `+4` / `+12%` bịa như prototype. */
-  async getOverview(): Promise<Overview> {
-    const res = await withAuthRetry(() => moderationOverview());
+  async getOverview(orgId: string): Promise<Overview> {
+    const res = await withAuthRetry(() => moderationOverview(orgHeader(orgId)));
     const data = unwrap(res, 'Không tải được số liệu');
 
     // Sparkline cần một chuỗi; dựng từ biểu đồ 14 ngày thay vì bịa số như bản fixture.
@@ -162,7 +179,7 @@ export const adminApi = {
         { key: 'users', label: 'Người dùng', value: data.users, trend: [data.users] },
         { key: 'reports', label: 'Báo cáo mở', value: data.openReports, trend: [data.openReports] },
       ],
-      trend: data.trend.map((d) => ({ approved: d.approved, pending: d.pending })),
+      trend: data.trend.map((d) => ({ day: d.day, approved: d.approved, pending: d.pending })),
       cats: data.categories.map((c) => ({ cat: c.name, count: c.count })),
     };
   },
@@ -191,12 +208,14 @@ export const adminApi = {
         { key: 'hidden', label: 'Đang ẩn', value: data.hidden, trend: [data.hidden] },
         { key: 'rejected', label: 'Đã từ chối', value: data.rejected, trend: [data.rejected] },
       ],
-      trend: data.trend.map((d) => ({ approved: d.approved, pending: d.pending })),
+      trend: data.trend.map((d) => ({ day: d.day, approved: d.approved, pending: d.pending })),
       cats: data.categories.map((c) => ({ cat: c.name, count: c.count })),
     };
   },
-  async getEvents(): Promise<AdminEvent[]> {
-    const res = await withAuthRetry(() => moderationActivity({ query: { limit: PAGE_SIZE } }));
+  async getEvents(orgId?: string): Promise<AdminEvent[]> {
+    const res = await withAuthRetry(() =>
+      moderationActivity({ query: { limit: PAGE_SIZE }, ...orgHeader(orgId) }),
+    );
     return unwrap(res, 'Không tải được dòng hoạt động').map((log) => ({
       id: log.id,
       tone: EVENT_TONE[log.action] ?? 'info',
@@ -210,6 +229,7 @@ export const adminApi = {
    * ngoài (tầng query đã có sẵn `useCategories`) để không gọi `/categories` thêm một lượt.
    */
   async getListings(
+    orgId: string | undefined,
     status: ModStatus | undefined,
     categoryNames: Map<string, string>,
     page: number,
@@ -224,6 +244,7 @@ export const adminApi = {
           page,
           limit: PAGE_SIZE,
         },
+        ...orgHeader(orgId),
       }),
     );
     return unwrapPage(res, 'Không tải được tin đăng', (l) => toModListing(l, categoryNames));
@@ -267,9 +288,9 @@ export const adminApi = {
     return unwrap(res, 'Không chuyển được tin sang ô khác');
   },
 
-  async getReports(page: number): Promise<Page<Report>> {
+  async getReports(orgId: string | undefined, page: number): Promise<Page<Report>> {
     const res = await withAuthRetry(() =>
-      reportList({ query: { status: 'open', page, limit: PAGE_SIZE } }),
+      reportList({ query: { status: 'open', page, limit: PAGE_SIZE }, ...orgHeader(orgId) }),
     );
     return unwrapPage(res, 'Không tải được báo cáo', (r) => ({
       id: r.id,
@@ -287,11 +308,12 @@ export const adminApi = {
     }));
   },
 
-  async setStatus(id: string, status: ModStatus, reason?: string) {
+  async setStatus(orgId: string | undefined, id: string, status: ModStatus, reason?: string) {
     const res = await withAuthRetry(() =>
       moderationSetListingStatus({
         path: { id },
         body: { status: status as 'active' | 'rejected' | 'hidden', reason },
+        ...orgHeader(orgId),
       }),
     );
     unwrap(res, 'Không cập nhật được trạng thái tin');
@@ -305,21 +327,27 @@ export const adminApi = {
    * về nội dung, mà là một quyết định phân phối. BE chốt thẩm quyền theo TRỤC CỦA TIN — tin
    * công khai thuộc người phụ trách danh mục, tin nội bộ thuộc quản trị nhóm.
    */
-  async bump(id: string) {
-    const res = await withAuthRetry(() => listingBump({ path: { id } }));
+  async bump(orgId: string | undefined, id: string) {
+    const res = await withAuthRetry(() => listingBump({ path: { id }, ...orgHeader(orgId) }));
     unwrap(res, 'Không đẩy được tin này lên đầu bảng');
     return { id };
   },
 
-  async remove(id: string) {
-    const res = await withAuthRetry(() => moderationRemoveListing({ path: { id } }));
+  async remove(orgId: string | undefined, id: string) {
+    const res = await withAuthRetry(() =>
+      moderationRemoveListing({ path: { id }, ...orgHeader(orgId) }),
+    );
     unwrap(res, 'Không gỡ được tin này');
     return { id };
   },
 
-  async resolveReport(id: string, hideTarget: boolean) {
+  async resolveReport(orgId: string | undefined, id: string, hideTarget: boolean) {
     const res = await withAuthRetry(() =>
-      reportResolve({ path: { id }, body: { action: hideTarget ? 'hide_target' : 'ignore' } }),
+      reportResolve({
+        path: { id },
+        body: { action: hideTarget ? 'hide_target' : 'ignore' },
+        ...orgHeader(orgId),
+      }),
     );
     unwrap(res, 'Không xử lý được báo cáo');
     return { id };
@@ -372,6 +400,27 @@ export const canModeratePublicAxis = (grants: RoleGrant[] | undefined) =>
 export const canModerateOrg = (grants: RoleGrant[] | undefined) =>
   isMaster(grants) ||
   (grants ?? []).some((g) => g.scopeType === 'org' || g.scopeType === 'org_unit');
+
+/**
+ * Id các nhóm người này QUẢN TRỊ được — `null` nghĩa là MỌI nhóm (master).
+ *
+ * `null` chứ không phải một Set rỗng, và cũng không phải một Set chứa tất cả: master không có
+ * grant trỏ tới từng nhóm, nên "mọi nhóm" là một câu trả lời khác hẳn "không nhóm nào" chứ
+ * không phải một trường hợp riêng của nó. Người gọi phải xử hai nhánh — và chính chỗ ép hai
+ * nhánh làm một là nơi bug cũ sinh ra.
+ *
+ * Nhận cả `org_unit`: staff nhóm con quản trị được trong phạm vi hẹp hơn, nhưng nhóm đó vẫn là
+ * nhóm họ có việc để làm — khớp `canModerateAnyInOrg` của BE.
+ */
+export const moderatedOrgIds = (grants: RoleGrant[] | undefined): Set<string> | null => {
+  if (isMaster(grants)) return null;
+  return new Set(
+    (grants ?? [])
+      .filter((g) => g.scopeType === 'org' || g.scopeType === 'org_unit')
+      .map((g) => g.orgId)
+      .filter((id): id is string => Boolean(id)),
+  );
+};
 
 /**
  * Sửa được hồ sơ MỘT nhóm cụ thể không. Khớp `requireOrgAdmin` → `canAdminOrg` của BE:

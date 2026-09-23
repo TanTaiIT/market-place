@@ -10,17 +10,22 @@ import Animated, {
 import { AttrFields, visibleAttrFields } from './AttrFields';
 import { PhotoPicker } from './PhotoPicker';
 import { EMPTY_LOCATION, LocationFields, type ListingLocation } from './LocationFields';
-import { listingDraftGaps } from './listingDraft';
-import { ReachPicker, defaultReach, type ReachTarget } from './ReachPicker';
+import { listingDraftGaps, type ListingFormValues } from './listingDraft';
+import {
+  ListingReachField,
+  defaultPick,
+  usePostGroups,
+  type PostGroup,
+  type ReachPick,
+} from './ListingReach';
 import { BoxField, FormSection } from './FormSection';
+import { ListingPriceFields } from './ListingPriceFields';
 import { CategoryField } from './CategoryField';
 import { useToast } from './Toast';
 import { useCategoryTemplate } from '@/queries/templates';
 import { useProfile } from '@/queries/listings';
 import { MAX_PHOTOS, type ListingPhotosController } from '@/queries/upload';
-import { useMyOrgs } from '@/queries/org';
-import type { Listing, ListingAttributes, ListingReach } from '@/api/db';
-import { useOrgId } from '@/stores/auth';
+import type { ListingAttributes } from '@/api/db';
 import { C, F, S, shadow } from '@/theme';
 
 /**
@@ -32,50 +37,6 @@ import { C, F, S, shadow } from '@/theme';
  * Form giữ state + luật hợp lệ, KHÔNG gọi mutation: submit đi ngược lên route qua `onSubmit`
  * (AGENTS §Kiến trúc — mutation chỉ khởi động từ `app/**`).
  */
-
-type ListingFormValues = {
-  title: string;
-  /** Chuỗi thô từ `TextInput`; đổi sang số là việc của `client.ts`, không phải của form. */
-  price: string;
-  desc: string;
-  categoryId: string;
-  /**
-   * Bậc phủ sóng. Form SỬA vẫn mang nó để hiện đúng trạng thái, nhưng route sửa không gửi đi:
-   * `PATCH /listings/:id` của BE không nhận `reach`.
-   */
-  reach: ListingReach;
-  location: ListingLocation;
-  /** Thuộc tính động theo template của danh mục — rỗng khi danh mục chưa có field nào. */
-  attributes: ListingAttributes;
-  /**
-   * Bản template của tin đang sửa. Chỉ form SỬA mới có — tin mới luôn dùng bản mới nhất.
-   * Không gửi lên BE; nó chỉ quyết định form hỏi template nào.
-   */
-  templateVersion?: number;
-};
-
-/**
- * Tin đã lưu → giá trị điền sẵn cho form sửa.
- *
- * Đọc `priceValue` chứ không phải `price`: bản hiển thị đã qua `formatPrice`, và "Miễn phí"
- * thì không còn đường nào quay về `0`.
- */
-export function listingToFormValues(listing: Listing): ListingFormValues {
-  return {
-    title: listing.title,
-    price: String(listing.priceValue),
-    desc: listing.desc,
-    categoryId: listing.categoryId,
-    reach: listing.reach,
-    attributes: listing.attributes ?? {},
-    templateVersion: listing.templateVersion,
-    location: {
-      province: listing.province ?? null,
-      ward: listing.ward ?? null,
-      address: listing.address ?? '',
-    },
-  };
-}
 
 export function ListingForm({
   photos,
@@ -95,22 +56,11 @@ export function ListingForm({
   submitLabel: string;
   busyLabel: string;
   busy: boolean;
-  /**
-   * Đăng thẳng vào MỘT nhóm — người dùng đi từ trang hồ sơ nhóm, không phải từ nút đăng chung.
-   *
-   * Có nó thì bậc `marketplace` biến mất khỏi bộ chọn. Đây không phải để cho gọn: lên sàn sẽ
-   * đưa tin sang hàng đợi của người phụ trách DANH MỤC, và quản trị nhóm không có lấy một lượt
-   * duyệt nào (`routeListing`). Người bấm "Đăng tin" trên trang một nhóm đang nói "gửi cho nhóm
-   * này duyệt" — để hở lựa chọn kia là phản bội đúng câu đó.
-   *
-   * Hai bậc TRONG nhóm vẫn chọn được (nếu nhóm công khai): cả hai đều do nhóm duyệt, nên không
-   * bậc nào phản bội câu trên.
-   */
-  toGroup?: { id: string; name: string; isPublic: boolean };
+  /** Đăng thẳng vào MỘT nhóm — đi từ hồ sơ nhóm. Khoá NHÓM, không khoá bậc (`usePostGroups`). */
+  toGroup?: PostGroup;
   onSubmit: (values: ListingFormValues) => void;
 }) {
   const toast = useToast();
-  const activeOrg = useOrgId();
   const { data: profile } = useProfile();
 
   const [title, setTitle] = useState(initial?.title ?? '');
@@ -119,23 +69,18 @@ export function ListingForm({
   // Giữ id chứ không giữ tên: BE nhận `categoryId` là ObjectId. Rỗng cho tới khi danh mục
   // tải xong hoặc người dùng chọn.
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? '');
-  /*
-   * Nhóm ĐÍCH của tin: nhóm đi từ trang hồ sơ (`toGroup`) thắng nhóm đang thao tác.
+  const [canDeliver, setCanDeliver] = useState(initial?.canDeliver ?? false);
+  /**
+   * Bậc phủ sóng: SUY RA cho tới khi người dùng chạm vào, chứ không giữ trong state ngay.
    *
-   * Phải tra ra cả `isPublic` chứ không chỉ id, vì bậc `group_open` chỉ tồn tại dưới nhóm công
-   * khai. `useMyOrgs` là nguồn duy nhất có sẵn cờ đó cho nhóm đang thao tác — và nó đã nằm
-   * trong cache từ lúc mở app, nên đây không phải một lượt gọi thêm.
+   * Mặc định phụ thuộc danh sách nhóm, mà danh sách đó về sau lúc mount. Giữ state rồi đồng bộ
+   * bằng `useEffect` là đúng cái `set-state-in-effect` oxlint chặn — và tệ hơn, nó có thể ghi
+   * đè lựa chọn người dùng vừa bấm. `null` nghĩa là "chưa chạm", nên giá trị hiện ra tự đúng
+   * lên khi nhóm về. Bấm gửi trước lúc đó thì tin lên sàn — phía an toàn, không lộ nhóm nào.
    */
-  const { data: myOrgs } = useMyOrgs();
-  const activeOrgRow = myOrgs?.find((o) => o.id === activeOrg);
-  const target: ReachTarget = toGroup
-    ? { name: toGroup.name, isPublic: toGroup.isPublic }
-    : activeOrgRow
-      ? { name: activeOrgRow.name, isPublic: activeOrgRow.isPublic }
-      : null;
-
-  // Tin đang sửa giữ nguyên bậc cũ; tin mới rơi về đúng bậc BE sẽ tự chọn nếu app không gửi gì.
-  const [reach, setReach] = useState<ListingReach>(initial?.reach ?? defaultReach(target));
+  const groups = usePostGroups(toGroup);
+  const [picked, setPicked] = useState<ReachPick | null>(null);
+  const pick: ReachPick = picked ?? defaultPick(groups);
   /**
    * Tên tỉnh/xã, không phải mã — BE lưu và lọc bằng chính chuỗi này.
    *
@@ -201,6 +146,7 @@ export function ListingForm({
     // Chỉ field ĐANG HIỆN mới bị đòi: field bị `showIf` ẩn không phải là thứ người dùng bỏ sót.
     attrFields: visibleAttrFields(attrFields, attributes),
     attributes,
+    needsGroup: pick.reach !== 'marketplace' && !pick.orgId,
   });
 
   const submit = () => {
@@ -220,7 +166,9 @@ export function ListingForm({
     const error = gaps[0]?.message ?? null;
     if (error) return toast(error);
 
-    onSubmit({ title, price, desc, categoryId, reach, location, attributes });
+    // `...pick` rải đúng hai khoá `reach` + `orgId` — chúng đi liền nhau nên tách ra hai
+    // dòng chỉ mở chỗ cho một bên được cập nhật mà bên kia quên.
+    onSubmit({ title, price, desc, categoryId, canDeliver, ...pick, location, attributes });
   };
 
   return (
@@ -284,13 +232,11 @@ export function ListingForm({
                 maxLength={150}
                 counter
               />
-              <BoxField
-                label="Mức giá"
-                value={price}
-                onChangeText={setPrice}
-                placeholder="0"
-                keyboardType="number-pad"
-                suffix="đ"
+              <ListingPriceFields
+                price={price}
+                onPrice={setPrice}
+                canDeliver={canDeliver}
+                onCanDeliver={setCanDeliver}
               />
 
               {/* Field động của đúng danh mục vừa chọn — vẫn trong nhóm "Chi tiết". */}
@@ -314,24 +260,16 @@ export function ListingForm({
 
               <View style={styles.card}>
               <FormSection flush step={4} title="Khu vực & hiển thị" />
-              {/*
-                Thẻ "đăng vào nhóm" chỉ nói nhóm NÀO — không còn nói tin hiện ở đâu, vì đó đã
-                thành một lựa chọn thật ngay dưới nó (nhóm công khai có hai bậc). Nói hộ một câu
-                mà bộ chọn ngay bên dưới có thể phủ định là cách chắc chắn để hai chỗ lệch nhau.
-              */}
-              {toGroup && (
-                <View style={styles.toGroup}>
-                  <Text style={styles.toGroupLabel}>ĐĂNG VÀO NHÓM</Text>
-                  <Text style={styles.toGroupName}>{toGroup.name}</Text>
-                  <Text style={styles.toGroupHint}>Quản trị nhóm sẽ duyệt tin này.</Text>
-                </View>
+              {/* Form SỬA không bày thang: BE từ chối `reach` ở `PATCH` (nâng bậc = đổi bàn
+                  duyệt), nên một ô chọn ở đây chỉ hứa suông rồi nuốt lựa chọn của người dùng. */}
+              {initial ? null : (
+                <ListingReachField
+                  value={pick}
+                  groups={groups}
+                  locked={toGroup}
+                  onChange={setPicked}
+                />
               )}
-              <ReachPicker
-                value={reach}
-                target={target}
-                lockToGroup={Boolean(toGroup)}
-                onChange={setReach}
-              />
               <LocationFields value={location} onChange={setLocation} />
               </View>
             </>
@@ -410,17 +348,6 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   descInput: { minHeight: 96, textAlignVertical: 'top', lineHeight: 22, fontFamily: F.ui },
-  toGroup: {
-    backgroundColor: C.mossLight,
-    borderRadius: 8,
-    padding: S.lg,
-    borderWidth: 1,
-    borderColor: C.moss,
-    marginBottom: S.lg,
-  },
-  toGroupLabel: { fontFamily: F.mono, fontSize: 9.5, letterSpacing: 1.2, color: C.moss },
-  toGroupName: { fontFamily: F.uiBold, fontSize: 15, color: C.ink, marginTop: S.xs },
-  toGroupHint: { fontFamily: F.ui, fontSize: 12, lineHeight: 18, color: C.inkSoft, marginTop: S.xs },
   // Nền đục + viền trên: nội dung cuộn qua bên dưới phải bị che hẳn, nếu không chữ sẽ chạy
   // lẫn vào nút và trông như lỗi render.
   /** Nhắc việc còn thiếu — canh giữa, ngay trên nút, cùng nhịp với `missing` của bản dựng. */

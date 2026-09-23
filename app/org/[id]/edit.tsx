@@ -17,9 +17,9 @@ import { C, F } from '@/theme';
 /**
  * Sửa hồ sơ nhóm — ảnh bìa, mô tả, nội quy.
  *
- * Nằm trong `app/org/[id]/` chứ không phải bàn quản trị: id đi theo đường dẫn nên màn này sửa
- * đúng nhóm mình vừa mở, không phụ thuộc "tổ chức đang thao tác" của cả app. Quản trị mở hồ sơ
- * nhóm B rồi bấm sửa thì sửa B, dù họ đang làm việc ở A.
+ * Nằm trong `app/org/[id]/` chứ không phải bàn quản trị: id đi theo đường dẫn nên màn này
+ * sửa đúng nhóm mình vừa mở, không phụ thuộc "tổ chức đang thao tác" của cả app. Quản trị mở
+ * hồ sơ nhóm B rồi bấm sửa thì sửa B, dù họ đang làm việc ở A.
  *
  * Cửa quyền thật là `requireOrgAdmin` bên BE. Phần chặn ở đây chỉ để người không có quyền
  * không phải điền hết form rồi mới ăn 403.
@@ -57,7 +57,6 @@ export default function OrgEditScreen() {
     );
   }
 
-  // `org.id` dùng thẳng: hồ sơ nhóm mang id từ lượt gỡ slug, không phải tra qua `useMyOrgs` nữa.
   if (!canAdminOrg(grants, org.id)) {
     return (
       <Shell>

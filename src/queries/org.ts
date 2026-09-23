@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { orgApi } from '@/api/org';
 import type { JoinRequestStatus } from '@/api/org';
-import { useEffect } from 'react';
-import { useIsAuthenticated, useOrgId, useSetActiveOrg } from '@/stores/auth';
-import { canModerateOrg } from '@/api/admin';
+import { useAdminOrgId } from '@/components/AdminOrgScope';
+import { useIsAuthenticated } from '@/stores/auth';
+import { canModerateOrg, moderatedOrgIds } from '@/api/admin';
 import { useMyGrants } from './admin';
-import { qk } from './keys';
+import { NO_ORG, qk } from './keys';
 import { usePagedList } from './paged';
 
 /** Độ dài tối thiểu của mã tham gia theo schema BE — gõ ngắn hơn thì chắc chắn 400. */
@@ -29,27 +29,19 @@ export function useOrgByCode(code: string) {
   });
 }
 
-/** Danh sách tổ chức của tôi. Đổi rất ít nên giữ cache lâu, tránh gọi lại mỗi lần mở màn. */
 /**
- * Các tổ chức mình LÀ THÀNH VIÊN.
+ * Các tổ chức mình LÀ THÀNH VIÊN — danh sách thuần, KHÔNG tác dụng phụ.
  *
- * Kèm một tác dụng phụ có chủ ý: **thuộc đúng MỘT tổ chức thì tự chọn nó**.
+ * Bản trước còn tự ghi "org đang thao tác" vào store khi người dùng thuộc đúng một nhóm, và
+ * xoá nó đi cho master. Cả hai nhu cầu đó chuyển sang `AdminOrgScope`, nơi luật "một nhóm thì
+ * suy ra" được tính TRONG RENDER thay vì bằng một effect ghi ngược vào store — effect đó chạy
+ * ở mọi màn có gọi hook này, kể cả những màn không liên quan gì tới quản trị.
  *
- * BE vốn tự suy ra org trong ca đó (`tenant.middleware`) nên request vẫn chạy đúng — nhưng
- * phía client thì `activeOrgId` vẫn là `null`, và đó là một trạng thái ngầm đã đẻ ra một
- * chuỗi lỗi cùng kiểu: khoá cache tính bằng `slug ?? '-'`, cổng `enabled: Boolean(slug)` tắt
- * mọi query của bàn quản trị, và các phép tra `find(o => o.slug === slug)` không khớp ai.
- * Mỗi chỗ lại phải tự nhớ luật "một nhóm thì suy ra" — và đã quên ở bốn chỗ khác nhau.
+ * Luật cũ vẫn còn giá trị và đã chuyển theo sang đó: chỉ suy ra nhóm đang ACTIVE. Nhóm bị khoá
+ * vẫn nằm trong danh sách này, và tự chọn nó là mọi request mang một id BE chắc chắn ném 403 —
+ * người dùng không bấm gì mà app tự đưa mình vào trạng thái không dùng được.
  *
- * Ghi thẳng vào store là biến luật ngầm thành một giá trị có thật. Từ đó `X-Org-Id` được
- * gửi TƯỜNG MINH, và mọi chỗ đọc `useOrgId()` đều nhận đúng một câu trả lời.
- *
- * Chỉ ghi khi CHƯA có lựa chọn nào: người đã tự chọn (hoặc master mượn slug nhóm khác) thì
- * không bị ghi đè. Có từ hai nhóm trở lên thì im lặng — lúc đó phải để họ chọn.
- *
- * Và chỉ tự chọn org đang ACTIVE: org bị khoá vẫn nằm trong danh sách, tự chọn nó là mọi
- * request mang một slug BE chắc chắn ném 403 — người dùng không hề bấm gì mà app tự đưa mình
- * vào trạng thái không dùng được.
+ * Đổi rất ít nên giữ cache lâu, tránh gọi lại mỗi lần mở màn.
  */
 export function useMyOrgs() {
   const isAuthenticated = useIsAuthenticated();
@@ -61,16 +53,47 @@ export function useMyOrgs() {
     staleTime: 5 * 60_000,
   });
 
-  const activeSlug = useOrgId();
-  const setActiveOrg = useSetActiveOrg();
-  const single = query.data?.length === 1 ? query.data[0] : undefined;
-  const only = single?.status === 'active' ? single.id : undefined;
-
-  useEffect(() => {
-    if (!activeSlug && only) setActiveOrg(only);
-  }, [activeSlug, only, setActiveOrg]);
-
   return query;
+}
+
+/**
+ * Các nhóm mình QUẢN TRỊ được — nguồn DUY NHẤT của mọi bộ chọn nhóm trong `/admin`.
+ *
+ * Khác `useMyOrgs` ở đúng một chữ: THAM GIA không phải QUẢN TRỊ. `/organizations/mine` trả mọi
+ * nhóm mình là thành viên, kể cả nhóm mình chỉ vào để mua bán. Bày chúng trong bộ chọn của bàn
+ * quản trị là mời người dùng chọn một phạm vi mà BE sẽ từ chối: `requireOrgModerator` xét
+ * `role_grants`, không xét `memberships`, nên mọi màn sau đó rỗng hoặc 403 — mà thông điệp
+ * lại nói về quyền, trong khi người dùng vừa bấm đúng một cái tên app tự bày ra cho họ.
+ *
+ * Lọc luôn nhóm đang khoá: chọn vào đó là mọi request mang một id BE chắc chắn ném 403.
+ *
+ * Master KHÔNG dùng hook này — họ không thuộc nhóm nào nên `/organizations/mine` rỗng với họ;
+ * bộ chọn của họ đọc `useAllOrgs` (toàn hệ thống). Xem `moderatedOrgIds` trả `null`.
+ */
+export function useAdminOrgs() {
+  const { data, isPending } = useMyOrgs();
+  const { data: grants } = useMyGrants();
+  const allowed = moderatedOrgIds(grants);
+  const rows = (data ?? []).filter(
+    (o) => o.status === 'active' && (allowed === null || allowed.has(o.id)),
+  );
+  return { rows, isPending };
+}
+
+/**
+ * Nhóm DUY NHẤT mình quản trị được — `null` khi không có, hoặc có từ hai.
+ *
+ * Đây là luật "một nhóm thì không phải bấm chọn", tách thành một hàm để `app/admin/_layout`
+ * mớm nó cho `AdminOrgScope`. Provider KHÔNG tự gọi query: nó nằm ở `components/`, mà mọi
+ * `queries/*` lại đọc `useAdminOrgId` từ nó — để nó gọi ngược vào `queries/` là dựng một vòng
+ * import thật, kiểu vòng chỉ nổ lúc chạy và nổ ở một file chẳng liên quan.
+ *
+ * Đọc `useAdminOrgs` chứ không `useMyOrgs`: tự chọn hộ một nhóm mình chỉ là thành viên thì
+ * người dùng thậm chí không có lấy một cú bấm nào để mà đổ lỗi — bàn quản trị mở ra là đã 403.
+ */
+export function useSoleOrgId(): string | null {
+  const { rows } = useAdminOrgs();
+  return rows.length === 1 ? rows[0].id : null;
 }
 
 export function useMyJoinRequests() {
@@ -108,18 +131,19 @@ export function useCancelJoinRequest() {
 /* ------------------------ phía người duyệt ------------------------ */
 
 /**
- * Hàng đợi đơn của tổ chức ĐANG HOẠT ĐỘNG.
+ * Hàng đợi đơn của MỘT tổ chức.
  *
- * Không có tham số org: BE lấy từ `X-Org-Id` mà `http.ts` gắn sẵn. Vì thế key phải chứa
- * `activeOrgId` — thiếu nó thì đổi tổ chức xong vẫn thấy hàng đợi của tổ chức cũ trong cache.
+ * `orgId` đi xuống hàm api chứ không qua header mặc định nào. Nó cũng phải nằm TRONG KEY —
+ * thiếu thì đổi tổ chức xong vẫn thấy hàng đợi của tổ chức cũ trong cache.
  */
 export function useJoinRequestQueue(status?: JoinRequestStatus) {
-  const orgId = useOrgId();
+  const orgId = useAdminOrgId();
   const { data: grants } = useMyGrants();
 
   return usePagedList(
-    qk.joinRequestQueue(orgId ?? '-', status ?? 'all'),
-    (page) => orgApi.joinRequests(status, page),
+    qk.joinRequestQueue(orgId ?? NO_ORG, status ?? 'all'),
+    // `orgId!`: `enabled` ngay dưới đã chặn ca rỗng.
+    (page) => orgApi.joinRequests(orgId!, status, page),
     {
       // Chặn bằng grant chứ không chỉ bằng org: `AdminNav` gọi hook này để lấy con số badge cho
       // MỌI người mở ngăn kéo, mà manager danh mục (grant `category_province`) tuy là thành viên
@@ -133,44 +157,23 @@ export function useJoinRequestQueue(status?: JoinRequestStatus) {
 /**
  * Gỡ thành viên / chuyển nhóm con.
  *
- * Refetch contract: cả hai quét `orgMembers(slug)` — danh bạ là chỗ duy nhất hiện thay đổi.
+ * Refetch contract: cả hai quét `orgMembers(orgId)` — danh bạ là chỗ duy nhất hiện thay đổi.
  * Gỡ người còn quét `joinRequestsRoot()`: người bị gỡ có thể xin vào lại, và hàng đợi đơn
  * đang cache trạng thái "đã là thành viên" của họ.
  */
 export function useRemoveMember() {
   const qc = useQueryClient();
-  const orgId = useOrgId();
+  const orgId = useAdminOrgId();
   return useMutation({
-    mutationFn: (userId: string) => orgApi.removeMember(userId),
+    mutationFn: (userId: string) => {
+      if (!orgId) throw new Error('Chưa chọn nhóm nào');
+      return orgApi.removeMember(orgId, userId);
+    },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: qk.orgMembers(orgId ?? '-') });
+      void qc.invalidateQueries({ queryKey: qk.orgMembers(orgId ?? NO_ORG) });
       void qc.invalidateQueries({ queryKey: qk.joinRequestsRoot() });
     },
   });
-}
-
-/**
- * Danh bạ thành viên của tổ chức — nguồn là `GET /memberships`.
- *
- * Bản trước suy roster từ đơn gia nhập đã duyệt vì BE chưa có route; cách đó bỏ sót đúng những
- * người không đi qua đơn (chủ tổ chức do master chỉ định, người thêm thẳng vào roster) và giữ
- * lại người đã rời tổ chức, vì đơn approved không bao giờ bị xoá.
- *
- * `enabled` chặn bằng GRANT chứ không chỉ bằng org, cùng lý do với `useJoinRequestQueue`:
- * endpoint đòi quyền quản trị, thành viên thường gọi vào chỉ nhận 403.
- */
-export function useOrgRoster() {
-  const orgId = useOrgId();
-  const { data: grants } = useMyGrants();
-
-  const query = usePagedList(qk.orgMembers(orgId ?? '-'), orgApi.members, {
-    enabled: Boolean(orgId) && canModerateOrg(grants),
-    staleTime: 5 * 60_000,
-    // Danh bạ không có `id` — khoá là `userId`.
-    keyOf: (m) => m.userId,
-  });
-
-  return { ...query, members: query.data ?? [] };
 }
 
 /**
@@ -180,33 +183,41 @@ export function useOrgRoster() {
  * `orgMembers()`: người vừa được duyệt phải xuất hiện ngay trong danh bạ, vì hai ô "chọn
  * người phụ trách" và "cấp quyền" đọc thẳng từ đó.
  */
-function useJoinRequestMutation<TVars, TData>(fn: (v: TVars) => Promise<TData>) {
+function useJoinRequestMutation<TVars, TData>(fn: (orgId: string, v: TVars) => Promise<TData>) {
   const qc = useQueryClient();
-  const orgId = useOrgId();
+  const orgId = useAdminOrgId();
   return useMutation({
-    mutationFn: fn,
+    /*
+     * Ba cửa dưới đây đều `requireOrg` bên BE. Chưa mở nhóm nào thì ném ngay tại đây với câu
+     * đọc được, thay vì đi một vòng mạng để nhận 403 "Chưa xác định được tổ chức" — mutation
+     * không có `enabled` để chặn hộ như query.
+     */
+    mutationFn: (v: TVars) => {
+      if (!orgId) throw new Error('Chưa chọn nhóm nào');
+      return fn(orgId, v);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.joinRequestsRoot() });
       qc.invalidateQueries({ queryKey: qk.adminRoot() });
-      qc.invalidateQueries({ queryKey: qk.orgMembers(orgId ?? '-') });
+      qc.invalidateQueries({ queryKey: qk.orgMembers(orgId ?? NO_ORG) });
     },
   });
 }
 
 export function useApproveJoinRequest() {
-  return useJoinRequestMutation((v: { id: string; unitId?: string | null }) =>
-    orgApi.approveRequest(v.id, v.unitId),
+  return useJoinRequestMutation((orgId, v: { id: string; unitId?: string | null }) =>
+    orgApi.approveRequest(orgId, v.id, v.unitId),
   );
 }
 
 export function useRejectJoinRequest() {
-  return useJoinRequestMutation((v: { id: string; reason?: string }) =>
-    orgApi.rejectRequest(v.id, v.reason),
+  return useJoinRequestMutation((orgId, v: { id: string; reason?: string }) =>
+    orgApi.rejectRequest(orgId, v.id, v.reason),
   );
 }
 
 export function useBulkApproveJoinRequests() {
-  return useJoinRequestMutation((v: { ids: string[]; unitId?: string | null }) =>
-    orgApi.bulkApprove(v.ids, v.unitId),
+  return useJoinRequestMutation((orgId, v: { ids: string[]; unitId?: string | null }) =>
+    orgApi.bulkApprove(orgId, v.ids, v.unitId),
   );
 }

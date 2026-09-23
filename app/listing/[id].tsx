@@ -11,6 +11,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ListingAttrs } from '@/components/ListingAttrs';
 import { ListingGallery } from '@/components/ListingGallery';
+import { ListingOrg } from '@/components/ListingOrg';
 import { ListingSeller } from '@/components/ListingSeller';
 import { ListingSuggestions } from '@/components/ListingSuggestions';
 import { SafetyNote } from '@/components/SafetyNote';
@@ -22,6 +23,7 @@ import { useIsAuthenticated } from '@/stores/auth';
 import { useRecordRecent } from '@/stores/recent';
 import { useListing, useSavedIds, useToggleSaved } from '@/queries/listings';
 import { useOpenConversation } from '@/queries/chat';
+import { ListingHiddenError } from '@/api/client';
 import { useCreateReport } from '@/queries/report';
 import { C, F, T, shadow } from '@/theme';
 
@@ -144,10 +146,14 @@ export default function ListingDetail() {
     );
 
   if (isLoading) return <Loading />;
-  // `isLoading` chỉ true ở lần fetch đầu: query hỏng hoặc id không tồn tại đều rơi xuống đây,
-  // nếu không có nhánh này màn hình đứng ở spinner vĩnh viễn và lỗi không hiện ở đâu cả.
+  // `isLoading` chỉ true ở lần fetch đầu, nên lỗi và id không tồn tại đều rơi xuống đây. 404 là
+  // ổ khoá kèm CẢ HAI khả năng (đã gỡ / nội bộ nhóm) — vì sao không tách: xem `ListingHiddenError`.
+  // Khách được nhắc đăng nhập: là thành viên thì đăng nhập là mở được ngay.
   if (error || !listing) {
-    return <EmptyState icon="📡" text={(error as Error | null)?.message ?? 'Không tìm thấy tin này'} />;
+    const hidden = error instanceof ListingHiddenError;
+    const guestHint = isAuthenticated ? '' : ' Nếu bạn là thành viên nhóm đó, hãy đăng nhập rồi mở lại.';
+    const fallback = (error as Error | null)?.message ?? 'Không tìm thấy tin này';
+    return <EmptyState icon={hidden ? '🔒' : '📡'} text={hidden ? error.message + guestHint : fallback} />;
   }
 
   return (
@@ -210,7 +216,17 @@ export default function ListingDetail() {
             đúng chỗ đó và giá bị che mất. Đặt giá thành một dòng thật trong khối vừa hết chồng
             lấn, vừa cho nó đứng đúng thứ tự người ta đọc: tên món → giá → ở đâu, bao giờ.
           */}
-          <Text style={styles.price}>{listing.price}</Text>
+          <View style={styles.priceRow}>
+            <Text style={[styles.price, listing.priceValue <= 0 && styles.priceFree]}>
+              {listing.price}
+            </Text>
+            {/*
+              "Giao tận nơi" đứng CẠNH giá, không lẫn vào hàng meta bên dưới: cùng với giá, nó
+              là hai thứ người mua cân trước khi quyết định nhắn tin. Chỉ hiện khi người bán
+              thật sự bật — im lặng là câu trả lời "không", không phải "chưa biết".
+            */}
+            {listing.canDeliver && <Text style={styles.deliver}>🚚 Giao tận nơi</Text>}
+          </View>
 
           {/*
             Ba mảnh RỜI thay cho một chuỗi `meta` mờ.
@@ -255,6 +271,20 @@ export default function ListingDetail() {
               onOpen={() => router.push(`/user/${listing.sellerId}`)}
             />
           </View>
+
+          {/*
+            Khối 2b — ĐĂNG TRONG NHÓM NÀO. Chỉ dựng khi tin thật sự mang danh thiếp nhóm:
+            `org` rỗng cả khi tin không thuộc nhóm lẫn khi nhóm đó riêng tư (BE quyết, xem
+            `withOrgBadge`), và cả hai ca đều không có gì để nói ở đây.
+          */}
+          {listing.org && (
+            <View style={styles.block}>
+              <ListingOrg
+                org={listing.org}
+                onOpen={() => router.push(`/org/${listing.org!.id}`)}
+              />
+            </View>
+          )}
 
           {/* Khối 3 — NGƯỜI BÁN NÓI GÌ. */}
           <View style={styles.block}>
@@ -395,7 +425,11 @@ const styles = StyleSheet.create({
    * Con số lớn nhất màn — `T.xl` là bậc chữ chỉ dùng cho MỘT dòng mỗi màn, và ở trang này đúng
    * là giá. `monoBold` để các chữ số đều bề ngang, không nhảy khi giá đổi.
    */
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' },
   price: { fontFamily: F.monoBold, ...T.xl, color: C.moss, marginTop: 10 },
+  /* Tin CHO TẶNG đổi hẳn quyết định của người xem, nên nó được đổi cả màu — không chỉ đổi chữ. */
+  priceFree: { color: C.pin },
+  deliver: { fontFamily: F.uiSemi, fontSize: 12, color: C.orange },
   /** Khe hở giữa các khối — chính nó để lộ nền `C.paper` và làm đường phân chia. */
   sheet: { gap: 9 },
   block: { backgroundColor: C.paperWarm, paddingHorizontal: 20, paddingVertical: 18 },

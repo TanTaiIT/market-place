@@ -143,7 +143,7 @@ export function TemplateFieldCard({
  *
  * `key` theo `row.id` chứ không theo chỉ số: xoá dòng giữa sẽ dồn chỉ số, và React đem
  * con trỏ + bàn phím đang mở của dòng dưới gán sang dòng khác — đúng bài học của form nội
- * quy nhóm (`org/[slug]/edit.tsx`).
+ * quy nhóm (`org/[id]/edit.tsx`).
  */
 function OptionRows({
   multi,

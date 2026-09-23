@@ -1,16 +1,23 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { initialsOf } from '@/api/client';
 import { displayUrl } from '@/api/cloudinary';
-import { Avatar } from './ui';
+import { Avatar, PinButton } from './ui';
+import { SectionHead } from './SectionHead';
 import type { Member, OrgProfile } from '@/api/org';
-import { C, F, shadow } from '@/theme';
+import { C, F, R, S, T, shadow } from '@/theme';
 
 /**
- * Thẻ đầu hồ sơ nhóm: ảnh bìa, tên, số liệu, mô tả, hàng avatar, hai nút hành động.
+ * Phần đầu hồ sơ nhóm: ảnh bìa, thẻ nhận dạng, hàng hành động, giới thiệu, nội quy.
  *
  * Tách khỏi route vì route chạm trần 250 dòng (HARD#11), và khối này thuần trình bày: mọi
  * quyết định (ai xem được gì, gọi endpoint nào) ở lại màn hình.
+ *
+ * **Bố cục theo một luật: mỗi màn MỘT nút chính.** Bản trước xếp ba nút tràn ngang chồng lên
+ * nhau — "Xin vào nhóm", "Đăng tin vào nhóm này", cộng nút "Mời" viền đứt cạnh nút đầu — nên
+ * không cái nào nổi lên, và người mở hồ sơ để quyết định có vào nhóm hay không phải tự tìm ra
+ * đâu là việc chính. Giờ chỉ "Xin vào nhóm" giữ hình nút; đăng tin, mời, sửa hạ xuống hàng chip
+ * nhẹ bên dưới — chúng là việc làm SAU khi đã vào, không phải việc của lần mở đầu tiên.
  */
 export function Header({
   org,
@@ -19,13 +26,16 @@ export function Header({
   onInvite,
   onEdit,
   onPost,
+  onOpenMembers,
   busy,
 }: {
   org: OrgProfile;
   members: Member[];
   onJoin: () => void;
   onInvite: () => void;
-  /** Chỉ truyền khi người xem là quản trị nhóm — `undefined` thì hàng nút không dựng ô sửa. */
+  /** Mở danh bạ nhóm. Chỉ tới được khi đã tham gia — người ngoài không có hàng mặt người nào. */
+  onOpenMembers: () => void;
+  /** Chỉ truyền khi người xem là quản trị nhóm — `undefined` thì hàng chip không dựng ô sửa. */
   onEdit?: () => void;
   /** Chỉ truyền khi nhóm này NHẬN được tin từ người đang xem — xem `index.tsx`. */
   onPost?: () => void;
@@ -37,129 +47,164 @@ export function Header({
     <View>
       {/* `coverUrl` có thì vẽ ảnh, không thì một dải màu — không dựng khung ảnh rỗng. */}
       {org.coverUrl ? (
-        <Image source={{ uri: displayUrl(org.coverUrl, 800) }} style={styles.cover} resizeMode="cover" />
+        <Image
+          source={{ uri: displayUrl(org.coverUrl, 800) }}
+          style={styles.cover}
+          resizeMode="cover"
+        />
       ) : (
-        <View style={[styles.cover, { backgroundColor: C.moss }]} />
+        <View style={[styles.cover, { backgroundColor: C.brand }]} />
       )}
 
-      <View style={[styles.card, styles.overCover, styles.inset]}>
-        {/*
-          Avatar đè lên mép trên thẻ, nửa trong nửa ngoài ảnh bìa — vị trí quen thuộc của
-          mọi trang hồ sơ. Trước bản này nhóm đặt được avatar mà KHÔNG chỗ nào trên trang
-          của chính nó hiện ra: người quản trị tải ảnh lên rồi tưởng mình làm hỏng.
-
-          Không rơi về ảnh bìa như các danh sách nhóm (`orgFace`): ở đây ảnh bìa đang nằm
-          ngay phía trên, lặp lại nó trong vòng tròn là hai lần cùng một ảnh.
-        */}
-        <View style={styles.avatarWrap}>
-          <Avatar text={initialsOf(org.name)} url={org.avatarUrl ?? undefined} size={64} />
-        </View>
-        <Text style={styles.name}>{org.name}</Text>
-        <Text style={styles.meta}>
-          🌐 Công khai · {org.memberCount.toLocaleString('vi-VN')} thành viên ·{' '}
-          {org.postsThisWeek} tin/tuần · {org.joinCode}
-          {where ? ` · ${where}` : ''}
-        </Text>
-
-        {!!org.description && <Text style={styles.desc}>{org.description}</Text>}
-
-        {/* Chỉ dựng khi ĐÃ vào nhóm: danh bạ đòi tư cách thành viên, người ngoài gọi vào chỉ
-            nhận 403 — nên `useOrgPeek` không bay và mảng này rỗng. */}
-        {members.length > 0 && (
-          <View style={styles.faces}>
-            {members.map((m, i) => (
-              <View key={m.userId} style={[styles.face, i > 0 && { marginLeft: -9 }]}>
-                {/*
-                  `Member.avatar` của BE là URL Cloudinary, KHÔNG phải chữ viết tắt — nó lấy
-                  thẳng `User.avatar`. Trước đây chỗ này truyền nó vào `text`, nên ai đã đặt
-                  ảnh sẽ hiện hai ký tự đầu của đường dẫn thay vì mặt mình.
-                  Chữ viết tắt dựng từ `name`, đúng cách mọi DTO khác làm ở `client.ts`.
-                */}
-                <Avatar text={initialsOf(m.name)} url={m.avatar || undefined} size={28} />
-              </View>
-            ))}
-            <Text style={styles.facesText}>
-              Bạn và {Math.max(0, org.memberCount - 1).toLocaleString('vi-VN')} người khác
+      {/*
+        Thẻ nhận dạng: logo BÊN TRÁI tên, không phải phía trên nó.
+        Bản trước đặt avatar đè lên mép thẻ rồi tên xuống dòng dưới — đẹp nhưng ngốn ~90px chiều
+        cao cho hai thông tin, mà đây là màn người ta cuộn để đọc tin. Xếp ngang thì cùng lượng
+        thông tin đó gói trong một khối cao 64px, và ảnh bìa không còn bị thẻ ăn mất một khúc.
+      */}
+      <View style={[styles.card, styles.overCover, styles.inset, styles.idRow]}>
+        <Avatar text={initialsOf(org.name)} url={org.avatarUrl ?? undefined} size={62} />
+        <View style={styles.idText}>
+          <Text numberOfLines={2} style={styles.name}>
+            {org.name}
+          </Text>
+          {/*
+            Số liệu tách thành DÒNG RIÊNG, không còn nối bằng `·` vào một chuỗi mono 10.5px.
+            Chuỗi cũ nhét năm thứ — công khai, số thành viên, tin/tuần, mã tham gia, địa điểm —
+            vào một dòng, và trên máy 360dp nó xuống ba dòng mono dày đặc mà không ai đọc hết.
+          */}
+          <Text style={styles.stat}>
+            {org.memberCount.toLocaleString('vi-VN')} thành viên · {org.postsThisWeek} tin/tuần
+          </Text>
+          {!!where && (
+            <Text numberOfLines={1} style={styles.stat}>
+              📍 {where}
             </Text>
-          </View>
-        )}
-
-        <View style={styles.acts}>
-          {org.joined ? (
-            <View style={[styles.btn, styles.btnDone]}>
-              <Text style={styles.btnDoneText}>✓ Đã tham gia</Text>
-            </View>
-          ) : (
-            <Pressable
-              onPress={onJoin}
-              disabled={busy || !org.allowJoinRequests}
-              style={({ pressed }) => [
-                styles.btn,
-                styles.btnJoin,
-                !org.allowJoinRequests && styles.btnOff,
-                pressed && { transform: [{ translateY: 2 }], borderBottomWidth: 1 },
-              ]}
-            >
-              <Text style={styles.btnJoinText}>
-                {org.allowJoinRequests ? 'Xin vào nhóm' : 'Nhóm đang không nhận đơn'}
-              </Text>
-            </Pressable>
           )}
-
-          {/* Mời = chia sẻ MÃ. Nhóm công khai xin vào được bằng slug, nhưng mã vẫn là lối gõ
-              nhanh và là thứ duy nhất dùng được nếu nhóm chuyển sang riêng tư sau này. */}
-          <Pressable onPress={onInvite} style={({ pressed }) => [styles.invite, pressed && { opacity: 0.7 }]}>
-            <Text style={styles.inviteText}>Mời</Text>
-          </Pressable>
         </View>
-
-        {/*
-          Đăng tin VÀO nhóm này. Đứng ngay dưới hàng tham gia vì đó là việc chính người ta
-          làm sau khi đã vào nhóm — và nó tránh hẳn đường vòng cũ: đổi "nhóm đang thao tác"
-          ở trang cá nhân rồi mới bấm nút đăng chung, một quy trình không ai đoán ra được.
-        */}
-        {!!onPost && (
-          <Pressable
-            onPress={onPost}
-            style={({ pressed }) => [styles.post, pressed && { opacity: 0.8 }]}
-          >
-            <Text style={styles.postText}>📌 Đăng tin vào nhóm này</Text>
-          </Pressable>
-        )}
-
-        {/*
-          Quản trị nhóm. Nằm TRONG thẻ thông tin vì nó sửa đúng những gì thẻ này đang hiện —
-          tên, mô tả, ảnh bìa, nội quy. Tách ra thành thẻ riêng thì nó đọc như một mục lạ chen
-          giữa hồ sơ và danh sách tin.
-          Một dòng dưới vạch kẻ, KHÔNG phải nút thứ ba trong hàng trên: "Đã tham gia" và "Mời"
-          là việc của người xem nhóm, còn đây là việc của người quản nhóm — nhồi chung một hàng
-          thì trên máy 360dp cả ba đều bị bóp đến mức không đọc nổi.
-        */}
-        {!!onEdit && (
-          <Pressable
-            onPress={onEdit}
-            style={({ pressed }) => [styles.editRow, pressed && { opacity: 0.6 }]}
-          >
-            <Text style={styles.editText}>✎ Sửa thông tin nhóm</Text>
-            <Text style={styles.editHint}>ảnh bìa · giới thiệu · nội quy</Text>
-          </Pressable>
-        )}
       </View>
 
-      {org.rules.length > 0 && (
-        <View style={[styles.card, styles.inset, styles.stack]}>
-          <Text style={styles.section}>NỘI QUY NHÓM</Text>
-          {org.rules.map((rule) => (
-            <View key={rule} style={styles.rule}>
-              <Text style={styles.rulePin}>📌</Text>
-              <Text style={styles.ruleText}>{rule}</Text>
-            </View>
-          ))}
+      <View style={[styles.inset, styles.stack]}>
+        {org.joined ? (
+          // Đã vào nhóm thì đây không còn là hành động, chỉ là trạng thái — nên nó là viên nhãn
+          // chứ không phải một hình nút không bấm được, thứ luôn khiến người ta thử bấm.
+          <View style={styles.joined}>
+            <Text style={styles.joinedText}>✓ Bạn là thành viên</Text>
+          </View>
+        ) : (
+          /*
+            `PinButton` — cùng nút chính với mọi màn khác của app.
+            Bản trước tự dựng nút riêng tô `C.pin`, mà `pin` là `#FF4D4D` và theme ghi thẳng
+            "Màu cảnh báo/chú ý. KHÔNG phải màu thương hiệu" — nó trùng byte với `C.danger`.
+            Nên hành động thuận nhất của trang mang đúng màu của nút Xoá.
+          */
+          <PinButton
+            label={org.allowJoinRequests ? 'Xin vào nhóm' : 'Nhóm đang không nhận đơn'}
+            tone="ok"
+            onPress={onJoin}
+            disabled={!org.allowJoinRequests}
+            loading={busy}
+          />
+        )}
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipRow}
+        >
+          {!!onPost && <ActionChip icon="📌" label="Đăng tin" onPress={onPost} />}
+          {/* Mời = chia sẻ MÃ. Nhóm công khai xin vào được bằng id, nhưng mã vẫn là lối gõ
+              nhanh và là thứ duy nhất dùng được nếu nhóm chuyển sang riêng tư sau này. */}
+          <ActionChip icon="🔗" label="Mời" onPress={onInvite} />
+          {!!onEdit && <ActionChip icon="✎" label="Sửa nhóm" onPress={onEdit} />}
+        </ScrollView>
+
+        {/* Mã vẫn phải ĐỌC được, không chỉ chia sẻ được: người ta hay đọc mã cho nhau nghe. Nhưng
+            nó là tra cứu, không phải nhận dạng — nên ra khỏi dòng tên, xuống đây. */}
+        <Text style={styles.code}>Mã tham gia · {org.joinCode}</Text>
+      </View>
+
+      {(!!org.description || members.length > 0) && (
+        <View style={[styles.inset, styles.stack]}>
+          <SectionHead title="Giới thiệu" />
+          <View style={styles.card}>
+            {!!org.description && <Text style={styles.desc}>{org.description}</Text>}
+
+            {/* Chỉ dựng khi ĐÃ vào nhóm: danh bạ đòi tư cách thành viên, người ngoài gọi vào chỉ
+                nhận 403 — nên `useOrgPeek` không bay và mảng này rỗng. */}
+            {/*
+              Hàng mặt người là LỐI VÀO danh bạ, không phải hình trang trí. Trước đây nó hiện
+              "Bạn và N người khác" mà N không dẫn tới đâu cả — câu đó tự nó là một lời hứa.
+            */}
+            {members.length > 0 && (
+              <Pressable
+                onPress={onOpenMembers}
+                style={({ pressed }) => [
+                  styles.faces,
+                  !!org.description && { marginTop: S.md },
+                  pressed && { opacity: 0.65 },
+                ]}
+              >
+                {members.map((m, i) => (
+                  <View key={m.userId} style={[styles.face, i > 0 && { marginLeft: -9 }]}>
+                    {/*
+                      `Member.avatar` của BE là URL Cloudinary, KHÔNG phải chữ viết tắt — nó lấy
+                      thẳng `User.avatar`. Trước đây chỗ này truyền nó vào `text`, nên ai đã đặt
+                      ảnh sẽ hiện hai ký tự đầu của đường dẫn thay vì mặt mình.
+                      Chữ viết tắt dựng từ `name`, đúng cách mọi DTO khác làm ở `client.ts`.
+                    */}
+                    <Avatar text={initialsOf(m.name)} url={m.avatar || undefined} size={28} />
+                  </View>
+                ))}
+                <Text style={styles.facesText}>
+                  Bạn và {Math.max(0, org.memberCount - 1).toLocaleString('vi-VN')} người khác
+                </Text>
+                <Text style={styles.facesChevron}>›</Text>
+              </Pressable>
+            )}
+          </View>
         </View>
       )}
 
-      <Text style={[styles.section, styles.inset, styles.stack]}>TIN TRONG NHÓM</Text>
+      {org.rules.length > 0 && (
+        <View style={[styles.inset, styles.stack]}>
+          <SectionHead title="Nội quy nhóm" />
+          <View style={styles.card}>
+            {org.rules.map((rule, i) => (
+              <View key={rule} style={[styles.rule, i > 0 && { marginTop: S.md }]}>
+                <Text style={styles.rulePin}>📌</Text>
+                <Text style={styles.ruleText}>{rule}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      <View style={[styles.inset, styles.stack]}>
+        <SectionHead title="Tin trong nhóm" />
+      </View>
     </View>
+  );
+}
+
+/** Hành động phụ. Viền mảnh, nền trắng — cố ý lùi hẳn sau nút chính ngay phía trên. */
+function ActionChip({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: string;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.chip, pressed && { opacity: 0.65 }]}
+    >
+      <Text style={styles.chipIcon}>{icon}</Text>
+      <Text style={styles.chipText}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -172,82 +217,56 @@ const styles = StyleSheet.create({
    * Tính theo tỉ lệ thì hai đầu nói cùng một khổ.
    */
   cover: { width: '100%', aspectRatio: 16 / 9 },
-  card: { backgroundColor: C.paperWarm, borderRadius: 10, padding: 18, gap: 9, ...shadow },
-  /** Viền cùng màu thẻ để vòng tròn tách khỏi ảnh bìa phía sau, không dính vào nhau. */
-  avatarWrap: {
-    marginTop: -50,
-    marginBottom: 10,
-    borderWidth: 3,
-    borderColor: C.paperWarm,
-    borderRadius: 999,
-    alignSelf: 'flex-start',
-  },
+  card: { backgroundColor: C.paperWarm, borderRadius: R.lg, padding: S.lg, ...shadow },
   /** Đè lên mép dưới ảnh bìa, đúng cách thẻ nổi trên nền trong bản thiết kế. */
-  overCover: { marginTop: -22 },
+  overCover: { marginTop: -28 },
   /*
    * LỀ NGOÀI, không phải đệm trong. `paddingHorizontal` chỉ đẩy nội dung vào trong khi thẻ
    * vẫn chạm hai mép màn hình — đúng lỗi bản trước: thẻ trông như một dải trắng full-width
    * chứ không phải tấm thẻ nổi trên nền.
    */
   inset: { marginHorizontal: 14 },
-  faces: { flexDirection: 'row', alignItems: 'center', marginTop: 14 },
+  /** Khoảng cách giữa các khối của phần đầu. */
+  stack: { marginTop: S.lg },
+
+  idRow: { flexDirection: 'row', alignItems: 'center', gap: S.md },
+  idText: { flex: 1, minWidth: 0 },
+  name: { fontFamily: F.uiBold, ...T.lg, color: C.ink },
+  stat: { fontFamily: F.ui, ...T.xs, color: C.inkSoft, marginTop: 2 },
+
+  joined: {
+    alignSelf: 'flex-start',
+    backgroundColor: C.brandLt,
+    borderRadius: R.pill,
+    paddingHorizontal: S.md,
+    paddingVertical: 7,
+  },
+  joinedText: { fontFamily: F.uiBold, ...T.sm, color: C.brandTx },
+
+  chipRow: { flexDirection: 'row', gap: S.sm, paddingTop: S.md, paddingRight: S.lg },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: C.paperWarm,
+    borderWidth: 1,
+    borderColor: C.lineInput,
+    borderRadius: R.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  chipIcon: { fontSize: 13 },
+  chipText: { fontFamily: F.uiBold, ...T.sm, color: C.ink },
+  code: { fontFamily: F.mono, ...T.xs, color: C.muted, marginTop: S.md },
+
+  desc: { fontFamily: F.ui, ...T.sm, color: C.inkSoft },
+  faces: { flexDirection: 'row', alignItems: 'center' },
   /** Viền cùng màu nền thẻ để các avatar chồng lên nhau vẫn tách bạch. */
   face: { borderWidth: 2, borderColor: C.paperWarm, borderRadius: 999 },
-  facesText: { fontFamily: F.ui, fontSize: 11.5, color: C.inkSoft, marginLeft: 9 },
-  /** Kalam như mọi tiêu đề khác của app — nhóm là một cái tên, không phải một nhãn dữ liệu. */
-  name: { fontFamily: F.hand, fontSize: 23, lineHeight: 30, color: C.ink },
-  meta: { fontFamily: F.mono, fontSize: 10.5, lineHeight: 16, color: C.moss },
-  desc: { fontFamily: F.ui, fontSize: 13.5, lineHeight: 20, color: C.inkSoft, marginTop: 2 },
+  facesText: { flex: 1, fontFamily: F.ui, ...T.xs, color: C.inkSoft, marginLeft: 9 },
+  facesChevron: { fontFamily: F.uiBold, fontSize: 18, color: C.muted },
 
-  acts: { flexDirection: 'row', gap: 10, marginTop: 8 },
-  btn: { flex: 1, borderRadius: 8, paddingVertical: 13, alignItems: 'center' },
-  btnJoin: { backgroundColor: C.pin, borderBottomWidth: 3, borderBottomColor: C.pinDark },
-  btnOff: { backgroundColor: C.muted, borderBottomColor: C.inkSoft },
-  btnJoinText: { fontFamily: F.uiBold, fontSize: 13.5, color: C.paper },
-  btnDone: { backgroundColor: C.mossLight, borderWidth: 1, borderColor: C.moss },
-  btnDoneText: { fontFamily: F.uiBold, fontSize: 13.5, color: C.moss },
-  invite: {
-    borderRadius: 8,
-    paddingVertical: 13,
-    paddingHorizontal: 22,
-    borderWidth: 1,
-    borderColor: C.pin,
-    borderStyle: 'dashed',
-  },
-  inviteText: { fontFamily: F.uiBold, fontSize: 13.5, color: C.pin },
-
-  section: {
-    fontFamily: F.uiBold,
-    fontSize: 11.5,
-    letterSpacing: 0.5,
-    color: C.inkSoft,
-  },
-  /** Khoảng cách giữa các khối của phần đầu — thay cho `gap` đã bỏ ở wrapper. */
-  stack: { marginTop: 14 },
-  /*
-   * Vạch kẻ chỉ dài bằng phần nội dung thẻ (thẻ có `padding: 18`), đúng kiểu vạch phân mục
-   * bên trong một thẻ — kéo hết bề ngang sẽ trông như thẻ bị cắt làm hai.
-   */
-  post: {
-    marginTop: 10,
-    borderRadius: 8,
-    paddingVertical: 13,
-    alignItems: 'center',
-    backgroundColor: C.moss,
-  },
-  postText: { fontFamily: F.uiBold, fontSize: 13.5, color: C.paper },
-  editRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 8,
-    borderTopWidth: 1,
-    borderTopColor: C.line,
-    paddingTop: 13,
-    marginTop: 5,
-  },
-  editText: { fontFamily: F.uiBold, fontSize: 13, color: C.moss },
-  editHint: { fontFamily: F.mono, fontSize: 9.5, color: C.inkSoft },
-  rule: { flexDirection: 'row', gap: 9, marginTop: 9 },
+  rule: { flexDirection: 'row', gap: 9 },
   rulePin: { fontSize: 10, marginTop: 3 },
-  ruleText: { flex: 1, fontFamily: F.ui, fontSize: 12.5, lineHeight: 19, color: C.inkSoft },
+  ruleText: { flex: 1, fontFamily: F.ui, ...T.sm, color: C.inkSoft },
 });

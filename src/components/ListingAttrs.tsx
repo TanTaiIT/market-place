@@ -67,12 +67,7 @@ function display(field: TemplateField, value: ListingAttributes[string]): string
 }
 
 const styles = StyleSheet.create({
-  box: {
-    marginTop: 18,
-    borderTopWidth: 1,
-    borderTopColor: C.lineInput,
-    paddingTop: 4,
-  },
+  box: { marginTop: 18 },
   /*
    * HAI CỘT, không phải `space-between`.
    *
@@ -80,14 +75,16 @@ const styles = StyleSheet.create({
    * "Màu ... Đỏ" thành một khoảng trắng dài giữa hai chữ, và mắt phải nhảy ngang để ghép cặp —
    * đọc năm dòng liền là năm lần nhảy. Cột nhãn cố định thì mọi giá trị thẳng hàng nhau, quét
    * dọc một lượt là xong.
+   *
+   * Không kẻ vạch giữa các dòng: cột nhãn cố định đã là thứ giữ hàng thẳng, vạch kẻ chỉ thêm
+   * một nét ngang cho mỗi dòng mà mắt phải nhảy qua — trên bảng 8–10 thuộc tính là 8–10 nét.
+   * Khoảng cách dọc đủ để hai dòng không dính nhau.
    */
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
-    paddingVertical: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: C.lineInput,
+    paddingVertical: 8,
   },
   // Rộng cố định: nhãn dài hơn thì xuống dòng trong cột của nó, không đẩy cột giá trị lệch đi.
   label: { fontFamily: F.ui, fontSize: 13, color: C.inkSoft, width: 116, flexShrink: 0 },

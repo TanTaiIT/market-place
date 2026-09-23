@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { CategoryLogo } from './CategoryLogo';
 import { FeedGreeting } from './FeedGreeting';
 import { FeedSearchCard } from './FeedSearchCard';
 import type { MyOrg } from '@/api/org';
@@ -49,7 +50,7 @@ export function FeedBar({
   onSignIn: () => void;
   onSaved: () => void;
   onMyListings: () => void;
-  onOrg: (slug: string) => void;
+  onOrg: (orgId: string) => void;
   onFindOrg: () => void;
   /** Chiều cao khối xanh, để màn hình biết cuộn bao nhiêu thì nó đi hết. */
   onTitleLayout: (height: number) => void;
@@ -95,7 +96,8 @@ export function FeedBar({
           {categories.map((c) => (
             <Chip
               key={c.id}
-              label={c.icon ? `${c.icon} ${c.name}` : c.name}
+              logo={c}
+              label={c.name}
               on={categoryId === c.id}
               onPress={() => onCategory(c.id)}
             />
@@ -106,12 +108,29 @@ export function FeedBar({
   );
 }
 
-function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
+function Chip({
+  label,
+  logo,
+  on,
+  onPress,
+}: {
+  label: string;
+  /** Vắng = viên "Tất cả", không thuộc danh mục nào nên không có sắc nào để mang. */
+  logo?: Category;
+  on: boolean;
+  onPress: () => void;
+}) {
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.chip, on && styles.chipOn, pressed && { opacity: 0.75 }]}
+      style={({ pressed }) => [
+        styles.chip,
+        !logo && styles.chipBare,
+        on && styles.chipOn,
+        pressed && { opacity: 0.75 },
+      ]}
     >
+      {!!logo && <CategoryLogo category={logo} size="sm" />}
       <Text style={[styles.chipText, on && styles.chipTextOn]}>{label}</Text>
     </Pressable>
   );
@@ -148,13 +167,21 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     backgroundColor: C.paperWarm,
     borderWidth: 1,
     borderColor: C.line,
     borderRadius: R.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    // Trái hẹp hơn phải: logo đã là một khối vuông có nền, đệm bằng nhau thì viên chip trông
+    // lệch về bên phải.
+    paddingLeft: 6,
+    paddingRight: 12,
+    paddingVertical: 5,
   },
+  // Không logo thì trả lại đệm trái bình thường, nếu không viên "Tất cả" trông thụt vào.
+  chipBare: { paddingLeft: 12, paddingVertical: 7 },
   chipOn: { backgroundColor: C.brand, borderColor: C.brand },
   chipText: { fontFamily: F.uiSemi, fontSize: 12.5, color: C.ink },
   chipTextOn: { color: C.paperWarm },

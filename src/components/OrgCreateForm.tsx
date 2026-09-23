@@ -14,10 +14,6 @@ import { ORG_TYPES, type NewOrgInput, type OrgType } from '@/api/org-admin';
  * Giữ state + luật hợp lệ, KHÔNG gọi mutation — submit đi ngược lên route (AGENTS §Kiến trúc).
  *
  * Chỉ `name` và `adminEmail` là bắt buộc.
- *
- * KHÔNG còn ô slug: tổ chức nay chỉ định danh bằng `_id`, và BE đã gỡ cả route đổi slug lẫn
- * route kiểm slug còn trống. Hệ quả cần biết khi nhìn form này: **tên tổ chức không unique** —
- * tạo hai nhóm trùng tên là hợp lệ, phân biệt chúng bằng địa bàn.
  */
 
 const EMPTY: NewOrgInput = {
@@ -68,6 +64,7 @@ export function OrgCreateForm({
         onChangeText={(name) => patch({ name })}
         placeholder="Ví dụ: THPT Hùng Vương"
       />
+
 
       <View style={{ marginTop: 16 }}>
         <Text style={adminFormStyles.label}>LOẠI TỔ CHỨC</Text>

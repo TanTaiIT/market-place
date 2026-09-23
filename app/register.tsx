@@ -6,11 +6,28 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Field, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
+// Hai import TẠM THỜI — đi cùng `if (REVIEW_MODE)` ngay đầu hàm, và cùng bị gỡ.
+import { ReviewRegister } from '@/components/ReviewRegister';
+import { REVIEW_MODE } from '@/compliance';
 import { useRegister } from '@/queries/auth';
 import { useMarkPendingEmailVerify, useSignIn } from '@/stores/auth';
 import { C, F, G, shadow } from '@/theme';
 
+/*
+ * CHẾ ĐỘ KIỂM DUYỆT — Bộ Công Thương đòi định danh ngay từ bước đăng ký.
+ *
+ * Chọn ở TẦNG COMPONENT, không phải bằng một `return` sớm bên trong: nhánh sớm đẩy toàn bộ
+ * hook của form cũ xuống sau một điều kiện, và dù `REVIEW_MODE` là hằng số lúc biên dịch thì
+ * đó vẫn là hình dạng mà luật hook cấm — người đọc sau không có cách nào biết nó an toàn.
+ *
+ * Form đăng ký GỐC nằm nguyên trong `LegacyRegister` bên dưới, không bị xoá một dòng nào. Gỡ
+ * về sau = xoá hàm bọc này, đổi `LegacyRegister` về `export default function Register`.
+ */
 export default function Register() {
+  return REVIEW_MODE ? <ReviewRegister /> : <LegacyRegister />;
+}
+
+function LegacyRegister() {
   const router = useRouter();
   const toast = useToast();
   const insets = useSafeAreaInsets();

@@ -1,5 +1,19 @@
 import type { SearchFilter } from '@/api/db';
 
+/**
+ * "Chưa chọn nhóm nào, query đang tắt". Ô cache này không bao giờ có dữ liệu thật.
+ */
+export const NO_ORG = '-';
+
+/**
+ * "Toàn sàn" — master cố ý xem số liệu KHÔNG lọc theo nhóm.
+ *
+ * Phải khác `NO_ORG`: hai thứ này từng dùng chung ký tự `'-'`, mà chúng là hai trạng thái
+ * ngược nhau — một cái là "không có gì để hỏi", cái kia là "hỏi tất cả". Dùng chung một khoá
+ * nghĩa là bàn của master đọc trúng ô cache rỗng của quản trị nhóm, và ngược lại.
+ */
+export const ALL_ORGS = 'all';
+
 export const qk = {
   /** Cũng là prefix của `listings(cat)` + `myListings()` — invalidate key này là quét cả cụm. */
   listings: () => ['listings'] as const,
@@ -72,8 +86,6 @@ export const qk = {
   savedIds: () => ['saved', 'ids'] as const,
   savedListings: () => ['saved', 'listings'] as const,
   conversations: () => ['conversations'] as const,
-  /** Prefix thuần, cùng vai với `savedRoot`: dọn cả chi tiết lẫn lịch sử của MỌI hội thoại. */
-  conversationRoot: () => ['conversation'] as const,
   conversation: (id: string) => ['conversation', id] as const,
   messages: (conversationId: string) => ['conversation', conversationId, 'messages'] as const,
   notifications: () => ['notifications'] as const,
@@ -107,22 +119,23 @@ export const qk = {
   orgByCode: (code: string) => ['orgs', 'by-code', code] as const,
   /** Tìm nhóm công khai. Từ khoá nằm trong key: mỗi từ khoá là một tập kết quả khác. */
   orgDiscover: (q: string) => ['orgs', 'discover', q] as const,
-  orgProfile: (slug: string) => ['orgs', 'profile', slug] as const,
+  /** `code` tham gia khoá: có mã và không mã là hai câu trả lời khác nhau cho cùng một id. */
+  orgProfile: (orgId: string, code?: string) =>
+    ['orgs', 'profile', orgId, code ?? ''] as const,
   /** Danh bạ + tin của MỘT nhóm đang mở hồ sơ, tách khỏi cụm scope theo org đang thao tác. */
-  orgPeek: (slug: string, take: number) => ['orgs', 'peek', slug, take] as const,
+  orgPeek: (orgId: string, take: number) => ['orgs', 'peek', orgId, take] as const,
+  /** Tìm tin theo tên trong MỘT nhóm. Từ khoá nằm trong khoá — mỗi từ là một tập kết quả khác. */
+  orgListingSearch: (orgId: string, q: string) => ['orgs', 'peek', orgId, 'search', q] as const,
   /** Prefix của cụm đơn xin tham gia — quét cả "đơn của tôi" lẫn hàng đợi của người duyệt. */
   joinRequestsRoot: () => ['join-requests'] as const,
   myJoinRequests: () => ['join-requests', 'mine'] as const,
-  // Cả hai key mang `activeOrgId`: dữ liệu scope theo `X-Org-Id`, thiếu slug trong key thì
-  // đổi tổ chức xong vẫn đọc trúng cache của tổ chức cũ.
+  // Cả hai key mang id nhóm: dữ liệu scope theo `X-Org-Id` của lượt gọi, thiếu id trong key
+  // thì đổi nhóm xong vẫn đọc trúng cache của nhóm cũ.
   joinRequestQueue: (orgId: string, status: string) =>
     ['join-requests', 'queue', orgId, status] as const,
-  /** Danh bạ thành viên. Theo slug vì đổi tổ chức là đổi hẳn tập người, không phải lọc lại. */
+  /** Danh bạ thành viên. Theo id vì đổi tổ chức là đổi hẳn tập người, không phải lọc lại. */
   orgMembers: (orgId: string) => ['orgs', 'members', orgId] as const,
-  /**
-   * Người phụ trách một org. Khoá theo `id` chứ không `slug`: endpoint nhận id, và slug thì
-   * đổi được (`PATCH /:id/slug`) — bám vào nó là cache mồ côi sau mỗi lần đổi tên.
-   */
+  /** Người phụ trách một org — `GET /organizations/:id/managers`. */
   orgManagers: (orgId: string) => ['orgs', 'managers', orgId] as const,
 
   /*
@@ -132,9 +145,9 @@ export const qk = {
   adminRoot: () => ['admin'] as const,
   /*
    * Bốn key dưới đây mang `orgId` vì dữ liệu của chúng scope theo `X-Org-Id` — cùng lý do
-   * đã ghi ở `joinRequestQueue`/`orgMembers`. Thiếu slug thì master bấm "Thao tác trong" sang tổ
-   * chức khác vẫn đọc trúng cache của tổ chức cũ: thẻ số, hàng đợi và báo cáo của nơi khác hiện
-   * dưới tên nơi này, và không có gì trên màn hình nói ra điều đó.
+   * đã ghi ở `joinRequestQueue`/`orgMembers`. Thiếu id thì quản trị hai nhóm đổi tổ chức xong
+   * vẫn đọc trúng cache của tổ chức cũ: thẻ số, hàng đợi và báo cáo của nơi khác hiện dưới tên
+   * nơi này, và không có gì trên màn hình nói ra điều đó.
    */
   adminOverview: (orgId: string) => ['admin', 'overview', orgId] as const,
   adminActivity: (orgId: string) => ['admin', 'activity', orgId] as const,
@@ -143,6 +156,12 @@ export const qk = {
     ['admin', 'listings', orgId, status, category, q] as const,
   adminPublicQueue: (status: string) => ['admin', 'public-queue', status] as const,
   adminCoverage: () => ['admin', 'coverage'] as const,
+  /**
+   * Ai phụ trách danh mục nào. Nằm dưới prefix `admin` để thu hồi một grant quét được cả
+   * bảng này lẫn ma trận phủ sóng — gỡ người phụ trách là ô đó đổi trạng thái ngay.
+   */
+  adminCategoryAxis: (categoryId: string, province: string) =>
+    ['admin', 'category-axis', categoryId, province] as const,
   adminPublicOverview: () => ['admin', 'public-overview'] as const,
   /**
    * Bàn của master. Nằm trong cụm `admin` để một lượt duyệt tin quét luôn nó, nhưng KHÔNG mang
@@ -164,7 +183,7 @@ export const qk = {
   adminUsersRoot: () => ['admin', 'users'] as const,
   /** Không mang tên trường: danh mục là từ điển dùng chung toàn hệ thống, không thuộc tổ chức nào. */
   adminCategories: () => ['admin', 'categories'] as const,
-  /** `scope=managed` đọc theo tổ chức đang thao tác, nên slug phải nằm trong key. */
+  /** `scope=managed` đọc theo tổ chức đang thao tác, nên id phải nằm trong key. */
   adminNotices: (orgId: string) => ['admin', 'notices', orgId] as const,
   adminNoticesRoot: () => ['admin', 'notices'] as const,
   /** Cụm cấm: từ điển toàn hệ thống, không có tham số nào để lọc. */

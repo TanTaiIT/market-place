@@ -1,5 +1,4 @@
 import type { Grad } from '@/theme';
-import type { CreateListing } from './generated';
 import type { ProvinceName } from './location';
 
 /**
@@ -8,17 +7,6 @@ import type { ProvinceName } from './location';
  * Không còn state hay fixture nào ở đây: mọi dữ liệu — tin đăng, hồ sơ, thông báo, hội thoại
  * và tin đã lưu — đều đọc từ BE thật qua SDK generated (`client.ts`).
  */
-
-/**
- * Ba bậc phủ sóng của một tin — khoá định tuyến của cả hệ thống duyệt.
- *
- * Thay cho cặp `org_internal`/`public` cũ. Bậc mới là `group_open`: tin NẰM TRONG nhóm nhưng ai
- * cũng đọc được — thứ mô hình hai giá trị không diễn đạt nổi, và là lý do nó bị thay.
- *
- * Re-export từ SDK generated chứ không chép tay: đây là enum của BE, chép lại là hẹn một ngày
- * hai bên lệch nhau mà không gì báo.
- */
-export type ListingReach = NonNullable<CreateListing['reach']>;
 
 export type Listing = {
   /** Mongo ObjectId 24 hex từ BE — không phải số, đừng `Number()` khi đọc route param. */
@@ -35,6 +23,14 @@ export type Listing = {
    * nạp lại con số, mà đọc ngược từ chuỗi hiển thị thì "Miễn phí" không còn đường về 0.
    */
   priceValue: number;
+  /**
+   * Người bán nhận giao tận nơi — LỜI HỨA CỦA HỌ, không phải dịch vụ của sàn.
+   *
+   * Bản trước viên "🚚 Giao tận nơi" trên thẻ tin được suy từ HASH CỦA ID
+   * (`placeholders.listingShips`), nghĩa là nó nói dối người mua về mọi tin. Field này là thứ
+   * thay nó, và mặc định `false` ở BE để tin cũ không tiếp tục hứa thay người bán.
+   */
+  canDeliver: boolean;
   cat: string;
   /**
    * Id danh mục + tỉnh giữ nguyên bên cạnh bản hiển thị (`cat`): đây là hai tiêu chí đi tìm
@@ -47,13 +43,15 @@ export type Listing = {
   ward?: string;
   address?: string;
   /**
-   * BẬC PHỦ SÓNG — nơi tin hiển thị, và qua đó là AI DUYỆT nó. Xem `ListingReach`.
+   * Bậc phủ sóng — ai đọc được tin, và qua đó là AI DUYỆT nó.
    *
-   * Form sửa tin CHỈ ĐỌC field này: `PATCH /listings/:id` không nhận `reach`, nên đổi bậc sau
-   * khi đăng là việc không làm được từ app. Đúng ý BE — đổi bậc là đổi người duyệt, tức là
-   * đưa một tin đã qua kiểm duyệt sang một bàn khác mà không ai duyệt lại.
+   * Thang bao nhau: `members` ⊂ `group_open` ⊂ `marketplace`. Tin `marketplace` VẪN nằm trong
+   * bảng tin nhóm của nó, nên đây không phải "chọn một trong hai bảng".
+   *
+   * Form sửa tin phải nạp lại đúng bậc cũ để hiển thị — BE KHÔNG cho sửa bậc sau khi đăng
+   * (`updateListingSchema` không nhận `reach`), vì nâng bậc là đổi bàn duyệt.
    */
-  reach: ListingReach;
+  reach: 'members' | 'group_open' | 'marketplace';
   meta: string;
   /** Cặp màu dựng ảnh giả — dùng khi tin chưa có ảnh thật */
   photo: Grad;
@@ -100,14 +98,22 @@ export type Listing = {
   /** Số người đã lưu tin — "N người quan tâm" trên thẻ. */
   favoriteCount: number;
   /**
-   * Tổ chức tin thuộc về; `null` = tin ở trục công khai.
-   *
-   * Chỉ có ID vì BE không snapshot tên tổ chức vào tin. Thẻ tin tra tên từ `useMyOrgs()`:
-   * tin nội bộ chỉ hiện cho thành viên của chính tổ chức đó, nên người đang xem luôn có
-   * tên trong danh sách của mình. Tra không ra thì giấu dòng đó đi, không bịa.
+   * Tổ chức tin thuộc về; `null` = tin ở trục công khai. Dùng để PHÂN QUYỀN, không để hiển thị.
    */
   organizationId: string | null;
+  /**
+   * Danh thiếp nhóm để HIỂN THỊ — BE tra sẵn, app không tự ghép tên nữa.
+   *
+   * `null` không chỉ nghĩa "tin không thuộc nhóm": nhóm riêng tư, đang khoá hoặc đã xoá cũng
+   * ra `null`. Bản trước app tra tên từ `useMyOrgs()`, và cách đó hỏng đúng ở ca thang phủ
+   * sóng vừa mở ra — người NGOÀI đọc được tin của nhóm công khai thì không có nhóm đó trong
+   * danh sách của mình, nên thấy một tin không rõ đến từ đâu.
+   */
+  org: ListingOrg | null;
 };
+
+/** Ba thứ đủ để nhận ra một nhóm và mở hồ sơ của nó — không hơn. */
+export type ListingOrg = { id: string; name: string; avatarUrl: string | null };
 
 /** Lời BE soạn cho chính chủ về tin chưa lên bảng. `hint` = việc họ làm được ngay, nếu có. */
 export type ListingReview = {
@@ -350,11 +356,8 @@ export type SearchFilter = {
    */
   ward: string | null;
   /**
-   * Thu hẹp về tin TRONG một nhóm mình đã tham gia — hai bậc `members` + `group_open`, không
-   * tính tin của nhóm đã lên sàn. `_id` của nhóm; slug đã bị BE gỡ, không còn khoá chữ nào.
-   *
-   * Hệ quả cho URL: tham số `?org=` giờ là một chuỗi hex, không đọc được bằng mắt nữa. Đổi lại
-   * nó là thứ BE thật sự hiểu — bản trước dán slug vào và mọi lượt lọc theo nhóm đều trượt.
+   * Thu hẹp về tin NỘI BỘ của một nhóm mình đã tham gia — `X-Org-Id` nhận đúng id này, nên
+   * URL kết quả mở lại được ở máy khác mà không phải tra gì thêm.
    *
    * Cùng luật với `ward`: chỉ có nghĩa khi có `province`. Danh sách nhóm để chọn được bày theo
    * tỉnh đang lọc (nhóm có địa bàn), nên bỏ hay đổi tỉnh là nhóm về `null` cùng lúc — không có

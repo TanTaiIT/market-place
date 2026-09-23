@@ -35,7 +35,7 @@ export function FormSection({
    * Bỏ lề trên. Dùng khi mục đã nằm trong một THẺ riêng — lúc đó đệm của thẻ đã tạo khoảng
    * cách, và lề 22px mặc định chồng thêm thành một mảng trống ở đầu mỗi thẻ.
    *
-   * Lề mặc định giữ nguyên cho form cũ (`org/[slug]/edit`) vốn xếp mọi mục trong một tờ liền —
+   * Lề mặc định giữ nguyên cho form cũ (`org/[id]/edit`) vốn xếp mọi mục trong một tờ liền —
    * ở đó lề chính là thứ duy nhất tách hai mục ra.
    */
   flush?: boolean;

@@ -210,33 +210,47 @@ export function ReviewRegister() {
   );
 }
 
+/*
+ * MỰC trên nền sáng, không phải chữ trắng.
+ *
+ * `G.auth` là `[C.brandWash, C.corkDark]` — một dải SÁNG (#F4FCF7 → #E4E6EA), xem ghi chú ở
+ * `app/login.tsx`. Bản trước đặt `C.paperWarm` (#FFFFFF) cho tiêu đề, nhãn mục và link, tức là
+ * trắng trên gần-trắng: không đọc được chữ nào. Màu đó chỉ đúng nếu nền auth còn tối như đợt
+ * bảng màu cũ.
+ *
+ * `opacity` cũng bỏ theo: nó sinh ra để hạ chữ trắng xuống cho đỡ chói trên nền tối. Đặt lên
+ * mực trên nền sáng thì nó chỉ làm chữ bạc đi, đúng hướng ngược với thứ đang cần.
+ *
+ * Bảng màu bám theo `app/login.tsx` — hai màn cùng một nền thì phải cùng một thang chữ, nếu
+ * không người dùng đi từ màn này sang màn kia sẽ thấy hai app khác nhau.
+ */
 const styles = StyleSheet.create({
   wrap: { paddingHorizontal: 26 },
-  title: { fontFamily: F.uiBold, fontSize: 24, color: C.paperWarm },
+  title: { fontFamily: F.uiBold, fontSize: 24, color: C.ink },
   sub: {
     fontFamily: F.ui,
     fontSize: 12.5,
     lineHeight: 19,
-    color: C.paperWarm,
-    opacity: 0.85,
+    color: C.inkSoft,
     marginTop: 6,
     marginBottom: S.lg,
   },
-  label: { fontFamily: F.mono, fontSize: 9.5, letterSpacing: 1.2, color: C.paperWarm, opacity: 0.8 },
+  label: { fontFamily: F.mono, fontSize: 9.5, letterSpacing: 1.2, color: C.inkSoft },
   tabs: { flexDirection: 'row', gap: 8, marginTop: 8, marginBottom: S.lg },
   section: {
     fontFamily: F.mono,
     fontSize: 9.5,
     letterSpacing: 1.2,
-    color: C.paperWarm,
-    opacity: 0.8,
+    color: C.inkSoft,
     marginTop: S.lg,
     marginBottom: 4,
   },
+  // `C.pin` như `link` bên `login.tsx`: đây là dòng bấm được, phải khác mực thường mới đọc ra
+  // là một lối đi chứ không phải một câu chú thích.
   link: {
     fontFamily: F.uiSemi,
     fontSize: 13,
-    color: C.paperWarm,
+    color: C.pin,
     textAlign: 'center',
     marginTop: S.lg,
   },

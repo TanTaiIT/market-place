@@ -982,6 +982,25 @@ export type VerifyEmail = {
     code: string;
 };
 
+export type ForgotPassword = {
+    email: string;
+};
+
+export type ResetPassword = {
+    email: string;
+    resetToken: string;
+    password: string;
+};
+
+export type ResetTicket = {
+    resetToken: string;
+};
+
+export type VerifyResetCode = {
+    email: string;
+    code: string;
+};
+
 export type ClearRejections = {
     reason: string;
 };
@@ -1009,6 +1028,15 @@ export type GrantOrganizationAdmin = {
 
 export type SetOrgVisibility = {
     isPublic: boolean;
+};
+
+export type UploadSignature = {
+    cloudName: string;
+    apiKey: string;
+    timestamp: number;
+    signature: string;
+    folder: string;
+    uploadPreset: string;
 };
 
 export type BannedPhrase = {
@@ -1335,6 +1363,105 @@ export type AuthVerifyEmailResponses = {
 };
 
 export type AuthVerifyEmailResponse = AuthVerifyEmailResponses[keyof AuthVerifyEmailResponses];
+
+export type AuthForgotPasswordData = {
+    body?: ForgotPassword;
+    path?: never;
+    query?: never;
+    url: '/auth/password/forgot';
+};
+
+export type AuthForgotPasswordErrors = {
+    /**
+     * Email sai định dạng
+     */
+    400: ErrorResponse;
+    /**
+     * Quá nhiều request
+     */
+    429: ErrorResponse;
+};
+
+export type AuthForgotPasswordError = AuthForgotPasswordErrors[keyof AuthForgotPasswordErrors];
+
+export type AuthForgotPasswordResponses = {
+    /**
+     * Đã tiếp nhận
+     */
+    200: {
+        success: true;
+        message: string;
+        data: unknown;
+    };
+};
+
+export type AuthForgotPasswordResponse = AuthForgotPasswordResponses[keyof AuthForgotPasswordResponses];
+
+export type AuthResetPasswordData = {
+    body?: ResetPassword;
+    path?: never;
+    query?: never;
+    url: '/auth/password/reset';
+};
+
+export type AuthResetPasswordErrors = {
+    /**
+     * Mã không đúng hoặc đã hết hạn
+     */
+    400: ErrorResponse;
+    /**
+     * Quá nhiều request
+     */
+    429: ErrorResponse;
+};
+
+export type AuthResetPasswordError = AuthResetPasswordErrors[keyof AuthResetPasswordErrors];
+
+export type AuthResetPasswordResponses = {
+    /**
+     * Đã đặt lại mật khẩu
+     */
+    200: {
+        success: true;
+        message: string;
+        data: unknown;
+    };
+};
+
+export type AuthResetPasswordResponse = AuthResetPasswordResponses[keyof AuthResetPasswordResponses];
+
+export type AuthVerifyResetCodeData = {
+    body?: VerifyResetCode;
+    path?: never;
+    query?: never;
+    url: '/auth/password/verify-code';
+};
+
+export type AuthVerifyResetCodeErrors = {
+    /**
+     * Mã không đúng hoặc đã hết hạn
+     */
+    400: ErrorResponse;
+    /**
+     * Quá nhiều request
+     */
+    429: ErrorResponse;
+};
+
+export type AuthVerifyResetCodeError = AuthVerifyResetCodeErrors[keyof AuthVerifyResetCodeErrors];
+
+export type AuthVerifyResetCodeResponses = {
+    /**
+     * Mã hợp lệ
+     */
+    200: {
+        success: true;
+        message: string;
+        data: ResetTicket;
+    };
+};
+
+export type AuthVerifyResetCodeResponse = AuthVerifyResetCodeResponses[keyof AuthVerifyResetCodeResponses];
 
 export type UserDeleteMeData = {
     body?: never;
@@ -4006,6 +4133,37 @@ export type DefaultTemplatePublishResponses = {
 
 export type DefaultTemplatePublishResponse = DefaultTemplatePublishResponses[keyof DefaultTemplatePublishResponses];
 
+export type ChatRemoveAllData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/chats';
+};
+
+export type ChatRemoveAllErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+};
+
+export type ChatRemoveAllError = ChatRemoveAllErrors[keyof ChatRemoveAllErrors];
+
+export type ChatRemoveAllResponses = {
+    /**
+     * Đã xoá
+     */
+    200: {
+        success: true;
+        message: string;
+        data: {
+            deleted: number;
+        };
+    };
+};
+
+export type ChatRemoveAllResponse = ChatRemoveAllResponses[keyof ChatRemoveAllResponses];
+
 export type ChatListData = {
     body?: never;
     path?: never;
@@ -4086,6 +4244,41 @@ export type ChatOpenResponses = {
 };
 
 export type ChatOpenResponse = ChatOpenResponses[keyof ChatOpenResponses];
+
+export type ChatRemoveData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/chats/{id}';
+};
+
+export type ChatRemoveErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Không tìm thấy hội thoại, hoặc bạn không thuộc hội thoại này
+     */
+    404: ErrorResponse;
+};
+
+export type ChatRemoveError = ChatRemoveErrors[keyof ChatRemoveErrors];
+
+export type ChatRemoveResponses = {
+    /**
+     * Đã xoá
+     */
+    200: {
+        success: true;
+        message: string;
+        data: unknown;
+    };
+};
+
+export type ChatRemoveResponse = ChatRemoveResponses[keyof ChatRemoveResponses];
 
 export type ChatGetByIdData = {
     body?: never;
@@ -4245,6 +4438,72 @@ export type ChatMarkReadResponses = {
 };
 
 export type ChatMarkReadResponse = ChatMarkReadResponses[keyof ChatMarkReadResponses];
+
+export type UploadSignatureData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/uploads/signature';
+};
+
+export type UploadSignatureErrors = {
+    /**
+     * Chưa đăng nhập
+     */
+    401: ErrorResponse;
+    /**
+     * Quá nhiều lượt xin chữ ký
+     */
+    429: ErrorResponse;
+    /**
+     * Server chưa cấu hình CLOUDINARY_*
+     */
+    501: ErrorResponse;
+};
+
+export type UploadSignatureError = UploadSignatureErrors[keyof UploadSignatureErrors];
+
+export type UploadSignatureResponses = {
+    /**
+     * Chữ ký upload
+     */
+    200: {
+        success: true;
+        message: string;
+        data: UploadSignature;
+    };
+};
+
+export type UploadSignatureResponse = UploadSignatureResponses[keyof UploadSignatureResponses];
+
+export type NotificationClearData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/notifications';
+};
+
+export type NotificationClearErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+};
+
+export type NotificationClearError = NotificationClearErrors[keyof NotificationClearErrors];
+
+export type NotificationClearResponses = {
+    /**
+     * Đã xoá
+     */
+    200: {
+        success: true;
+        message: string;
+        data: unknown;
+    };
+};
+
+export type NotificationClearResponse = NotificationClearResponses[keyof NotificationClearResponses];
 
 export type NotificationListData = {
     body?: never;

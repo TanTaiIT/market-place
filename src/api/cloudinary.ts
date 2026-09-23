@@ -1,41 +1,40 @@
 /**
  * Upload ảnh thẳng từ máy người dùng lên Cloudinary rồi chỉ gửi URL xuống BE.
  *
- * Dùng **unsigned upload preset** — đây là cách duy nhất upload từ client an toàn:
- * bundle React Native giải nén được, nên `apiSecret` (và cả `apiKey`) tuyệt đối không
- * được xuất hiện trong repo này. Chữ ký chỉ tồn tại ở phía server; muốn upload có ký
- * thì BE phải cấp signature, và khi đó luồng không còn là "FE upload thẳng" nữa.
+ * Preset chạy ở chế độ **Signed**, nên mỗi lượt gồm HAI chặng:
  *
- * Cloud name không phải bí mật — nó nằm sẵn trong mọi URL ảnh Cloudinary trả về.
+ *   1. `POST /uploads/signature` tới BE  → xin `signature` + `timestamp` + `api_key`.
+ *   2. `POST` thẳng lên Cloudinary       → file đi kèm ba thứ đó.
  *
- * RỦI RO CÒN LẠI, và nó KHÔNG chặn được bằng code ở đây: unsigned nghĩa là bất kỳ ai đọc được
- * bundle (giải nén .apk là xong) cũng upload được vào tài khoản này. Đây là bài toán lạm dụng
- * và hoá đơn, không phải rò khoá — chặn nó bằng cấu hình PRESET ở Cloudinary Console:
+ * File vẫn KHÔNG đi qua server — chỉ chữ ký đi. Đẩy vài MB ảnh qua instance mỗi lượt đăng tin
+ * là tốn băng thông gấp đôi để đổi lấy đúng một phép băm.
  *
- * - Allowed formats: chỉ ảnh (jpg, png, webp, heic). Mặc định cho phép cả video và raw.
- * - Max file size + max image dimensions: app đã thu nhỏ về `MAX_DIMENSION` trước khi gửi,
- *   nên đặt trần ở preset là chặn đúng thứ KHÔNG đi qua app này.
- * - Folder: ghim tất cả vào một thư mục để tách được rác khi phải dọn.
- * - Access control nếu cần, và theo dõi hạn mức để biết khi bị lạm dụng.
+ * `apiSecret` tuyệt đối không có mặt trong repo này: bundle React Native giải nén được. Nó chỉ
+ * sống ở BE (`upload.service.ts`), và đó là toàn bộ lý do chặng 1 tồn tại. `apiKey` thì không
+ * phải bí mật, nhưng vẫn lấy từ BE cho cùng một nguồn sự thật — cloud name và tên preset cũng
+ * vậy, vì cả ba đều là tham số ĐƯỢC KÝ hoặc nằm trong URL đã ký.
+ *
+ * ĐIỀU ĐỔI LẠI: upload không còn ẩn danh — chưa đăng nhập thì không có chữ ký. Trước đây (preset
+ * unsigned) bất kỳ ai giải nén được .apk đều bơm được file vào tài khoản này, và không dòng code
+ * nào bên app chặn nổi. Đó là lỗ hổng mà Signed bịt lại.
+ *
+ * Cấu hình preset ở Console vẫn còn giá trị và vẫn nên đặt — Allowed formats (chỉ ảnh),
+ * Max file size, Max image dimensions — nhưng giờ chúng là lớp thứ hai, không phải lớp duy nhất.
+ * `folder` thì KHÔNG còn đọc từ preset: BE ký kèm nó, nên thư mục ảnh rơi vào luôn khớp thư mục
+ * mà job dọn ảnh mồ côi quét.
  *
  * KHÔNG bật lại add-on kiểm duyệt ảnh ở đây. Nó từng được bật, và hạ cả luồng đăng tin: hết hạn
  * mức thì Cloudinary không "bỏ qua bước kiểm" mà TỪ CHỐI CẢ LƯỢT UPLOAD, nên một công tơ bên
  * thứ ba cạn giữa tháng là không ai đăng được tin nữa. Ảnh vi phạm giờ do người duyệt gỡ ở bàn
  * quản trị — chậm hơn, nhưng không biến một lá chắn thành sự cố toàn hệ thống.
- *
- * Muốn chặn triệt để thì BE phải cấp chữ ký cho từng lượt upload — khi đó luồng không còn là
- * "FE upload thẳng" nữa, và đó là một thay đổi kiến trúc chứ không phải một cờ cấu hình.
  */
 import { Image } from 'react-native';
 import { File } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
-
-const CLOUD_NAME = 'ds4dqc7s5';
-
-/** Preset phải được tạo ở Cloudinary Console với Signing Mode = Unsigned. */
-const UPLOAD_PRESET = 'ghim_unsigned';
-
-const UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
+import { uploadSignature } from './generated';
+import type { UploadSignature } from './generated';
+import { unwrap } from './client';
+import { withAuthRetry } from './http';
 
 /**
  * Trần cạnh dài của ảnh upload. Màn rộng nhất app phục vụ ~430pt × 3 = 1290px, và `displayUrl`
@@ -160,11 +159,31 @@ type CloudinaryUploadResponse = {
 };
 
 /**
+ * Xin chữ ký cho MỘT lượt upload.
+ *
+ * Đi qua SDK generated + `withAuthRetry` chứ không `fetch` tay: đây là một endpoint BE bình
+ * thường, nên nó được hưởng đúng thứ mọi endpoint khác có — kiểu sinh từ spec, và một lượt làm
+ * mới phiên khi access token vừa hết hạn giữa chừng.
+ *
+ * Một chữ ký cho MỘT ảnh, không tái sử dụng: `timestamp` nằm trong chữ ký và Cloudinary từ chối
+ * chữ ký quá cũ. Đăng tin 5 ảnh là 5 lượt gọi — rẻ, response chỉ vài trăm byte.
+ */
+async function fetchTicket(): Promise<UploadSignature> {
+  const res = await withAuthRetry(() => uploadSignature());
+  // `unwrap` giữ nguyên câu BE trả về, nên 401 (chưa đăng nhập) và 501 (server thiếu
+  // `CLOUDINARY_*`) đi thẳng ra toast với đúng lời giải thích của chúng.
+  return unwrap(res, 'Không xin được chữ ký tải ảnh');
+}
+
+/**
  * Tải một ảnh local (`file://…` từ expo-image-picker) lên Cloudinary.
  * @returns `secure_url` — chuỗi HTTPS để lưu xuống BE.
  */
 export async function uploadImage(uri: string): Promise<string> {
   const t0 = Date.now();
+  // Xin chữ ký TRƯỚC khi nén: hỏng vì chưa đăng nhập hay server thiếu cấu hình thì biết ngay,
+  // không bắt người dùng chờ hết một lượt resize rồi mới báo lỗi.
+  const ticket = await fetchTicket();
   const source = await prepare(uri);
   const t1 = Date.now();
   const name = source.split('/').pop() || 'upload.jpg';
@@ -175,9 +194,25 @@ export async function uploadImage(uri: string): Promise<string> {
   // expo-file-system tương thích Blob nên append thẳng được; ép kiểu vì lib DOM của TS
   // khai `Blob | string` chứ không biết class này.
   form.append('file', new File(source) as unknown as Blob, name);
-  form.append('upload_preset', UPLOAD_PRESET);
+  /*
+   * ĐÚNG những trường này, không thừa không thiếu.
+   *
+   * `folder`, `timestamp`, `upload_preset` là ba tham số BE đã ký — gửi lệch một giá trị, bỏ
+   * bớt một trường, hay thêm một trường được ký nữa (`context`, `tags`…) đều làm chữ ký sai và
+   * Cloudinary trả 401. Thêm tham số mới thì phải thêm ở CẢ HAI phía, `upload.service.ts` trước.
+   *
+   * `file` và `api_key` không tham gia ký — Cloudinary loại chúng ra trước khi đối chiếu.
+   */
+  form.append('api_key', ticket.apiKey);
+  form.append('timestamp', String(ticket.timestamp));
+  form.append('signature', ticket.signature);
+  form.append('folder', ticket.folder);
+  form.append('upload_preset', ticket.uploadPreset);
 
-  const res = await fetch(UPLOAD_URL, { method: 'POST', body: form });
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${ticket.cloudName}/image/upload`, {
+    method: 'POST',
+    body: form,
+  });
   const json = (await res.json()) as CloudinaryUploadResponse;
   logTiming(uri, source, t0, t1, Date.now());
 

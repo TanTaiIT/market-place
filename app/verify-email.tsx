@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { CODE_LENGTH, CodeField, useResendCountdown } from '@/components/CodeField';
 import { PinButton, ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useSendEmailCode, useVerifyEmail } from '@/queries/auth';
 import { useProfile } from '@/queries/listings';
-import { C, F, R, S, T } from '@/theme';
+import { C, F, S, T } from '@/theme';
 
 /**
  * Nhập mã 6 số gửi về hộp thư.
@@ -19,7 +20,6 @@ import { C, F, R, S, T } from '@/theme';
  * viễn — đó là điều kiện để nút đó tồn tại.
  */
 
-const CODE_LENGTH = 6;
 
 export default function VerifyEmail() {
   const router = useRouter();
@@ -29,14 +29,7 @@ export default function VerifyEmail() {
   const verify = useVerifyEmail();
 
   const [code, setCode] = useState('');
-  const [waitLeft, setWaitLeft] = useState(0);
-
-  // Đếm ngược tới lúc bấm gửi lại được. Dọn interval khi rời màn, nếu không nó chạy tiếp.
-  useEffect(() => {
-    if (waitLeft <= 0) return;
-    const id = setInterval(() => setWaitLeft((s) => s - 1), 1000);
-    return () => clearInterval(id);
-  }, [waitLeft]);
+  const { left: waitLeft, start: startCountdown } = useResendCountdown();
 
   /**
    * `useCallback` chỉ để effect bên dưới khai đủ dependency mà không phải tắt lint. Danh tính
@@ -45,10 +38,10 @@ export default function VerifyEmail() {
    */
   const resend = useCallback(() => {
     send.mutate(undefined, {
-      onSuccess: (r) => setWaitLeft(r.resendAfterSeconds),
+      onSuccess: (r) => startCountdown(r.resendAfterSeconds),
       onError: (e: Error) => toast(`⚠️ ${e.message}`),
     });
-  }, [send, toast]);
+  }, [send, toast, startCountdown]);
 
   /*
    * Tự gửi mã đúng MỘT lần khi mở màn — người vừa đăng ký không nên phải bấm thêm một nút để
@@ -91,23 +84,7 @@ export default function VerifyEmail() {
           trong 10 phút.
         </Text>
 
-        {/*
-          Một ô cho cả 6 số, không phải 6 ô rời. Sáu ô trông giống bản mẫu hơn nhưng hỏng đúng
-          thao tác người dùng hay làm nhất: dán mã copy từ thư. Chúng cũng phải tự lo focus,
-          phím xoá và bàn phím che — ba chỗ dễ sai mà không đổi lại được gì.
-        */}
-        <TextInput
-          value={code}
-          onChangeText={(t) => setCode(t.replace(/\D/g, '').slice(0, CODE_LENGTH))}
-          keyboardType="number-pad"
-          textContentType="oneTimeCode"
-          autoComplete="sms-otp"
-          autoFocus
-          maxLength={CODE_LENGTH}
-          placeholder="••••••"
-          placeholderTextColor={C.muted}
-          style={styles.input}
-        />
+        <CodeField value={code} onChange={setCode} autoFocus />
 
         <PinButton
           label="Xác nhận"
@@ -142,20 +119,6 @@ const styles = StyleSheet.create({
   lead: { fontFamily: F.ui, ...T.sm, color: C.inkSoft, marginBottom: S.xl },
   email: { fontFamily: F.uiBold, color: C.ink },
 
-  /* Giãn chữ rộng + canh giữa: sáu chữ số phải đọc được thành sáu, không thành một số. */
-  input: {
-    fontFamily: F.uiBold,
-    fontSize: 30,
-    letterSpacing: 12,
-    textAlign: 'center',
-    color: C.ink,
-    backgroundColor: C.paperWarm,
-    borderRadius: R.lg,
-    borderWidth: 1,
-    borderColor: C.lineInput,
-    paddingVertical: S.lg,
-    marginBottom: S.xl,
-  },
 
   resend: { alignSelf: 'center', marginTop: S.lg, padding: S.sm },
   resendText: { fontFamily: F.uiBold, ...T.sm, color: C.brandTx },

@@ -2,6 +2,9 @@ import {
   authLogin,
   authLogout,
   authRefresh,
+  authForgotPassword,
+  authResetPassword,
+  authVerifyResetCode,
   authSendEmailCode,
   authVerifyEmail,
   authRegister,
@@ -10,6 +13,8 @@ import {
   chatGetById,
   chatList,
   chatMarkRead,
+  chatRemove,
+  chatRemoveAll,
   chatMessages,
   chatOpen,
   chatSend,
@@ -31,6 +36,7 @@ import {
   locationWards,
   moderationGetListing,
   notificationList,
+  notificationClear,
   notificationMarkRead,
   userGetById,
   userGetMe,
@@ -586,6 +592,36 @@ export const api = {
     unwrap(res, 'Mã không đúng hoặc đã hết hạn');
   },
 
+  /* ---------------- quên mật khẩu ---------------- */
+
+  /**
+   * Xin mã đặt lại. KHÔNG `withAuthRetry`: người quên mật khẩu chưa đăng nhập được, nên một
+   * vòng refresh ở đây chỉ tốn thời gian rồi vẫn hỏng.
+   *
+   * BE trả 200 cho cả địa chỉ không có tài khoản — cố ý, để endpoint không thành máy dò. App
+   * vì thế KHÔNG được hứa "mã đã gửi tới hộp thư của bạn": câu đó sai với người gõ nhầm địa
+   * chỉ, và đúng thứ cái 200 kia sinh ra để không nói.
+   */
+  async forgotPassword(email: string): Promise<void> {
+    const res = await authForgotPassword({ body: { email } });
+    unwrap(res, 'Không gửi được mã đặt lại');
+  },
+
+  /**
+   * Đổi mã lấy VÉ. Bước riêng vì trần 5 lần gõ sai: gộp với bước đặt mật khẩu thì mỗi lần gõ
+   * nhầm mã bắt người dùng gõ lại cả mật khẩu — một ô họ không nhìn thấy để soát — và vẫn đốt
+   * một lượt trong năm lượt đó.
+   */
+  async verifyResetCode(email: string, code: string): Promise<string> {
+    const res = await authVerifyResetCode({ body: { email, code } });
+    return unwrap(res, 'Mã không đúng hoặc đã hết hạn').resetToken;
+  },
+
+  async resetPassword(email: string, resetToken: string, password: string): Promise<void> {
+    const res = await authResetPassword({ body: { email, resetToken, password } });
+    unwrap(res, 'Phiên đặt lại đã hết hạn');
+  },
+
   /* ---------------- categories ---------------- */
   /** Từ điển dùng chung toàn hệ thống — BE chỉ trả danh mục đang bật. */
   async getCategories(): Promise<Category[]> {
@@ -1031,6 +1067,24 @@ export const api = {
     return toConversation(unwrap(res, 'Không cập nhật được trạng thái đã đọc'));
   },
 
+  /**
+   * Xoá hội thoại khỏi hộp thư của MÌNH. Người kia không mất gì — BE chỉ ẩn phía người gọi và
+   * cắt lịch sử tại thời điểm này (`IParticipant.hidden` / `clearedAt`).
+   *
+   * Hệ quả cần nói rõ ở chỗ xác nhận: người kia nhắn tiếp thì hội thoại quay lại, nhưng phần
+   * tin nhắn đã xoá thì không.
+   */
+  async deleteConversation(conversationId: string): Promise<void> {
+    const res = await withAuthRetry(() => chatRemove({ path: { id: conversationId } }));
+    unwrap(res, 'Không xoá được hội thoại');
+  },
+
+  /** Dọn cả hộp thư. Trả về số hội thoại đã xoá để câu thông báo nói đúng con số. */
+  async deleteAllConversations(): Promise<number> {
+    const res = await withAuthRetry(() => chatRemoveAll());
+    return unwrap(res, 'Không xoá được hội thoại')?.deleted ?? 0;
+  },
+
   /* ---------------- misc ---------------- */
   /**
    * BE đã lọc sẵn theo người gọi: thông báo cả tổ chức + thông báo của đúng nhóm con họ thuộc.
@@ -1055,6 +1109,18 @@ export const api = {
   async markNotificationRead(id: string): Promise<void> {
     const res = await withAuthRetry(() => notificationMarkRead({ path: { id } }));
     unwrap(res, 'Không đánh dấu được đã đọc');
+  },
+
+  /**
+   * Xoá tất cả thông báo — một LẰN RANH THỜI GIAN, không phải xoá từng dòng.
+   *
+   * BE đẩy mốc `notificationsClearedAt` lên hiện tại vì thông báo phát chung là một document
+   * dùng chung cho cả nhóm; xoá document là xoá của mọi người. Vì vậy không có đường xoá chọn
+   * lọc, cũng không hoàn tác được — chỗ xác nhận phải nói ra điều đó.
+   */
+  async clearNotifications(): Promise<void> {
+    const res = await withAuthRetry(() => notificationClear());
+    unwrap(res, 'Không xoá được thông báo');
   },
 
   async getProfile(): Promise<Profile> {

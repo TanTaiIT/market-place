@@ -17,11 +17,11 @@ import { ListingPhoto } from '@/components/ListingPhoto';
 import { chatColor } from '@/api/client';
 import {
   useConversation,
-  useConversationRoom,
   useMarkConversationRead,
   useMessages,
   useSendMessage,
 } from '@/queries/chat';
+import { useConversationRoom } from '@/queries/chat-socket';
 import { useListing } from '@/queries/listings';
 import { C, F, shadow } from '@/theme';
 

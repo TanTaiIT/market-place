@@ -1,106 +1,149 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AvatarPicker } from '@/components/AvatarPicker';
 import { AddressField, ProvinceField, WardField } from '@/components/LocationPicker';
-import { EmptyState, Field, Loading, PinButton, ScreenHeader } from '@/components/ui';
+import { SettingsChoice, SettingsSection } from '@/components/SettingsCard';
+import { EmptyState, Field, Loading, PinButton, ScreenHeader, Switch } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useProfile, useUpdateProfile } from '@/queries/listings';
+import { useAuthStore } from '@/stores/auth';
 import { GENDER_LABEL } from '@/api/db';
 import type { Gender, Profile } from '@/api/db';
-import { C, F } from '@/theme';
+import { C, F, R, S, T } from '@/theme';
 
-const GENDERS = Object.keys(GENDER_LABEL) as Gender[];
+const GENDER_OPTIONS = (Object.keys(GENDER_LABEL) as Gender[]).map((key) => ({
+  key,
+  text: GENDER_LABEL[key],
+}));
 
-/** Chỉ những field người dùng sửa được. `rating`/`posted`/`sold` là số đọc, không phải ô nhập. */
+/** Chỉ những field sửa được. `posted`/`sold`/`rating` là số BE chốt, không phải ô nhập. */
 type Form = Pick<
   Profile,
   'name' | 'phone' | 'avatarUrl' | 'gender' | 'province' | 'ward' | 'address' | 'showPhone'
 >;
 
 export default function Settings() {
+  const router = useRouter();
   const toast = useToast();
+  const userId = useAuthStore((s) => s.session?.userId);
   const { data: profile, error } = useProfile();
   const update = useUpdateProfile();
 
-  const [form, setForm] = useState<Form | null>(null);
+  /*
+   * State chỉ giữ NHỮNG Ô ĐÃ SỬA, form đầy đủ dựng lại lúc render từ hồ sơ mới nhất.
+   *
+   * Cách hiển nhiên hơn — `useEffect` nạp cả hồ sơ vào state một lần — phải tự chặn không cho
+   * lần chạy sau đè lên thứ người dùng đang gõ, vì `useUpdateProfile` ghi lại cache ngay khi
+   * lưu xong. Chồng `draft` lên hồ sơ thì thứ tự đó tự đúng: nền luôn mới, ô đang sửa luôn
+   * thắng, và không có nhịp nào state cũ hơn server.
+   */
+  const [draft, setDraft] = useState<Partial<Form>>({});
+  const patch = (part: Partial<Form>) => setDraft((d) => ({ ...d, ...part }));
 
-  // Nạp một lần khi hồ sơ về. Không đồng bộ lại theo mỗi lần `profile` đổi: sau khi lưu, query
-  // được ghi lại và effect sẽ đè lên đúng thứ người dùng vừa gõ nếu họ sửa tiếp.
-  useEffect(() => {
-    setForm((prev) => prev ?? (profile ? pickForm(profile) : null));
-  }, [profile]);
-
-  const patch = (part: Partial<Form>) => setForm((f) => (f ? { ...f, ...part } : f));
-
-  // Nhánh lỗi phải đứng TRƯỚC: hồ sơ tải hỏng thì `form` mãi là `null`, và nếu kiểm `!form`
-  // trước thì màn đứng ở spinner vĩnh viễn — thông điệp lỗi không bao giờ hiện ra.
+  // Nhánh lỗi phải đứng TRƯỚC nhánh chờ: hồ sơ hỏng thì `profile` mãi `undefined`, và kiểm
+  // `!profile` trước sẽ giữ màn ở spinner vĩnh viễn — thông điệp lỗi không bao giờ hiện ra.
   if (error) {
     return <EmptyState icon="📡" text={(error as Error).message || 'Không tải được hồ sơ'} />;
   }
-  if (!profile || !form) return <Loading />;
+  if (!profile) return <Loading />;
+
+  const base = pickForm(profile);
+  const form = { ...base, ...draft };
+  // So GIÁ TRỊ chứ không đếm key trong `draft`: sửa rồi sửa lại như cũ phải về 0, đúng lúc một
+  // cờ `dirty` bật-một-lần sẽ nói dối trên một màn dài phải cuộn mới thấy nút lưu.
+  const dirty = (Object.keys(base) as (keyof Form)[]).filter((k) => form[k] !== base[k]).length;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-      <ScreenHeader title="Cài đặt" />
+      <ScreenHeader title="Tài khoản" />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 40 }}
-          keyboardShouldPersistTaps="handled"
-        >
-          <AvatarPicker
-            initials={profile.avatar}
-            url={form.avatarUrl}
-            onChange={(avatarUrl) => patch({ avatarUrl })}
-          />
-
-          <Field label="Họ và tên" value={form.name} onChangeText={(name) => patch({ name })} />
-
-          <Text style={styles.label}>Giới tính</Text>
-          <View style={styles.chips}>
-            {GENDERS.map((g) => (
-              <Chip
-                key={g}
-                label={GENDER_LABEL[g]}
-                on={form.gender === g}
-                onPress={() => patch({ gender: g })}
-              />
-            ))}
-          </View>
-          <Text style={styles.note}>Hiện trên hồ sơ người bán mà người mua xem được.</Text>
-
-          <Field
-            label="Số điện thoại"
-            value={form.phone}
-            onChangeText={(phone) => patch({ phone })}
-            keyboardType="phone-pad"
-          />
-
-          <Pressable
-            onPress={() => patch({ showPhone: !form.showPhone })}
-            style={({ pressed }) => [styles.toggle, pressed && { opacity: 0.75 }]}
-          >
-            <View style={[styles.box, form.showPhone && styles.boxOn]}>
-              {form.showPhone && <Text style={styles.tick}>✓</Text>}
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.toggleLabel}>Cho người mua thấy số điện thoại</Text>
-              {/* Nói rõ hai giới hạn thật, thay vì để người dùng tự phát hiện sau. */}
-              <Text style={styles.note}>
-                Tắt thì người mua chỉ liên hệ qua chat trong app. Chỉ áp dụng cho tin đăng
-                <Text style={styles.strong}> mới</Text> — tin đã đăng giữ nguyên số cũ.
+        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+          <View style={styles.hero}>
+            <AvatarPicker
+              initials={profile.avatar}
+              url={form.avatarUrl}
+              onChange={(avatarUrl) => patch({ avatarUrl })}
+            />
+            <View style={styles.heroText}>
+              <Text numberOfLines={1} style={styles.heroName}>
+                {form.name || profile.name}
               </Text>
+              <Text numberOfLines={1} style={styles.heroMail}>
+                {profile.email}
+              </Text>
+              {/*
+                Huy hiệu bám XÁC THỰC EMAIL chứ không phải số điện thoại như bản mẫu: app chưa
+                có luồng xác thực SĐT nào, nên một dấu "đã xác thực" cạnh số là lời khẳng định
+                không có gì đứng sau. Email thì có thật, và khi chưa xong nó còn là lối vào.
+              */}
+              {profile.emailVerified ? (
+                <Text style={styles.ok}>✓ Email đã xác thực</Text>
+              ) : (
+                <Text style={styles.warn} onPress={() => router.push('/verify-email')}>
+                  ⚠️ Email chưa xác thực — xác thực ngay
+                </Text>
+              )}
             </View>
-          </Pressable>
+          </View>
 
-          <Text style={styles.label}>Khu vực của bạn</Text>
-          <Text style={styles.note}>
-            Chỉ mình bạn thấy. Dùng để điền sẵn khu vực khi đăng tin, đỡ phải chọn lại mỗi lần.
-          </Text>
-          <View style={{ marginTop: 12 }}>
+          {/* Chỉ hiện khi biết id: hồ sơ công khai tra theo `/users/{id}`, không có id thì link
+              dẫn tới màn lỗi chứ không phải tới trang trống. */}
+          {!!userId && (
+            <Pressable onPress={() => router.push(`/user/${userId}`)} style={styles.peek}>
+              <Text style={styles.peekText}>👁  Xem hồ sơ của bạn như người mua thấy</Text>
+            </Pressable>
+          )}
+
+          <SettingsSection title="Thông tin công khai" visibility="public">
+            <Field
+              label="Họ và tên"
+              value={form.name}
+              onChangeText={(name) => patch({ name })}
+              placeholder="Tên hiện trên tin đăng"
+            />
+            <SettingsChoice
+              label="GIỚI TÍNH"
+              options={GENDER_OPTIONS}
+              value={form.gender}
+              onChange={(gender) => patch({ gender })}
+            />
+          </SettingsSection>
+
+          <SettingsSection title="Liên hệ" visibility="private" badgeLabel="🔒  Bạn tự chọn hiển thị">
+            <Field
+              label="Số điện thoại"
+              value={form.phone}
+              onChangeText={(phone) => patch({ phone })}
+              keyboardType="phone-pad"
+              placeholder="Chưa có số"
+            />
+            <Pressable
+              onPress={() => patch({ showPhone: !form.showPhone })}
+              style={({ pressed }) => [styles.block, styles.switchRow, pressed && { opacity: 0.75 }]}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.switchTitle}>Hiện số cho người mua</Text>
+                {/* Nói ra giới hạn thật, thay vì để người dùng tự phát hiện sau khi tắt mà số cũ
+                    vẫn còn trên tin đăng hôm qua. */}
+                <Text style={styles.switchDesc}>
+                  Tắt thì người mua chỉ nhắn tin trong app. Chỉ áp dụng cho tin
+                  <Text style={styles.strong}> đăng mới</Text> — tin cũ giữ nguyên số.
+                </Text>
+              </View>
+              <Switch on={form.showPhone} />
+            </Pressable>
+          </SettingsSection>
+
+          <SettingsSection
+            title="Khu vực của bạn"
+            visibility="private"
+            note="Dùng để điền sẵn khi bạn đăng tin, đỡ phải chọn lại mỗi lần. Mỗi tin vẫn mang khu vực riêng của nó."
+          >
             <ProvinceField
               value={form.province ?? null}
               onChange={(province) => patch({ province: province ?? undefined })}
@@ -111,23 +154,38 @@ export default function Settings() {
               value={form.ward ?? null}
               onChange={(ward) => patch({ ward: ward ?? undefined })}
             />
-            <AddressField
-              value={form.address ?? ''}
-              onChange={(address) => patch({ address })}
-            />
-          </View>
+            <AddressField value={form.address ?? ''} onChange={(address) => patch({ address })} />
+          </SettingsSection>
+        </ScrollView>
 
+        {/*
+          Thanh lưu DÍNH đáy, ngoài vùng cuộn. Bản trước để nút ở cuối danh sách, nên người sửa ô
+          đầu tiên phải cuộn qua cả ba mục mới thấy nó — và không có gì nói cho họ biết còn thay
+          đổi chưa lưu trước khi họ bấm quay lại.
+        */}
+        <View style={styles.saveBar}>
+          <Text style={[styles.dirtyNote, dirty > 0 && { color: C.brandTx }]}>
+            {dirty === 0 ? 'Đã lưu mọi thay đổi' : `${dirty} thay đổi chưa lưu`}
+          </Text>
           <PinButton
             label="Lưu thay đổi"
+            tone="ok"
+            style={styles.saveBtn}
+            disabled={dirty === 0}
             loading={update.isPending}
             onPress={() =>
               update.mutate(form, {
-                onSuccess: () => toast('✓ Đã lưu thay đổi!'),
+                // Dọn `draft` chứ không để nó trùng nền: BE có chuẩn hoá lại (cắt khoảng trắng
+                // ở số điện thoại), và giữ bản chưa chuẩn hoá thì màn báo "chưa lưu" mãi mãi.
+                onSuccess: () => {
+                  setDraft({});
+                  toast('✓ Đã lưu thay đổi!');
+                },
                 onError: (e: Error) => toast(`⚠️ ${e.message}`),
               })
             }
           />
-        </ScrollView>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -146,60 +204,47 @@ function pickForm(p: Profile): Form {
   };
 }
 
-function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.chip, on && styles.chipOn, pressed && { opacity: 0.7 }]}
-    >
-      <Text style={[styles.chipText, on && { color: C.paperWarm }]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.paper },
-  label: {
-    fontFamily: F.uiBold,
-    fontSize: 11.5,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    color: C.inkSoft,
-    marginBottom: 8,
+  body: { paddingHorizontal: S.lg, paddingTop: S.md, paddingBottom: S.xl },
+
+  hero: { flexDirection: 'row', alignItems: 'center', gap: S.lg, marginBottom: S.md },
+  heroText: { flex: 1, minWidth: 0 },
+  heroName: { fontFamily: F.uiBold, ...T.lg, color: C.ink },
+  heroMail: { fontFamily: F.ui, ...T.xs, color: C.muted, marginTop: 1 },
+  ok: { fontFamily: F.uiBold, ...T.xs, color: C.brandTx, marginTop: S.xs },
+  warn: { fontFamily: F.uiBold, ...T.xs, color: C.pin, marginTop: S.xs },
+
+  peek: {
+    backgroundColor: C.chipIdle,
+    borderRadius: R.md,
+    paddingHorizontal: S.md,
+    paddingVertical: S.sm,
+    marginBottom: S.xl,
   },
-  note: { fontFamily: F.ui, fontSize: 11.5, color: C.inkSoft, lineHeight: 17 },
+  peekText: { fontFamily: F.ui, ...T.sm, color: C.inkSoft, textAlign: 'center' },
+
+  // 18px = nhịp `styles.field` của ô nhập; khối tự dựng phải trùng nó, xem `SettingsCard`.
+  block: { marginBottom: 18 },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: S.md },
+  switchTitle: { fontFamily: F.uiBold, ...T.sm, color: C.ink },
+  switchDesc: { fontFamily: F.ui, ...T.xs, color: C.inkSoft, marginTop: 2 },
   strong: { fontFamily: F.uiBold },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
-  chip: {
-    borderWidth: 1,
-    borderColor: C.lineInput,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-  },
-  chipOn: { backgroundColor: C.moss, borderColor: C.moss },
-  chipText: { fontFamily: F.ui, fontSize: 12.5, color: C.ink },
-  toggle: {
+
+  saveBar: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 11,
-    backgroundColor: C.paperWarm,
-    borderRadius: 10,
-    padding: 13,
-    marginTop: 4,
-    marginBottom: 22,
-  },
-  box: {
-    width: 21,
-    height: 21,
-    borderRadius: 5,
-    borderWidth: 1.5,
-    borderColor: C.lineInput,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 1,
+    gap: S.md,
+    paddingHorizontal: S.lg,
+    paddingTop: S.md,
+    paddingBottom: 6,
+    backgroundColor: C.paperWarm,
+    borderTopWidth: 1,
+    borderTopColor: C.line,
   },
-  boxOn: { backgroundColor: C.moss, borderColor: C.moss },
-  tick: { fontSize: 12, color: C.paperWarm, fontFamily: F.uiBold },
-  toggleLabel: { fontFamily: F.uiBold, fontSize: 13, color: C.ink, marginBottom: 4 },
+  // Nút chiếm phần dư, chữ co lại — không phải ngược lại: `btnFace` của `PinButton` không có
+  // `paddingHorizontal` nào, để nó tự co là ra một mẩu đúng bề ngang chữ. Mọi màn khác không lộ
+  // vì đều dùng nó full-width; `TemplateSaveBar` cũng giải bằng đúng `flex: 1` này.
+  saveBtn: { flex: 1 },
+  dirtyNote: { flexShrink: 1, fontFamily: F.ui, ...T.xs, color: C.muted },
 });

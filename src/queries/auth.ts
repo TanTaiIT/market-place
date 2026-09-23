@@ -48,6 +48,29 @@ export function useVerifyEmail() {
   });
 }
 
+/**
+ * Quên mật khẩu — hai bước, không hook nào đụng tới phiên đang có.
+ *
+ * Không invalidate gì: người dùng ở đây chưa đăng nhập, nên không có cache nào của họ để làm
+ * mới. Sau khi đặt lại xong, màn đẩy họ sang đăng nhập và luồng đăng nhập tự dựng phiên.
+ */
+export function useForgotPassword() {
+  return useMutation({ mutationFn: (email: string) => api.forgotPassword(email) });
+}
+
+export function useVerifyResetCode() {
+  return useMutation({
+    mutationFn: (v: { email: string; code: string }) => api.verifyResetCode(v.email, v.code),
+  });
+}
+
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: (v: { email: string; resetToken: string; password: string }) =>
+      api.resetPassword(v.email, v.resetToken, v.password),
+  });
+}
+
 /* --------------------------- session lifecycle --------------------------- */
 
 /**

@@ -58,6 +58,21 @@ export function useNotifSignal(qc: QueryClient): void {
 }
 
 /**
+ * Xoá tất cả thông báo.
+ *
+ * Refetch contract: `onSuccess` invalidate `notifications()`. Không optimistic và không
+ * `setQueryData` rỗng: thao tác không lùi lại được, nên danh sách chỉ được rỗng đi sau khi BE
+ * đã thật sự dời mốc — xoá trước rồi hiện lại vì lỗi mạng là cú giật khó hiểu nhất có thể có.
+ */
+export function useClearNotifications() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.clearNotifications(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.notifications() }),
+  });
+}
+
+/**
  * Bản lạc quan của luật BE (`markRead`): đánh dấu một dòng TỰ ĐỘNG là đẩy mốc "đã xem" của cả
  * nhóm tới thời điểm dòng đó, nên mọi dòng tự động cũ hơn TRONG NHÓM ĐÓ cũng tắt chấm. Không mô
  * phỏng thì cụm "Tài và 3 người khác vừa đăng 5 tin" còn 4 chấm treo tới khi refetch về.

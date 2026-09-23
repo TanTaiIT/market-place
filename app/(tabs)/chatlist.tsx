@@ -4,16 +4,31 @@ import { useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar, EmptyState, Loading, PagedFooter, TabHeader } from '@/components/ui';
+import { ClearAllButton } from '@/components/ClearAllButton';
 import { GuestGate } from '@/components/GuestGate';
 import { ListingPhoto } from '@/components/ListingPhoto';
+import { SwipeToDelete } from '@/components/SwipeToDelete';
+import { useToast } from '@/components/Toast';
 import { useIsAuthenticated } from '@/stores/auth';
 import { chatColor } from '@/api/client';
-import { useConversations } from '@/queries/chat';
+import { useClearConversations, useConversations, useDeleteConversation } from '@/queries/chat';
 import { C, F, shadow } from '@/theme';
+
+/**
+ * Câu cảnh báo dùng chung cho cả xoá một lẫn xoá tất cả.
+ *
+ * Nói ra đúng hai điều người dùng KHÔNG đoán được từ chữ "xoá", và cả hai đều là hệ quả thật
+ * của cách BE cài đặt (`IParticipant.hidden` / `clearedAt`): người kia không mất gì, còn hội
+ * thoại thì quay lại được — nhưng phần tin nhắn cũ thì không.
+ */
+const WARNING = 'Tin nhắn cũ sẽ không xem lại được. Người kia vẫn giữ nguyên hội thoại của họ.';
 
 export default function ChatList() {
   const router = useRouter();
+  const toast = useToast();
   const { data, error, isLoading, refetch, loadMore, isFetchingNextPage } = useConversations();
+  const remove = useDeleteConversation();
+  const clear = useClearConversations();
 
   const isAuthenticated = useIsAuthenticated();
 
@@ -27,11 +42,31 @@ export default function ChatList() {
       />
     );
   }
+
+  const items = data ?? [];
+
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
-      <TabHeader title="Tin nhắn" />
+      <TabHeader
+        title="Tin nhắn"
+        right={
+          items.length > 0 && (
+            <ClearAllButton
+              title="Xoá tất cả hội thoại?"
+              message={WARNING}
+              busy={clear.isPending}
+              onConfirm={() =>
+                clear.mutate(undefined, {
+                  onSuccess: (deleted) => toast(`✓ Đã xoá ${deleted} hội thoại`),
+                  onError: (e: Error) => toast(`⚠️ ${e.message}`),
+                })
+              }
+            />
+          )
+        }
+      />
       <FlatList
-        data={data ?? []}
+        data={items}
         keyExtractor={(c) => c.id}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
@@ -39,40 +74,55 @@ export default function ChatList() {
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, gap: 10 }}
         renderItem={({ item, index }) => (
           <Animated.View entering={FadeInDown.delay(index * 70).duration(340)}>
-            <Pressable
-              onPress={() => router.push(`/chat/${item.id}`)}
-              style={({ pressed }) => [styles.row, pressed && { transform: [{ scale: 0.98 }] }]}
+            <SwipeToDelete
+              title={`Xoá hội thoại với ${item.name}?`}
+              message={WARNING}
+              onConfirm={() =>
+                remove.mutate(item.id, {
+                  onError: (e: Error) => toast(`⚠️ ${e.message}`),
+                })
+              }
             >
-              <Avatar text={item.avatar} url={item.avatarUrl} size={46} color={chatColor(item.name)} />
-              <View style={{ flex: 1 }}>
-                <View style={styles.top}>
-                  <Text style={[styles.name, item.unread && { color: C.pin }]}>{item.name}</Text>
-                  <Text style={styles.time}>{item.time}</Text>
+              <Pressable
+                onPress={() => router.push(`/chat/${item.id}`)}
+                style={({ pressed }) => [styles.row, pressed && { transform: [{ scale: 0.98 }] }]}
+              >
+                <Avatar
+                  text={item.avatar}
+                  url={item.avatarUrl}
+                  size={46}
+                  color={chatColor(item.name)}
+                />
+                <View style={{ flex: 1 }}>
+                  <View style={styles.top}>
+                    <Text style={[styles.name, item.unread && { color: C.pin }]}>{item.name}</Text>
+                    <Text style={styles.time}>{item.time}</Text>
+                  </View>
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.preview, item.unread && { color: C.ink, fontFamily: F.uiSemi }]}
+                  >
+                    {item.lastMsg}
+                  </Text>
+                  {!!item.listingTitle && <Text style={styles.tag}>Về: {item.listingTitle}</Text>}
                 </View>
-                <Text
-                  numberOfLines={1}
-                  style={[styles.preview, item.unread && { color: C.ink, fontFamily: F.uiSemi }]}
-                >
-                  {item.lastMsg}
-                </Text>
-                {!!item.listingTitle && <Text style={styles.tag}>Về: {item.listingTitle}</Text>}
-              </View>
-              {/*
-                Ảnh món đồ, ở mép PHẢI — trái đã là avatar người kia, và hai ảnh tròn cạnh nhau
-                thì không ai đọc ra cái nào là người, cái nào là hàng. Vuông bo góc cũng là hình
-                dạng mà thẻ tin trên bảng đang dùng, nên mắt nhận ra ngay đó là một tin đăng.
+                {/*
+                  Ảnh món đồ, ở mép PHẢI — trái đã là avatar người kia, và hai ảnh tròn cạnh nhau
+                  thì không ai đọc ra cái nào là người, cái nào là hàng. Vuông bo góc cũng là hình
+                  dạng mà thẻ tin trên bảng đang dùng, nên mắt nhận ra ngay đó là một tin đăng.
 
-                `ListingPhoto` lo luôn nhánh không ảnh (dải màu suy từ id tin) — dùng lại thay vì
-                tự viết `photoUrl ? … : …` ở đây, để mọi chỗ vẽ ảnh tin rơi về cùng một bậc cuối.
-              */}
-              <ListingPhoto
-                photo={item.listingPhoto}
-                photoUrl={item.listingImage}
-                style={styles.thumb}
-                imageStyle={styles.thumbRadius}
-              />
-              {item.unread && <View style={styles.dot} />}
-            </Pressable>
+                  `ListingPhoto` lo luôn nhánh không ảnh (dải màu suy từ id tin) — dùng lại thay vì
+                  tự viết `photoUrl ? … : …` ở đây, để mọi chỗ vẽ ảnh tin rơi về cùng một bậc cuối.
+                */}
+                <ListingPhoto
+                  photo={item.listingPhoto}
+                  photoUrl={item.listingImage}
+                  style={styles.thumb}
+                  imageStyle={styles.thumbRadius}
+                />
+                {item.unread && <View style={styles.dot} />}
+              </Pressable>
+            </SwipeToDelete>
           </Animated.View>
         )}
         ListEmptyComponent={

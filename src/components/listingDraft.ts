@@ -22,6 +22,16 @@ export type ListingDraft = {
   attributes: ListingAttributes;
   /** Đã chọn bậc trong nhóm mà chưa chỉ ra nhóm nào — `routeListing` bên BE từ chối tổ hợp đó. */
   needsGroup: boolean;
+  /**
+   * Khu vực đã ĐÓNG BĂNG (form sửa) — thôi đòi tỉnh/phường.
+   *
+   * Không có cờ này thì form sửa thành ngõ cụt với tin TRONG NHÓM: bậc `members`/`group_open`
+   * được phép không có tỉnh (`resolveProvinceCode` trả `null` cho chúng), nên `locationGap` báo
+   * "Chọn tỉnh / thành" trong khi ô chọn đã bị khoá — người dùng không có đường nào làm nó im.
+   *
+   * Và đòi cũng vô nghĩa: lúc này khu vực thuộc về server, người sửa tin không đặt được nó.
+   */
+  areaLocked: boolean;
 };
 
 
@@ -134,8 +144,10 @@ export function listingDraftGaps(draft: ListingDraft): DraftGap[] {
     gaps.push({ label: 'nhóm', message: '⚠️ Chọn nhóm sẽ đăng vào, hoặc chuyển sang đăng lên sàn' });
   }
 
-  const where = locationGap(draft.location);
-  if (where) gaps.push(where);
+  if (!draft.areaLocked) {
+    const where = locationGap(draft.location);
+    if (where) gaps.push(where);
+  }
 
   return gaps;
 }

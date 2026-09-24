@@ -1,18 +1,18 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BANNERS, GUIDE_STEPS, PERKS, PROMOS, type Banner } from '@/api/placeholders';
+import { BANNERS, GUIDE_STEPS, PROMOS, type Banner } from '@/api/placeholders';
 import { SectionHead } from './SectionHead';
 import { C, F, R, S, T, shadow } from '@/theme';
 
 /**
- * Hai dải ngang của màn Khám phá trong prototype: "Đang diễn ra" (banner khuyến mãi) và "Vì sao
- * chọn Ghim" (khối lợi ích).
+ * Dải ngang "Đang diễn ra" (banner khuyến mãi) của màn Khám phá, khối banner lớn và dải
+ * hướng dẫn 4 bước.
  *
- * Nội dung là HARDCODE — hệ thống chưa có khuyến mãi, và khối lợi ích là chữ tiếp thị chứ không
- * phải dữ liệu. Cả hai nằm ở `@/api/placeholders` cùng chỗ với các số tạm khác để gỡ một lượt.
+ * Nội dung là HARDCODE — hệ thống chưa có khuyến mãi, và phần còn lại là chữ tiếp thị chứ không
+ * phải dữ liệu. Tất cả nằm ở `@/api/placeholders` cùng chỗ với các số tạm khác để gỡ một lượt.
  *
- * Tách khỏi `feed.tsx` vì màn đó đã chạm trần LOC của route, và hai dải này là trang trí thuần —
+ * Tách khỏi `feed.tsx` vì màn đó đã chạm trần LOC của route, và các dải này là trang trí thuần —
  * không đọc query nào, không nhận sự kiện nào.
  */
 export function PromoStrip({ grid }: { grid?: boolean }) {
@@ -100,22 +100,6 @@ export function GuideStrip({ grid }: { grid?: boolean }) {
   );
 }
 
-export function PerkStrip({ grid }: { grid?: boolean }) {
-  return (
-    <View style={[styles.block, grid && styles.inset, { marginTop: S.md }]}>
-      <SectionHead title="Vì sao chọn Ghim" />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-        {PERKS.map((k) => (
-          <View key={k.id} style={styles.perk}>
-            <Text style={styles.perkTitle}>{k.title}</Text>
-            <Text style={styles.perkBody}>{k.body}</Text>
-          </View>
-        ))}
-      </ScrollView>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   /* Ba dòng đầu KHỚP TỪNG SỐ với `FeedHighlights`: hai file cùng vẽ 'một mục của bảng tin', lệch
      nhau vài pixel là mắt đọc ra hai nhịp khác nhau trên cùng một màn cuộn. */
@@ -174,8 +158,4 @@ const styles = StyleSheet.create({
   guideIcon: { fontSize: 24 },
   guideTitle: { fontFamily: F.uiBold, ...T.md, color: C.ink, marginBottom: S.xs },
   guideBody: { fontFamily: F.ui, ...T.sm, color: C.inkSoft },
-
-  perk: { width: 280, backgroundColor: C.brandLt, borderRadius: R.lg, padding: S.lg, ...shadow },
-  perkTitle: { fontFamily: F.uiBold, ...T.md, color: C.ink, marginBottom: S.sm },
-  perkBody: { fontFamily: F.ui, ...T.sm, color: C.inkSoft },
 });

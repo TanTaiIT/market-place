@@ -29,23 +29,26 @@ import { C, F } from '@/theme';
  */
 
 /**
- * Phần ĐỌC ĐƯỢC của sheet chiếm nhiều nhất bao nhiêu khoảng trống còn lại.
+ * Sheet cao nhiều nhất bao nhiêu phần khoảng trống CÒN LẠI.
  *
- * Tính trên khoảng còn lại (màn hình trừ bàn phím) chứ không trên cả màn hình: hai con số đó
- * bằng nhau khi bàn phím đóng, nhưng khi mở thì "82% màn hình" gồm luôn phần đang bị bàn phím
- * che — sheet trông như cao 82% mà chỗ đọc được chỉ còn hai dòng.
+ * Là PHẦN TRĂM chứ không phải số dp tính tay, và đó là điểm mấu chốt: phần trăm quy chiếu về ô
+ * cha, mà ô cha chính là cửa sổ modal — nên nó tự đúng trên cả hai hệ, kể cả khi Android đã thu
+ * cửa sổ lại vì bàn phím. Bản trước tính `(screen - keyboard) * 0.82 + keyboard` từ
+ * `useWindowDimensions()`, tức đo bằng MÀN HÌNH trong khi sheet sống trong CỬA SỔ MODAL — trên
+ * Android hai số đó lệch nhau đúng bằng chiều cao bàn phím.
  *
- * Chừa lại 18% để vệt scrim phía trên còn bấm được: đó là lối đóng sheet mà ngón cái với tới
- * dễ nhất, sheet cao hết màn thì chỉ còn dấu ✕ ở góc.
+ * Chừa lại 18% để vệt scrim phía trên còn bấm được: đó là lối đóng sheet mà ngón cái với tới dễ
+ * nhất, sheet cao hết màn thì chỉ còn dấu ✕ ở góc.
  */
-const SHEET_MAX_RATIO = 0.82;
+const SHEET_MAX_HEIGHT = '82%' as const;
 
 /**
  * Chiều cao bàn phím đang che, theo dp.
  *
- * Sheet dán vào `bottom: 0` và bàn phím vẽ ĐÈ LÊN cửa sổ modal, nên không có cơ chế layout nào
- * tự đẩy nó lên: ô tìm trong sheet nhận focus là danh sách lựa chọn nằm dưới bàn phím — và cuộn
- * cũng không lôi ra được, vì `FlatList` vẫn đang giữ đúng khung cao như lúc chưa có bàn phím.
+ * CHỈ iOS cần: ở đó cửa sổ modal không thu lại khi bàn phím mở, nên không có cơ chế layout nào
+ * tự đẩy sheet lên — ô tìm nhận focus là danh sách nằm dưới bàn phím. Android thì hệ điều hành
+ * lo việc đó (xem `SHEET_MAX_HEIGHT`); ở đó giá trị này chỉ dùng để biết bàn phím có đang mở,
+ * để thôi chừa vạch home.
  *
  * iOS nghe `keyboardWillChangeFrame`: một sự kiện phủ cả mở, đóng và ĐỔI chiều cao (chuyển sang
  * bàn phím emoji, thanh gợi ý bật lên), lại phát TRƯỚC animation nên sheet đi cùng nhịp với bàn
@@ -107,7 +110,6 @@ export function PickerSheet<T extends string>({
    * không chừa được lề an toàn (xem ghi chú ở chỗ dùng bên dưới).
    */
   const insets = useSafeAreaInsets();
-  const { height: screen } = useWindowDimensions();
   const keyboard = useKeyboardOverlap();
 
   /*
@@ -125,41 +127,47 @@ export function PickerSheet<T extends string>({
   return (
     /* `fade` + `entering` chứ không `slide` — xem lý do đầy đủ ở `AdminListingSheet`. */
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.scrim} onPress={onClose} />
+      {/*
+        Bù bàn phím CHỈ trên iOS.
 
-      <Animated.View
-        entering={SlideInDown.duration(260)}
-        style={[
-          styles.sheet,
-          {
-            // Bàn phím mở thì CHÍNH NÓ là mép dưới của nội dung; đóng thì chừa vạch home. Không
-            // cộng dồn: lúc bàn phím mở, vạch home nằm sau nó, đệm thêm là 34dp trống vô ích.
-            paddingBottom: keyboard > 0 ? keyboard : insets.bottom,
-            maxHeight: (screen - keyboard) * SHEET_MAX_RATIO + keyboard,
-          },
-        ]}
-      >
-        <View style={styles.head}>
-          <Text style={styles.headTitle}>{title}</Text>
-          <Pressable onPress={onClose} hitSlop={10} style={styles.close}>
-            <Text style={styles.closeGlyph}>✕</Text>
-          </Pressable>
-        </View>
+        Android chạy `softwareKeyboardLayoutMode: 'resize'` (mặc định của Expo; app.json không
+        đặt khác), nên hệ điều hành đã thu cửa sổ modal xuống còn đúng phần bàn phím không che.
+        Chừa thêm một lần nữa ở đây là bù HAI LẦN: sheet cao hơn cửa sổ, và vì nó neo đáy nên
+        phần thừa trào ra ĐẦU MÀN — tiêu đề với ô tìm biến mất khỏi mép trên, danh sách bị cắt
+        cụt, còn khoảng đệm thừa nằm lại thành mảng trống giữa danh sách và bàn phím.
 
-        {/* key: ép dựng lại để từ khoá lần trước không còn lọc sẵn danh sách ở lần mở sau */}
-        <SheetBody
-          key={String(visible)}
-          placeholder={placeholder}
-          search={search}
-          loading={loading}
-          value={value}
-          onChoose={(next: T | null) => {
-            onSelect(next);
-            onClose();
-          }}
-          emptyAll={emptyAll}
-        />
-      </Animated.View>
+        iOS thì cửa sổ modal KHÔNG thu, nên ở đó vẫn phải tự chừa.
+      */}
+      <View style={[styles.fill, Platform.OS === 'ios' && { paddingBottom: keyboard }]}>
+        <Pressable style={styles.scrim} onPress={onClose} />
+
+        <Animated.View
+          entering={SlideInDown.duration(260)}
+          // Bàn phím mở thì mép dưới đã là bàn phím, không cần chừa vạch home nữa.
+          style={[styles.sheet, { paddingBottom: keyboard > 0 ? 0 : insets.bottom }]}
+        >
+          <View style={styles.head}>
+            <Text style={styles.headTitle}>{title}</Text>
+            <Pressable onPress={onClose} hitSlop={10} style={styles.close}>
+              <Text style={styles.closeGlyph}>✕</Text>
+            </Pressable>
+          </View>
+
+          {/* key: ép dựng lại để từ khoá lần trước không còn lọc sẵn danh sách ở lần mở sau */}
+          <SheetBody
+            key={String(visible)}
+            placeholder={placeholder}
+            search={search}
+            loading={loading}
+            value={value}
+            onChoose={(next: T | null) => {
+              onSelect(next);
+              onClose();
+            }}
+            emptyAll={emptyAll}
+          />
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
@@ -197,6 +205,9 @@ function SheetBody<T extends string>({
       </View>
 
       <FlatList
+        // Nhường khi đụng trần của sheet: thiếu dòng này thì danh sách giữ nguyên chiều cao tự
+        // nhiên và tràn ra ngoài khung bo góc thay vì cuộn bên trong nó.
+        style={styles.listBox}
         data={shown}
         keyExtractor={(i) => i.key}
         keyboardShouldPersistTaps="handled"
@@ -257,14 +268,15 @@ function Row({
 
 const styles = StyleSheet.create({
   scrim: { ...StyleSheet.absoluteFill, backgroundColor: C.scrim },
+  /* Ô phủ kín cửa sổ modal — cái mà `maxHeight: '82%'` của sheet quy chiếu vào. */
+  fill: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
+    maxHeight: SHEET_MAX_HEIGHT,
     backgroundColor: C.paper,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
+    // Bo góc chỉ ăn thua khi ruột bị cắt theo: `FlatList` cuộn sát mép trên của sheet.
+    overflow: 'hidden',
   },
   head: {
     flexDirection: 'row',
@@ -302,6 +314,7 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontFamily: F.ui, fontSize: 14, color: C.ink, paddingVertical: 9 },
   searchGlyph: { fontSize: 15 },
 
+  listBox: { flexShrink: 1 },
   list: { paddingHorizontal: 18, paddingTop: 12, paddingBottom: 20, gap: 6 },
   row: {
     flexDirection: 'row',

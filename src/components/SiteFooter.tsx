@@ -12,7 +12,7 @@ import { C, F, S, T } from '@/theme';
  * cột và tiêu đề bài đều đọc từ `@/api/legal`. Nhờ vậy lúc gỡ không ai phải đi soi xem còn
  * sót câu nào ở đây không — xoá file là xong.
  *
- * Đây KHÔNG phải một khối tiếp thị như `BannerBoard`/`PerkStrip`: thông tin doanh nghiệp và
+ * Đây KHÔNG phải một khối tiếp thị như `BannerBoard`/`GuideStrip`: thông tin doanh nghiệp và
  * đầu mối bảo vệ quyền lợi người tiêu dùng là thứ sàn thương mại điện tử buộc phải công bố.
  * Vì vậy nó LUÔN hiện, không gác sau cờ `isGuest` hay cờ nào khác, và không cuộn ngang —
  * người đi tìm nó là người đang cần đọc cho hết, không phải người đang lướt.

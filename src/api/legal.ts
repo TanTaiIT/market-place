@@ -40,8 +40,14 @@
 // ── HẰNG SỐ PHÁP NHÂN ───────────────────────────────────────────
 
 export const SITE = {
-  brand: 'Groupnhadat.vn',
+  brand: 'Ghim',
   hotline: '0987 308 562',
+  /*
+   * Tên miền thư LỆCH tên thương hiệu, và đó là CHỦ Ý — đừng 'sửa cho khớp' thành @ghim.vn.
+   * Đây là hộp thư đang hoạt động thật của pháp nhân vận hành; một địa chỉ đẹp mà không ai
+   * đọc thì ô 'bảo vệ quyền lợi người tiêu dùng' thành lời hứa suông. Đổi khi nào hộp thư
+   * mới đã dựng xong và có người trực.
+   */
   support: 'admin@groupnhadat.vn',
   care: 'admin@groupnhadat.vn',
   company: 'CÔNG TY TNHH KINH DOANH PT DỊCH VỤ NVGGROUP',

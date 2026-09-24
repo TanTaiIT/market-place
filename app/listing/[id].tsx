@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated, {
   FadeInDown,
@@ -102,10 +102,6 @@ export default function ListingDetail() {
    */
   const phone = listing?.contact?.replace(/[^+d]/g, "") ?? "";
 
-  const share = () =>
-    // Không `catch` im lặng: bấm Huỷ trên sheet chia sẻ cũng vào đây, mà đó không phải lỗi.
-    void Share.share({ message: `${listing?.title ?? ''} — ${listing?.price ?? ''}` }).catch(() => {});
-
   // @keyframes saveBounce — phóng to + xoay nhẹ rồi về chỗ cũ
   const bounce = useSharedValue(1);
   const rot = useSharedValue(0);
@@ -169,14 +165,6 @@ export default function ListingDetail() {
             style={[styles.circleBtn, { top: insets.top + 8, left: 16 }]}
           >
             <Text style={{ fontSize: 16 }}>←</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={share}
-            style={[styles.circleBtn, { top: insets.top + 8, right: 60 }]}
-            hitSlop={8}
-          >
-            <Text style={{ fontSize: 15 }}>↗</Text>
           </Pressable>
 
           <Animated.View style={[styles.circleBtn, { top: insets.top + 8, right: 16 }, saveStyle, saved && { backgroundColor: C.pin }]}>

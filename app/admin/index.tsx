@@ -1,5 +1,6 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Redirect } from 'expo-router';
 import { CategoryBars, TrendChart } from '@/components/AdminChart';
 import { AdminKpis } from '@/components/AdminKpis';
 import { AdminReviewDesk } from '@/components/AdminReviewDesk';
@@ -7,7 +8,7 @@ import { AdminPanel, AdminScreen } from '@/components/AdminScreen';
 import { AdminSystemOverview } from '@/components/AdminSystemOverview';
 import { EmptyState, Loading } from '@/components/ui';
 import { useToast } from '@/components/Toast';
-import { isMaster } from '@/api/admin';
+import { canModerateOrg, canModeratePublicAxis, isMaster } from '@/api/admin';
 import {
   useAdminActivity,
   useAdminActivityStream,
@@ -52,6 +53,25 @@ export default function AdminOverview() {
         <AdminSystemOverview />
       </AdminScreen>
     );
+  }
+
+  /*
+   * Người phụ trách DANH MỤC mà không quản trị nhóm nào — bàn của họ là TRỤC CÔNG KHAI.
+   *
+   * Không có nhánh này thì họ rơi vào `OrgOverview`, một màn khai `org` và vì thế dựng cửa
+   * 'chọn tổ chức' chắn ngang. Mà họ KHÔNG thuộc tổ chức nào, cũng không cần thuộc: phạm vi
+   * của họ đến từ `role_grants`, BE không đọc `X-Org-Id` ở một màn nào của trục này. Cửa đó
+   * bảo họ đi tìm một tổ chức để tham gia — một việc vô nghĩa với vai của họ, và làm xong
+   * cũng không mở ra được gì.
+   *
+   * Kẹp `!canModerateOrg` chứ không chỉ hỏi `canModeratePublicAxis`: người vừa phụ trách danh
+   * mục vừa quản trị một nhóm thì bàn org mới là trang chủ đúng — ngăn kéo của họ có cả hai
+   * nhóm mục, và trục công khai chỉ cách một cú chạm.
+   *
+   * `grants` chưa về là cả hai vị từ đều `false`, nên không có cú nhảy nào bắn ra lúc đang tải.
+   */
+  if (canModeratePublicAxis(grants) && !canModerateOrg(grants)) {
+    return <Redirect href="/admin/public-overview" />;
   }
 
   return <OrgOverview />;

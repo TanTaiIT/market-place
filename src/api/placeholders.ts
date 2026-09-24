@@ -13,7 +13,7 @@
  * thì mặt kính đọc ra "màu nhạt hơn" thay vì "vật liệu"; ngưỡng dùng được là quanh L=0.30.
  * Bản trước hai dải promo ở 0.37 và banner cam ở 0.37 — đều sát vùng hỏng đó.
  *
- * 3. `GUIDE_STEPS` / `PERKS` — chữ giới thiệu sản phẩm. Không phải dữ liệu, và sẽ không bao
+ * 3. `GUIDE_STEPS` — chữ giới thiệu sản phẩm. Không phải dữ liệu, và sẽ không bao
  *    giờ đến từ DB trừ khi marketing cần tự sửa mà không build lại.
  *
  * ĐÃ GỠ HẲN (không phải chuyển đi đâu): sao đánh giá, số giao dịch, % giảm giá, giá cũ gạch
@@ -134,19 +134,5 @@ export const GUIDE_STEPS = [
     icon: '🤝',
     title: 'Gặp mặt rồi mới trả tiền',
     body: 'Hẹn ở cổng trường hay căng tin, xem hàng tận tay. Không cọc trước, không ship xa, không rủi ro.',
-  },
-] as const;
-
-/** Khối "Vì sao chọn Ghim" — chữ tĩnh, không phải dữ liệu; để đây cho cùng một chỗ gỡ. */
-export const PERKS = [
-  {
-    id: 'k1',
-    title: 'Chỉ người cùng trường',
-    body: 'Mọi tài khoản đều xác thực bằng email trường. Giao dịch với bạn học, không phải người lạ trên mạng.',
-  },
-  {
-    id: 'k2',
-    title: 'Gặp nhau ở cổng trường',
-    body: 'Không cần ship, không cần cọc. Hẹn giờ tan học, xem hàng rồi mới trả tiền.',
   },
 ] as const;

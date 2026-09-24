@@ -1,7 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { AdminPanel } from './AdminScreen';
-import { ReportColumns } from './AdminChart';
 import type {
   ListingReportPoint,
   ReportGranularity,
@@ -17,8 +16,8 @@ import { C, F } from '@/theme';
  * hai trạng thái loading/error dùng chung. Nhồi cả hai bộ panel vào đó thì mỗi báo cáo con
  * thêm vào là màn phình thêm một đoạn, và trần 250 dòng vỡ ở cái thứ ba.
  *
- * Hai bộ panel ở CHUNG một file vì chúng là cùng một thứ ở hai hình dạng — sửa cách hiển thị
- * cột thì sửa cả hai cùng lúc, và để hai file cạnh nhau chỉ tổ lệch nhau dần.
+ * Hai bộ panel ở CHUNG một file vì chúng là cùng một thứ ở hai hình dạng — sửa cách bày một
+ * kỳ thì sửa cả hai cùng lúc, và để hai file cạnh nhau chỉ tổ lệch nhau dần.
  */
 
 /** Hermes không có Intl đầy đủ — chấm nghìn bằng tay, cùng cách với `formatPrice`. */
@@ -30,21 +29,7 @@ const UNIT: Record<ReportGranularity, string> = {
   year: 'năm',
 };
 
-/**
- * Nhãn cột rút gọn cho trục x: `2026-09-08` → `08/09`, `2026-09` → `09/26`, `2026` → `2026`.
- *
- * Cắt chuỗi chứ không `new Date()`: nhãn BE trả về đã là ngày theo giờ Việt Nam, mà dựng lại
- * `Date` rồi format sẽ quy đổi thêm một lần theo múi giờ của MÁY người xem — một người mở app
- * ở Nhật sẽ thấy trục lệch một ngày so với chính con số bên cạnh.
- */
-export function tickLabel(bucket: string): string {
-  const [y, m, d] = bucket.split('-');
-  if (d) return `${d}/${m}`;
-  if (m) return `${m}/${y!.slice(2)}`;
-  return y!;
-}
-
-/** Mới nhất trước. Nhãn cột là ISO đã đệm số 0 nên thứ tự chữ trùng thứ tự thời gian. */
+/** Mới nhất trước. Nhãn kỳ là ISO đã đệm số 0 nên thứ tự chữ trùng thứ tự thời gian. */
 const newestFirst = <T extends { bucket: string }>(rows: readonly T[]) =>
   rows.slice().sort((a, b) => (a.bucket < b.bucket ? 1 : -1));
 
@@ -63,11 +48,6 @@ export function ListingReportPanels({
 
   return (
     <>
-      <AdminPanel title="Tin đăng theo thời gian">
-        <ReportColumns points={points.map((p) => ({ bucket: p.bucket, value: p.posts }))} labelOf={tickLabel} />
-        {meta}
-      </AdminPanel>
-
       <AdminPanel title="Tổng trong kỳ">
         <View style={styles.kpis}>
           <Kpi label="Tin đăng" value={group(totals.posts)} tone={C.deskTxt} />
@@ -80,15 +60,16 @@ export function ListingReportPanels({
         </Text>
       </AdminPanel>
 
-      <AdminPanel title="Chi tiết từng cột">
+      <AdminPanel title="Tin đăng theo thời gian">
         {/*
-          Bảng số đi kèm biểu đồ, không thay thế nó: hình cho thấy xu hướng, số cho phép đối
-          chiếu một cột cụ thể. Chỉ hiện cột CÓ tin — cột rỗng cần cho hình dạng của biểu đồ,
-          nhưng một danh sách toàn số 0 thì chỉ tổ phải cuộn.
+          Bảng số, KHÔNG phải biểu đồ cột — cột dọc ở cỡ màn hình điện thoại là 30 vạch rộng
+          vài pixel với nhãn 8px, đọc ra xu hướng thì mờ mà đọc ra con số thì không nổi.
+          Chỉ hiện kỳ CÓ tin: một danh sách toàn số 0 thì chỉ tổ phải cuộn.
         */}
         {newestFirst(points.filter((p) => p.posts > 0)).map((p) => (
           <Row key={p.bucket} bucket={p.bucket} left={`${group(p.posts)} tin`} right={`${group(p.sellers)} người`} />
         ))}
+        {meta}
       </AdminPanel>
     </>
   );
@@ -118,16 +99,6 @@ export function UserReportPanels({
 
   return (
     <>
-      <AdminPanel title={orgScoped ? 'Thành viên mới theo thời gian' : 'Người dùng mới theo thời gian'}>
-        {/* `unit` phải truyền: mặc định là "tin", để nguyên thì nhãn đỉnh ghi "đỉnh 12 tin"
-            trên một biểu đồ đang đếm người. */}
-        <ReportColumns
-          points={points.map((p) => ({ bucket: p.bucket, value: p.users }))}
-          labelOf={tickLabel}
-          unit="người"
-        />
-        {meta}
-      </AdminPanel>
 
       <AdminPanel title="Tổng trong kỳ">
         <View style={styles.kpis}>
@@ -156,7 +127,7 @@ export function UserReportPanels({
         </Text>
       </AdminPanel>
 
-      <AdminPanel title="Chi tiết từng cột">
+      <AdminPanel title={orgScoped ? 'Thành viên mới theo thời gian' : 'Người dùng mới theo thời gian'}>
         {newestFirst(points.filter((p) => p.users > 0 || p.active > 0)).map((p) => (
           <Row
             key={p.bucket}
@@ -165,6 +136,7 @@ export function UserReportPanels({
             right={`${group(p.active)} đăng tin`}
           />
         ))}
+        {meta}
       </AdminPanel>
     </>
   );

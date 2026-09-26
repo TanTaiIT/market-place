@@ -1,5 +1,5 @@
 import React from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text } from 'react-native';
+import { KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Surface } from '@/components/Surface';
@@ -15,28 +15,7 @@ import {
 } from '@/queries/listings';
 import { useListingPhotos } from '@/queries/upload';
 import { useOrgProfile } from '@/queries/org-discover';
-import type { PostingQuota } from '@/api/db';
-import { C, F } from '@/theme';
-
-/**
- * Câu báo TRƯỚC khi soạn tin — người dùng phải biết tin sẽ chờ duyệt hay bị chặn ngay từ đầu,
- * không phải sau khi gõ xong và ăn một toast 409. `null` = không có gì đáng nói.
- */
-function quotaNotice(q: PostingQuota | undefined): string | null {
-  if (!q) return null;
-  if (q.probation) return `⚖️ Tài khoản đang bị quản chế — tin sẽ chờ người duyệt. Lý do: ${q.probation.reason}`;
-  if (q.reason === 'live_full') {
-    return `Bạn đang có ${q.live.count}/${q.live.limit} tin đang hiện hoặc chờ duyệt — đánh dấu đã bán hoặc xoá bớt trước khi đăng.`;
-  }
-  if (q.reason === 'blocked_by_rejections') {
-    return 'Quyền đăng đang tạm khoá vì có tin bị từ chối gần đây — liên hệ quản trị để mở lại.';
-  }
-  // 80% trần: nhắc sớm để họ dọn tin cũ, thay vì đụng trần rồi mới biết.
-  if (q.live.count >= q.live.limit * 0.8) {
-    return `Đang có ${q.live.count}/${q.live.limit} tin đang hiện hoặc chờ duyệt.`;
-  }
-  return null;
-}
+import { QuotaNotice } from '@/components/QuotaNotice';
 
 /**
  * Ghim tin mới.
@@ -49,6 +28,15 @@ export default function Post() {
   const toast = useToast();
   const create = useCreateListing();
   const photos = useListingPhotos();
+
+  /*
+   * Khoá chống đăng đôi, sinh MỘT lần cho mỗi lần mở màn: mạng chậm, bấm "Ghim" hai lần thì BE trả
+   * đúng tin đã tạo thay vì tin thứ hai. Cùng cách sinh với `UserActionSheet` — Hermes không có
+   * `crypto.randomUUID`, và khoá chỉ cần duy nhất trong phạm vi một người bấm vài giây.
+   */
+  const draftKey = React.useRef(
+    `post-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+  );
 
   /*
    * HÀNG RÀO ĐỐI SOÁT — tin cũ hết hạn phải được trả lời trước khi đăng tin mới.
@@ -98,7 +86,6 @@ export default function Post() {
   // `isPublic` đi kèm vì thang phủ sóng cần nó: nhóm kín không có bậc "Ai cũng xem được".
   const toGroup =
     orgId && org ? { id: orgId, name: org.name, isPublic: org.isPublic } : undefined;
-  const notice = quotaNotice(quota.data);
 
   if (quota.isPending || stale.length > 0) {
     return (
@@ -130,7 +117,7 @@ export default function Post() {
           style={{ flex: 1 }}
         >
           <ScreenHeader title={toGroup ? `Đăng vào ${toGroup.name}` : 'Ghim tin mới'} />
-          {!!notice && <Text style={styles.notice}>{notice}</Text>}
+          <QuotaNotice quota={quota.data} />
           <ListingForm
             photos={photos}
             toGroup={toGroup}
@@ -141,7 +128,10 @@ export default function Post() {
               // Nhóm đích nằm TRONG `values` — `ListingReachField` chọn nó cùng lúc với bậc, vì
               // một bậc dưới `marketplace` mà không có nhóm là vô nghĩa.
               create.mutate(
-                { ...values, ...location, photoUrls: photos.photoUrls },
+                {
+                  input: { ...values, ...location, photoUrls: photos.photoUrls },
+                  idempotencyKey: draftKey.current,
+                },
                 {
                   onSuccess: () => {
                     // Tin vào BE ở trạng thái `pending`, feed chỉ hiện tin `active` — về feed là
@@ -161,17 +151,3 @@ export default function Post() {
   );
 }
 
-const styles = StyleSheet.create({
-  notice: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 10,
-    backgroundColor: C.warnTint,
-    fontFamily: F.ui,
-    fontSize: 12.5,
-    lineHeight: 18,
-    color: C.tape,
-  },
-});

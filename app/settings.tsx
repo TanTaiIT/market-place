@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AvatarPicker } from '@/components/AvatarPicker';
+import { ChangePasswordCard } from '@/components/ChangePasswordCard';
 import { AddressField, ProvinceField, WardField } from '@/components/LocationPicker';
 import { EmptyState, Field, Loading, PinButton, ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useProfile, useUpdateProfile } from '@/queries/listings';
+import { useChangePassword } from '@/queries/auth';
 import { GENDER_LABEL } from '@/api/db';
 import type { Gender, Profile } from '@/api/db';
 import { C, F } from '@/theme';
@@ -22,6 +24,7 @@ export default function Settings() {
   const toast = useToast();
   const { data: profile, error } = useProfile();
   const update = useUpdateProfile();
+  const changePw = useChangePassword();
 
   const [form, setForm] = useState<Form | null>(null);
 
@@ -123,6 +126,19 @@ export default function Settings() {
             onPress={() =>
               update.mutate(form, {
                 onSuccess: () => toast('✓ Đã lưu thay đổi!'),
+                onError: (e: Error) => toast(`⚠️ ${e.message}`),
+              })
+            }
+          />
+
+          <ChangePasswordCard
+            busy={changePw.isPending}
+            onSubmit={(input, reset) =>
+              changePw.mutate(input, {
+                onSuccess: () => {
+                  reset();
+                  toast('✓ Đã đổi mật khẩu — các thiết bị khác đã đăng xuất');
+                },
                 onError: (e: Error) => toast(`⚠️ ${e.message}`),
               })
             }

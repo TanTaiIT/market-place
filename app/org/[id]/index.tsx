@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { FlatList, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Share, StyleSheet, Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { OrgMemberSheet } from '@/components/OrgMemberSheet';
-import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
-import { ListingCard } from '@/components/ListingCard';
+import { GroupFeed, OrgListingRow, OrgSearchBox, OrgShell } from '@/components/OrgProfileParts';
+import { EmptyState, Loading } from '@/components/ui';
 import { Header } from '@/components/OrgProfileCard';
 import { useToast } from '@/components/Toast';
 import { useRequireAuth } from '@/components/GuestGate';
@@ -18,7 +17,6 @@ import {
 import { useMyGrants } from '@/queries/admin';
 import { canAdminOrg } from '@/api/admin';
 import { useProfile, useSavedIds, useToggleSaved } from '@/queries/listings';
-import type { OrgProfile } from '@/api/org';
 import { C, F } from '@/theme';
 
 /**
@@ -31,6 +29,9 @@ import { C, F } from '@/theme';
  * không ai quét id để lập danh sách nhóm kín được. TRỪ khi đường dẫn mang `?code=`: mã đúng
  * của chính nhóm đó là chìa khoá mở hồ sơ, và màn Tìm nhóm gắn sẵn nó vào link khi người dùng
  * vừa gõ trúng mã. Mã sai vẫn 404 như thường.
+ *
+ * Phần trình bày thuần (khung, ô tìm, hàng tin, chỗ trống) ở `OrgProfileParts` — route chỉ giữ
+ * hook dữ liệu và mutation (HARD#11).
  */
 export default function OrgProfileScreen() {
   const { id, code } = useLocalSearchParams<{ id: string; code?: string }>();
@@ -51,33 +52,22 @@ export default function OrgProfileScreen() {
    * Đọc `term` chứ không `search.data`: người vừa gõ xong mà kết quả chưa về thì vẫn là đang
    * tìm, và rơi về khối xem trước lúc đó là nháy một danh sách không liên quan tới thứ họ gõ.
    *
-   * Khai ở ĐÂY, trên mọi nhánh `return` sớm: hook không được gọi có điều kiện. Đặt nó cạnh
-   * chỗ dùng (dưới `invite`) thì nó rơi xuống sau nhánh "đang tải"/"404", và thứ tự hook đổi
-   * giữa hai lượt render — React vỡ ở lần trạng thái đổi, không phải ở lần đầu.
+   * Khai ở ĐÂY, trên mọi nhánh `return` sớm: hook không được gọi có điều kiện — đặt sau nhánh
+   * "đang tải"/"404" là thứ tự hook đổi giữa hai lượt render, React vỡ ở lần trạng thái đổi.
    */
   const searching = term.trim().length > 0;
   const search = useOrgListingSearch(id ?? '', term, searching);
   /*
-   * Tin trong nhóm bày bằng `ListingCard` — CÙNG một thẻ với mọi bề mặt công khai.
-   *
-   * Trước đây là một thẻ "dòng gọn" riêng, với lý do "cùng thẻ với màn tìm kiếm". Lý do đó đã
-   * hết đúng khi màn kết quả chuyển sang `ListingCard`, và giờ không bề mặt nào còn dùng dòng
-   * gọn nữa (component đó đã xoá). Cùng một tin đọc ở hai nơi ra hai hình dạng khác nhau thì
-   * người dùng đọc ra ngay là "tin trong nhóm" khác loại với "tin ngoài kia".
-   *
-   * Vẫn KHÔNG đọc `feedLayout` của nhóm: thiết lập đó chọn giữa thẻ lớn và lưới hai cột cho
-   * bảng tin của nhóm, còn ở đây thẻ lớn là lựa chọn duy nhất — hồ sơ nhóm là chỗ người ta đọc
-   * để quyết định xin vào, mà lưới hai cột thì cắt mất đúng những thứ dùng để quyết định
-   * (lượt xem, người quan tâm, khu vực).
+   * Tin trong nhóm bày bằng `ListingCard` (qua `OrgListingRow`) — CÙNG một thẻ với mọi bề mặt
+   * công khai. Vẫn KHÔNG đọc `feedLayout` của nhóm: thiết lập đó chọn giữa thẻ lớn và lưới hai
+   * cột cho bảng tin của nhóm, còn ở đây thẻ lớn là lựa chọn duy nhất — hồ sơ nhóm là chỗ người
+   * ta đọc để quyết định xin vào, mà lưới hai cột cắt mất đúng những thứ dùng để quyết định.
    */
   const peek = useOrgPeek(id ?? '', Boolean(org?.joined));
-
   /*
-   * Ba thứ `ListingCard` cần ngoài `item`.
-   *
-   * `useSavedIds` tự tắt khi chưa đăng nhập (khách vẫn mở được hồ sơ nhóm công khai) — trái tim
-   * hiện rỗng, chạm vào thì `requireAuth` đưa sang màn đăng nhập. Cùng cách màn kết quả tìm
-   * kiếm đang làm, không dựng thêm luật mới ở đây.
+   * Ba thứ `ListingCard` cần ngoài `item`. `useSavedIds` tự tắt khi chưa đăng nhập (khách vẫn
+   * mở được hồ sơ nhóm công khai) — trái tim hiện rỗng, chạm vào thì `requireAuth` đưa sang màn
+   * đăng nhập. Cùng cách màn kết quả tìm kiếm đang làm, không dựng thêm luật mới ở đây.
    */
   const { data: savedIds } = useSavedIds();
   const toggleSaved = useToggleSaved();
@@ -86,10 +76,15 @@ export default function OrgProfileScreen() {
   /* Ai được sửa: master, hoặc người giữ grant `manager` trên ĐÚNG nhóm này — xem `canAdminOrg`. */
   const { data: grants } = useMyGrants();
 
-  if (isPending) return <Shell><Loading /></Shell>;
+  if (isPending)
+    return (
+      <OrgShell>
+        <Loading />
+      </OrgShell>
+    );
   if (error || !org) {
     return (
-      <Shell>
+      <OrgShell>
         <EmptyState
           icon="🔒"
           // 404 gộp ba ca: id sai, nhóm đã đóng, và nhóm riêng tư mà mình không thuộc về.
@@ -97,7 +92,7 @@ export default function OrgProfileScreen() {
           // ba ca này để không ai quét id lập danh sách nhóm kín.
           text="Không mở được nhóm này. Địa chỉ có thể sai, nhóm đã đóng, hoặc đây là nhóm riêng tư mà bạn chưa tham gia — lúc đó cần mã tham gia."
         />
-      </Shell>
+      </OrgShell>
     );
   }
 
@@ -123,6 +118,12 @@ export default function OrgProfileScreen() {
       },
     );
 
+  const leaveOrg = () =>
+    leave.mutate(undefined, {
+      onSuccess: () => toast(`✓ Đã rời ${org.name}`),
+      onError: (e: Error) => toast(`⚠️ ${e.message}`),
+    });
+
   const invite = () =>
     void Share.share({
       message: `Vào nhóm "${org.name}" trên Ghim — mã tham gia: ${org.joinCode}`,
@@ -131,109 +132,61 @@ export default function OrgProfileScreen() {
   const rows = searching ? (search.data ?? []) : (peek.data?.listings ?? []);
 
   return (
-    <Shell>
+    <OrgShell>
       <FlatList
         data={rows}
         keyExtractor={(l) => l.id}
-        // `gap: 14` khớp nhịp của màn kết quả tìm kiếm — xem `styles.post`.
+        // `gap: 14` khớp nhịp của màn kết quả tìm kiếm.
         contentContainerStyle={[styles.body, { gap: 14 }]}
         ListHeaderComponent={
           <>
-          <Header
-            org={org}
-            members={peek.data?.members ?? []}
-            onJoin={requestJoin}
-            onInvite={invite}
-            /*
-             * Nhóm nhận được tin từ người này không.
-             *
-             * Thành viên thì luôn được. Người ngoài chỉ khi nhóm bật `allowOutsiderPosts` —
-             * tắt thì `routeListing` trả 400, và một cái nút dẫn thẳng tới lỗi thì tệ hơn
-             * không có nút.
-             */
-            onPost={
-              org.joined || org.allowOutsiderPosts
-                ? () => router.push(`/post?org=${org.id}`)
-                : undefined
-            }
-            onEdit={
-              canAdminOrg(grants, org.id)
-                ? () => router.push(`/org/${org.id}/edit`)
-                : undefined
-            }
-            onOpenMembers={() => setMembersOrgId(org.id)}
-            onLeave={
-              org.joined
-                ? () =>
-                    leave.mutate(undefined, {
-                      onSuccess: () => toast(`✓ Đã rời ${org.name}`),
-                      onError: (e: Error) => toast(`⚠️ ${e.message}`),
-                    })
-                : undefined
-            }
-            busy={join.isPending || leave.isPending}
-          />
-            {/*
-              Ô TÌM nằm trong `ListHeaderComponent`, dưới phần hồ sơ và ngay trên danh sách:
-              nó thuộc về khối tin, không phải khối nhận diện nhóm. Chỉ dựng khi người xem
-              ĐỌC ĐƯỢC tin của nhóm — người ngoài một nhóm kín không có gì để mà tìm.
-            */}
-            {org.joined && (
-              <View style={styles.search}>
-                <Text style={styles.searchIcon}>🔍</Text>
-                <TextInput
-                  value={term}
-                  onChangeText={setTerm}
-                  placeholder="Tìm tin trong nhóm…"
-                  placeholderTextColor={C.muted}
-                  style={styles.searchInput}
-                  returnKeyType="search"
-                  autoCorrect={false}
-                />
-                {/* Nút xoá thay cho việc bắt người dùng xoá từng ký tự để về lại xem trước. */}
-                {term.length > 0 && (
-                  <Text onPress={() => setTerm('')} style={styles.searchClear}>
-                    ✕
-                  </Text>
-                )}
-              </View>
-            )}
+            <Header
+              org={org}
+              members={peek.data?.members ?? []}
+              onJoin={requestJoin}
+              onInvite={invite}
+              /*
+               * Nhóm nhận được tin từ người này không: thành viên thì luôn được, người ngoài
+               * chỉ khi nhóm bật `allowOutsiderPosts` — tắt thì `routeListing` trả 400, và một
+               * cái nút dẫn thẳng tới lỗi thì tệ hơn không có nút.
+               */
+              onPost={
+                org.joined || org.allowOutsiderPosts
+                  ? () => router.push(`/post?org=${org.id}`)
+                  : undefined
+              }
+              onEdit={
+                canAdminOrg(grants, org.id) ? () => router.push(`/org/${org.id}/edit`) : undefined
+              }
+              onOpenMembers={() => setMembersOrgId(org.id)}
+              onLeave={org.joined ? leaveOrg : undefined}
+              busy={join.isPending || leave.isPending}
+            />
+            {/* Chỉ khi người xem ĐỌC ĐƯỢC tin của nhóm — người ngoài một nhóm kín không có gì để tìm. */}
+            {org.joined && <OrgSearchBox term={term} onChange={setTerm} />}
           </>
         }
         ListHeaderComponentStyle={{ marginBottom: 4 }}
         // Gõ xong bấm ra ngoài để đóng bàn phím mà không mất phím vừa chạm.
         keyboardShouldPersistTaps="handled"
         renderItem={({ item, index }) => (
-          <View style={styles.post}>
-            <ListingCard
-              item={item}
-              index={index}
-              /*
-               * TẮT viên "🏫 tên nhóm", dù ở đây biết chắc nó là gì.
-               *
-               * Viên đó có nghĩa ở bảng tin và kết quả tìm kiếm vì tin ở đó đến từ nhiều nguồn
-               * — nó trả lời "tin này của nhóm nào". Trên chính hồ sơ nhóm thì câu trả lời đã
-               * nằm ở tiêu đề trang, nên in lại trên từng thẻ chỉ là lặp N lần một thông tin
-               * không ai còn hỏi.
-               */
-              showOrg={false}
-              saved={saved.has(item.id)}
-              onPress={() => router.push(`/listing/${item.id}`)}
-              onToggleSave={() =>
-                requireAuth(
-                  () => toggleSaved.mutate({ id: item.id, saved: !saved.has(item.id) }),
-                  'Đăng nhập để lưu tin',
-                )
-              }
-            />
-          </View>
+          <OrgListingRow
+            item={item}
+            index={index}
+            saved={saved.has(item.id)}
+            onPress={() => router.push(`/listing/${item.id}`)}
+            onToggleSave={() =>
+              requireAuth(
+                () => toggleSaved.mutate({ id: item.id, saved: !saved.has(item.id) }),
+                'Đăng nhập để lưu tin',
+              )
+            }
+          />
         )}
         ListEmptyComponent={
           searching ? (
             <Text style={styles.noHit}>
-              {search.isPending
-                ? 'Đang tìm…'
-                : `Không có tin nào khớp “${term.trim()}”`}
+              {search.isPending ? 'Đang tìm…' : `Không có tin nào khớp “${term.trim()}”`}
             </Text>
           ) : (
             <GroupFeed org={org} />
@@ -254,66 +207,11 @@ export default function OrgProfileScreen() {
           router.push(`/user/${userId}`);
         }}
       />
-    </Shell>
-  );
-}
-
-/**
- * Chỗ trống của danh sách tin trong nhóm.
- *
- * Tin của nhóm là dữ liệu SCOPE THEO ORG — `GET /listings` đối chiếu tư cách thành viên với
- * `X-Org-Id`. Người chưa vào không đọc được, và đó là đúng: tin nội bộ của một trường không
- * phải thứ ai lướt qua hồ sơ cũng xem. Hai ca phải nói khác nhau — "chưa được xem" và "nhóm
- * chưa có tin" nhìn giống hệt nhau nếu dùng chung một câu.
- */
-function GroupFeed({ org }: { org: OrgProfile }) {
-  return (
-    <View style={styles.locked}>
-      <Text style={styles.lockedGlyph}>{org.joined ? '📭' : '🔒'}</Text>
-      <Text style={styles.lockedText}>
-        {org.joined
-          ? 'Nhóm chưa có tin nào.'
-          : 'Đây là nội dung riêng của nhóm. Tham gia để xem tin đăng bên trong.'}
-      </Text>
-    </View>
-  );
-}
-
-/**
- * `SafeAreaView edges={['top']}`, không phải `View` trần.
- *
- * `ScreenHeader` KHÔNG tự chừa lề trên (xem docblock của nó), nên `View` trần đặt nút quay lại
- * ở y=0 — nằm dưới đồng hồ và Dynamic Island, và trên iPhone có tai thì vùng đó không nhận
- * được cú chạm. Đúng lỗi "bấm back không được" ở trang này.
- *
- * `['top']` thôi: đáy trang là danh sách tin cuộn được, chừa thêm lề dưới sẽ cắt một dải trống
- * giữa tin cuối và mép màn.
- */
-function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.cork }} edges={['top']}>
-      <ScreenHeader title="Nhóm" />
-      {children}
-    </SafeAreaView>
+    </OrgShell>
   );
 }
 
 const styles = StyleSheet.create({
-  search: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-    marginHorizontal: 16,
-    marginTop: 14,
-    paddingHorizontal: 13,
-    borderRadius: 10,
-    backgroundColor: C.paper,
-    borderWidth: 1,
-    borderColor: C.lineInput,
-  },
-  searchIcon: { fontSize: 13, opacity: 0.6 },
-  searchInput: { flex: 1, paddingVertical: 10, fontFamily: F.ui, fontSize: 13, color: C.ink },
-  searchClear: { fontFamily: F.uiBold, fontSize: 13, color: C.inkSoft, paddingHorizontal: 4 },
   noHit: {
     fontFamily: F.ui,
     fontSize: 13,
@@ -322,25 +220,5 @@ const styles = StyleSheet.create({
     paddingVertical: 28,
     paddingHorizontal: 24,
   },
-  /** Khoảng cách hàng do call-site truyền vào — 10, khớp danh sách của màn tìm kiếm. */
   body: { paddingBottom: 32 },
-  /** Lề NGOÀI cho thẻ tin, khớp với `inset` của khối hồ sơ phía trên. */
-  /*
-   * Lề đặt trên TỪNG thẻ, không trên `contentContainerStyle`: ảnh bìa + thẻ hồ sơ nhóm ở
-   * `ListHeaderComponent` phải tràn hết bề ngang, mà padding của container thì thụt cả nó vào.
-   *
-   * 16 để khớp `paddingHorizontal` của màn kết quả tìm kiếm — hai trang bày CÙNG một loại thẻ
-   * thì không được lệch nhau vài pixel, người dùng đọc ra ngay là hai màn khác nhau.
-   */
-  post: { marginHorizontal: 16 },
-
-  locked: { alignItems: 'center', paddingHorizontal: 32, paddingVertical: 34 },
-  lockedGlyph: { fontSize: 30, marginBottom: 10 },
-  lockedText: {
-    fontFamily: F.ui,
-    fontSize: 13,
-    lineHeight: 21,
-    color: C.inkSoft,
-    textAlign: 'center',
-  },
 });

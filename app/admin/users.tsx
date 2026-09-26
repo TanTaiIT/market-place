@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
-import { RowAction } from '@/components/AdminListingRow';
 import { AdminFilter, AdminScreen } from '@/components/AdminScreen';
+import { AdminUserRow } from '@/components/AdminUserRow';
 import { UserActionSheet } from '@/components/UserActionSheet';
 import type { UserAction, UserActionInput } from '@/components/UserActionSheet';
-import { Avatar, EmptyState, Loading, PagedFooter } from '@/components/ui';
+import { EmptyState, Loading, PagedFooter } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import {
   useAdjustWallet,
   useAdminUsers,
   useClearRejections,
+  useRestoreTrust,
   useSetUserLock,
 } from '@/queries/admin-people';
-import type { AdminUser, UserStatus } from '@/api/admin-people';
+import type { AdminUser } from '@/api/admin-people';
 import { C, F } from '@/theme';
 
 /**
@@ -23,7 +24,8 @@ import { C, F } from '@/theme';
  * không nằm trong bàn quản trị của org.
  *
  * Ba con số bịa của bản fixture (tin đăng / đã bán / đánh giá) đã bỏ; thứ thay vào là bậc uy
- * tín — con số quyết định tin của người này có tự lên bảng hay không.
+ * tín — con số quyết định tin của người này có tự lên bảng hay không. Hàng hiển thị nằm ở
+ * `AdminUserRow`; file này chỉ còn bộ lọc và chỗ bấm gửi mutation.
  */
 
 /** Đúng hai nhánh BE lọc được. "Chưa xác thực email" là một BADGE, không phải bộ lọc. */
@@ -32,16 +34,6 @@ const TABS = [
   { value: 'active', label: 'Đang hoạt động' },
   { value: 'locked', label: 'Đang khoá' },
 ];
-
-const STATUS: Record<UserStatus, { label: string; fg: string; bg: string }> = {
-  ok: { label: 'Bình thường', fg: C.okText, bg: C.okTint },
-  unverified: { label: 'Chưa xác thực email', fg: C.tape, bg: C.warnTint },
-  locked: { label: 'Đang khoá', fg: C.badText, bg: C.badTint },
-};
-
-const AVATAR_COLORS = [C.mossBright, C.amber, C.cork, C.sky, C.corkDark, C.moss];
-const colorOf = (name: string) =>
-  AVATAR_COLORS[[...name].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % AVATAR_COLORS.length];
 
 export default function AdminUsers() {
   const toast = useToast();
@@ -54,9 +46,10 @@ export default function AdminUsers() {
   });
   const lock = useSetUserLock();
   const clear = useClearRejections();
+  const restore = useRestoreTrust();
   const adjust = useAdjustWallet();
 
-  /** Thao tác đang mở ngăn. Một state cho cả ba vì ngăn chỉ mở được một lần một. */
+  /** Thao tác đang mở ngăn. Một state cho tất cả vì ngăn chỉ mở được một lần một. */
   const [acting, setActing] = useState<{ action: UserAction; user: AdminUser } | null>(null);
 
   const rows = data ?? [];
@@ -86,6 +79,17 @@ export default function AdminUsers() {
       return clear.mutate(
         { id: user.id, reason: text },
         { onSuccess: () => done(`✓ Đã gỡ án phạt đăng tin cho ${user.name}`), onError: fail },
+      );
+    }
+
+    if (action === 'restore') {
+      return restore.mutate(
+        { id: user.id, reason: text },
+        {
+          // Bậc mới lấy từ response, không đoán: hàng sẽ hiện đúng con số này sau khi quét cache.
+          onSuccess: (u) => done(`↺ Đã phục hồi uy tín bậc ${u.trustLevel} cho ${u.name}`),
+          onError: fail,
+        },
       );
     }
 
@@ -126,63 +130,9 @@ export default function AdminUsers() {
         ListFooterComponent={<PagedFooter loading={isFetchingNextPage} onDark />}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
-        renderItem={({ item }) => {
-          const status = STATUS[item.status];
-          const locked = item.status === 'locked';
-          return (
-            <View style={styles.row}>
-              <Avatar
-                text={item.avatar}
-                url={item.avatarUrl}
-                size={38}
-                color={colorOf(item.name)}
-                textColor={C.desk}
-              />
-
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text numberOfLines={1} style={styles.name}>
-                  {item.name}
-                </Text>
-                <Text numberOfLines={1} style={styles.email}>
-                  {item.email}
-                </Text>
-                <Text style={styles.stats}>
-                  {/* Bậc 2 là ngưỡng tự đăng — tô sáng đúng ngưỡng đó, vì nó là thứ khiến tin
-                      của người này lên bảng mà không ai nhìn qua. */}
-                  <Text style={{ color: item.trustLevel >= 2 ? C.okText : C.deskTxtDim }}>
-                    uy tín bậc {item.trustLevel}
-                  </Text>
-                  {' · vào '}
-                  {item.joined}
-                  {item.lastSeen ? ` · đăng nhập ${item.lastSeen}` : ' · chưa đăng nhập lại'}
-                </Text>
-
-                <View style={styles.foot}>
-                  <View style={[styles.badge, { backgroundColor: status.bg }]}>
-                    <View style={[styles.badgeDot, { backgroundColor: status.fg }]} />
-                    <Text style={[styles.badgeText, { color: status.fg }]}>{status.label}</Text>
-                  </View>
-
-                  <View style={styles.acts}>
-                    <RowAction
-                      glyph="🪙"
-                      onPress={() => setActing({ action: 'wallet', user: item })}
-                    />
-                    <RowAction
-                      glyph="⏳"
-                      onPress={() => setActing({ action: 'clear', user: item })}
-                    />
-                    <RowAction
-                      glyph={locked ? '🔓' : '🔒'}
-                      tone={locked ? undefined : 'danger'}
-                      onPress={() => setActing({ action: locked ? 'unlock' : 'lock', user: item })}
-                    />
-                  </View>
-                </View>
-              </View>
-            </View>
-          );
-        }}
+        renderItem={({ item }) => (
+          <AdminUserRow item={item} onAction={(action) => setActing({ action, user: item })} />
+        )}
         ListEmptyComponent={
           isPending ? (
             <Loading onDark />
@@ -197,7 +147,7 @@ export default function AdminUsers() {
       <UserActionSheet
         action={acting?.action ?? null}
         user={acting?.user ?? null}
-        pending={lock.isPending || clear.isPending || adjust.isPending}
+        pending={lock.isPending || clear.isPending || restore.isPending || adjust.isPending}
         onSubmit={submit}
         onClose={() => setActing(null)}
       />
@@ -221,30 +171,5 @@ const styles = StyleSheet.create({
   searchIcon: { fontSize: 13 },
   searchInput: { flex: 1, paddingVertical: 10, fontFamily: F.ui, fontSize: 13, color: C.deskTxt },
   searchCount: { fontFamily: F.mono, fontSize: 10.5, color: C.deskTxtDim },
-
   list: { paddingHorizontal: 18, paddingBottom: 24, gap: 10 },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-    backgroundColor: C.deskPanel,
-    borderWidth: 1,
-    borderColor: C.deskLine,
-    borderRadius: 12,
-    padding: 12,
-  },
-  name: { fontFamily: F.uiBold, fontSize: 13.5, color: C.paper },
-  email: { fontFamily: F.mono, fontSize: 10.5, color: C.deskTxtSoft, marginTop: 3 },
-  stats: { fontFamily: F.ui, fontSize: 11, color: C.deskTxtDim, marginTop: 6 },
-  foot: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
-  acts: { flexDirection: 'row', gap: 6, marginLeft: 'auto' },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 20,
-  },
-  badgeDot: { width: 5, height: 5, borderRadius: 3 },
-  badgeText: { fontFamily: F.mono, fontSize: 10 },
 });

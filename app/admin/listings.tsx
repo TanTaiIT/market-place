@@ -110,11 +110,9 @@ export default function AdminListings() {
                 onPress={() => bump.mutate(item.id, act(`Đã đẩy "${item.title}" lên đầu bảng`))}
               />
             )}
-            <RowAction
-              glyph="🗑"
-              tone="danger"
-              onPress={() => remove.mutate(item.id, act(`Đã gỡ "${item.title}" khỏi bảng`))}
-            />
+            {/* Gỡ là thao tác không rút lại được: đi qua ngăn chi tiết để có nhịp chọn lý do,
+                thay vì một chạm lặng lẽ xoá tin ngay trên hàng. */}
+            <RowAction glyph="🗑" tone="danger" onPress={() => setSheet(item)} />
           </AdminListingRow>
         )}
         ListEmptyComponent={
@@ -139,7 +137,9 @@ export default function AdminListings() {
           setStatus.mutate({ id: l.id, status: 'active' }, act(`📌 Đã ghim "${l.title}" lên bảng`))
         }
         onToggleHide={hide}
-        onRemove={(l) => remove.mutate(l.id, act(`Đã gỡ "${l.title}" khỏi bảng`))}
+        onRemove={(l, reason) =>
+          remove.mutate({ id: l.id, reason }, act(`Đã gỡ "${l.title}" khỏi bảng`))
+        }
       />
     </AdminScreen>
   );

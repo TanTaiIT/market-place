@@ -196,7 +196,8 @@ export function useRemoveModListing() {
   const qc = useQueryClient();
   const orgId = useAdminOrgId();
   return useMutation({
-    mutationFn: (id: string) => adminApi.remove(orgId, id),
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      adminApi.remove(orgId, id, reason),
     onSettled: () => qc.invalidateQueries({ queryKey: qk.adminRoot() }),
   });
 }

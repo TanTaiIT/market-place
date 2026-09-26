@@ -57,6 +57,11 @@ export function useClearRejections() {
   return usePeopleMutation(adminPeopleApi.clearRejections);
 }
 
+/** Phục hồi bậc đổi thẳng `trustLevel` trên hàng — quét cùng gốc để hàng hiện đúng bậc mới. */
+export function useRestoreTrust() {
+  return usePeopleMutation(adminPeopleApi.restoreTrust);
+}
+
 /**
  * Điều chỉnh ví. KHÔNG quét cache nào: BE không có đường đọc ví người khác, nên không tồn tại
  * query nào để làm mới — bằng chứng duy nhất của lượt điều chỉnh là sổ cái phía BE.

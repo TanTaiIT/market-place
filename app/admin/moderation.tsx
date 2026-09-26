@@ -108,7 +108,9 @@ export default function Moderation() {
             act(l.status === 'hidden' ? 'Tin đã hiện lại trên bảng' : 'Đã ẩn tin khỏi bảng'),
           )
         }
-        onRemove={(l) => remove.mutate(l.id, act(`Đã gỡ "${l.title}" khỏi bảng`))}
+        onRemove={(l, reason) =>
+          remove.mutate({ id: l.id, reason }, act(`Đã gỡ "${l.title}" khỏi bảng`))
+        }
       />
     </AdminScreen>
   );

@@ -333,9 +333,19 @@ export const adminApi = {
     return { id };
   },
 
-  async remove(orgId: string | undefined, id: string) {
+  /**
+   * Gỡ hẳn tin. `reason` tuỳ chọn nhưng đáng gửi: BE ghi thẳng vào thông báo cho người bán và
+   * dòng nhật ký — không có thì người bán chỉ thấy "không còn trên bảng tin". Bỏ trống thì
+   * KHÔNG gửi body: schema BE `.strict()` và `reason` min 1, chuỗi rỗng là 400.
+   */
+  async remove(orgId: string | undefined, id: string, reason?: string) {
+    const note = reason?.trim();
     const res = await withAuthRetry(() =>
-      moderationRemoveListing({ path: { id }, ...orgHeader(orgId) }),
+      moderationRemoveListing({
+        path: { id },
+        ...(note ? { body: { reason: note } } : {}),
+        ...orgHeader(orgId),
+      }),
     );
     unwrap(res, 'Không gỡ được tin này');
     return { id };

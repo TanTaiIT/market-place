@@ -1005,6 +1005,10 @@ export type ClearRejections = {
     reason: string;
 };
 
+export type RestoreTrust = {
+    reason: string;
+};
+
 export type ListingProduct = {
     _id: string;
     code: string;
@@ -1037,6 +1041,10 @@ export type UploadSignature = {
     signature: string;
     folder: string;
     uploadPreset: string;
+};
+
+export type RemoveListing = {
+    reason?: string;
 };
 
 export type BannedPhrase = {
@@ -1709,6 +1717,49 @@ export type UserClearRejectionsResponses = {
 
 export type UserClearRejectionsResponse = UserClearRejectionsResponses[keyof UserClearRejectionsResponses];
 
+export type UserRestoreTrustData = {
+    body?: RestoreTrust;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/users/{id}/restore-trust';
+};
+
+export type UserRestoreTrustErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy người dùng
+     */
+    404: ErrorResponse;
+    /**
+     * Uy tín đang ở bậc trần
+     */
+    409: ErrorResponse;
+};
+
+export type UserRestoreTrustError = UserRestoreTrustErrors[keyof UserRestoreTrustErrors];
+
+export type UserRestoreTrustResponses = {
+    /**
+     * Đã phục hồi
+     */
+    200: {
+        success: true;
+        message: string;
+        data: AdminUser;
+    };
+};
+
+export type UserRestoreTrustResponse = UserRestoreTrustResponses[keyof UserRestoreTrustResponses];
+
 export type UserSetStatusData = {
     body?: SetUserStatus;
     path: {
@@ -2250,7 +2301,9 @@ export type ListingUpdateResponse = ListingUpdateResponses[keyof ListingUpdateRe
 export type ListingQuotaData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        categoryId?: string;
+    };
     url: '/listings/quota';
 };
 
@@ -4743,7 +4796,7 @@ export type ModerationListingsResponses = {
 export type ModerationListingsResponse = ModerationListingsResponses[keyof ModerationListingsResponses];
 
 export type ModerationRemoveListingData = {
-    body?: never;
+    body?: RemoveListing;
     path: {
         id: string;
     };

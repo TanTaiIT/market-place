@@ -4,17 +4,18 @@ import type { AdminUser } from '@/api/admin-people';
 import { C, F } from '@/theme';
 
 /**
- * Một ngăn cho cả ba thao tác nặng trên một tài khoản: khoá, gỡ án phạt đăng tin, điều chỉnh Xu.
+ * Một ngăn cho mọi thao tác nặng trên một tài khoản: khoá, gỡ án phạt đăng tin, phục hồi uy
+ * tín, điều chỉnh Xu.
  *
- * Gộp làm một vì cả ba có cùng hình dạng — đều đòi một câu lý do bắt buộc, đều không rút lại
- * được, và đều là quyền chỉ master có. Dựng ba modal gần giống nhau là ba chỗ để quên mất ô lý
- * do ở đúng cái thứ ba.
+ * Gộp làm một vì tất cả có cùng hình dạng — đều đòi một câu lý do bắt buộc, đều không rút lại
+ * được, và đều là quyền chỉ master có. Dựng bốn modal gần giống nhau là bốn chỗ để quên mất ô
+ * lý do ở đúng cái cuối cùng.
  *
- * `Alert.alert` không dùng được ở đây: Android không có `prompt()`, mà cả ba thao tác đều cần
+ * `Alert.alert` không dùng được ở đây: Android không có `prompt()`, mà thao tác nào cũng cần
  * chữ người dùng gõ chứ không chỉ một nút xác nhận.
  */
 
-export type UserAction = 'lock' | 'unlock' | 'clear' | 'wallet';
+export type UserAction = 'lock' | 'unlock' | 'clear' | 'restore' | 'wallet';
 
 export type UserActionInput = {
   /** Lý do khoá / gỡ án phạt, hoặc ghi chú của lượt điều chỉnh ví. */
@@ -43,6 +44,12 @@ const COPY: Record<UserAction, { heading: string; label: string; submit: string;
     label: 'Lý do gỡ',
     submit: 'Gỡ án phạt',
     hint: 'Bị 3 tin từ chối trong 7 ngày là khoá quyền đăng. Đây là đường duy nhất gỡ sớm — dùng khi máy quét chặn oan.',
+  },
+  restore: {
+    heading: 'Phục hồi uy tín',
+    label: 'Lý do phục hồi',
+    submit: 'Phục hồi',
+    hint: 'Trả bậc về trần để tin lại tự lên bảng. KHÔNG gỡ án 7 ngày — người còn án thì bấm thêm "Gỡ án phạt".',
   },
   wallet: {
     heading: 'Điều chỉnh ví Xu',

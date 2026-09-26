@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, { SlideInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ModListing } from '@/api/admin';
 import { ListingPhoto } from './ListingPhoto';
@@ -8,11 +8,27 @@ import { StatusBadge } from './AdminListingRow';
 import { C, F } from '@/theme';
 
 /**
+ * Lý do gỡ hẳn một tin ĐÃ lên bảng — khác `REJECT_REASONS` của bàn duyệt (tin chưa lên). BE ghi
+ * nguyên câu vào thông báo cho người bán và dòng nhật ký, nên mỗi câu phải đọc được từ phía họ.
+ */
+const REMOVE_REASONS = [
+  'Nghi ngờ lừa đảo',
+  'Hàng không được phép bán',
+  'Giá hoặc mô tả sai sự thật',
+  'Tin trùng lặp',
+  'Người bán yêu cầu gỡ',
+];
+
+/**
  * Chi tiết một tin. Prototype web đẩy ngăn này ra từ mép phải; trên điện thoại nó trượt từ
  * dưới lên — cùng vai trò, nhưng ngón cái với tới được nút ở đáy.
  *
  * Nhận `item = null` để đóng thay vì có prop `open` riêng: chỉ có một nguồn sự thật, không thể
  * rơi vào trạng thái "mở nhưng không có tin nào".
+ *
+ * "Gỡ khỏi bảng" đi HAI nhịp: bấm nút rồi chọn lý do. Trước đây là một nhịp không xác nhận cho
+ * một thao tác không rút lại được — và không có chỗ nào để nói lý do, nên người bán chỉ nhận
+ * "không còn trên bảng tin". Vẫn có lối "không nêu lý do" cho ca vội.
  */
 export function AdminListingSheet({
   item,
@@ -25,13 +41,17 @@ export function AdminListingSheet({
   onClose: () => void;
   onApprove: (item: ModListing) => void;
   onToggleHide: (item: ModListing) => void;
-  onRemove: (item: ModListing) => void;
+  onRemove: (item: ModListing, reason?: string) => void;
 }) {
   /*
    * `useSafeAreaInsets()` chứ KHÔNG `<SafeAreaView>` — bên trong `<Modal>` thì component đó
    * không chừa được lề an toàn (xem ghi chú ở chỗ dùng bên dưới).
    */
   const insets = useSafeAreaInsets();
+
+  const [asking, setAsking] = useState(false);
+  // Mở tin khác (hoặc đóng) là quay về nhịp một — bước chọn lý do không được dính từ tin trước.
+  useEffect(() => setAsking(false), [item?.id]);
 
   return (
     /*
@@ -80,29 +100,57 @@ export function AdminListingSheet({
             </View>
           </ScrollView>
 
-          <View style={styles.foot}>
-            {item.status === 'pending' ? (
-              <Pressable
-                onPress={() => onApprove(item)}
-                style={({ pressed }) => [styles.btn, styles.btnOk, pressed && { opacity: 0.8 }]}
-              >
-                <Text style={styles.btnOkText}>📌 Ghim lên bảng</Text>
+          {asking ? (
+            <Animated.View entering={FadeInDown.duration(160)} style={styles.reasons}>
+              <Text style={styles.reasonsTitle}>Gỡ vì lý do gì? Người bán sẽ đọc đúng dòng này.</Text>
+              <View style={styles.reasonRow}>
+                {REMOVE_REASONS.map((reason) => (
+                  <Pressable
+                    key={reason}
+                    onPress={() => onRemove(item, reason)}
+                    style={({ pressed }) => [styles.tag, pressed && { opacity: 0.7 }]}
+                  >
+                    <Text style={styles.tagText}>{reason}</Text>
+                  </Pressable>
+                ))}
+                <Pressable
+                  onPress={() => onRemove(item)}
+                  style={({ pressed }) => [styles.tag, styles.tagMuted, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={[styles.tagText, { color: C.deskTxtDim }]}>Không nêu lý do</Text>
+                </Pressable>
+              </View>
+              <Pressable onPress={() => setAsking(false)} hitSlop={8} style={styles.back}>
+                <Text style={styles.backText}>← Quay lại</Text>
               </Pressable>
-            ) : (
+            </Animated.View>
+          ) : (
+            <View style={styles.foot}>
+              {item.status === 'pending' ? (
+                <Pressable
+                  onPress={() => onApprove(item)}
+                  style={({ pressed }) => [styles.btn, styles.btnOk, pressed && { opacity: 0.8 }]}
+                >
+                  <Text style={styles.btnOkText}>📌 Ghim lên bảng</Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  onPress={() => onToggleHide(item)}
+                  style={({ pressed }) => [styles.btn, pressed && { opacity: 0.8 }]}
+                >
+                  <Text style={styles.btnText}>
+                    {item.status === 'hidden' ? 'Hiện lại' : 'Ẩn tin'}
+                  </Text>
+                </Pressable>
+              )}
               <Pressable
-                onPress={() => onToggleHide(item)}
-                style={({ pressed }) => [styles.btn, pressed && { opacity: 0.8 }]}
+                onPress={() => setAsking(true)}
+                style={({ pressed }) => [styles.btn, styles.btnDanger, pressed && { opacity: 0.8 }]}
               >
-                <Text style={styles.btnText}>{item.status === 'hidden' ? 'Hiện lại' : 'Ẩn tin'}</Text>
+                <Text style={styles.btnDangerText}>Gỡ khỏi bảng</Text>
               </Pressable>
-            )}
-            <Pressable
-              onPress={() => onRemove(item)}
-              style={({ pressed }) => [styles.btn, styles.btnDanger, pressed && { opacity: 0.8 }]}
-            >
-              <Text style={styles.btnDangerText}>Gỡ khỏi bảng</Text>
-            </Pressable>
-          </View>
+            </View>
+          )}
         </Animated.View>
       )}
     </Modal>
@@ -214,4 +262,27 @@ const styles = StyleSheet.create({
   btnOkText: { fontFamily: F.uiBold, fontSize: 13, color: C.desk },
   btnDanger: { backgroundColor: C.pin, borderColor: C.pin },
   btnDangerText: { fontFamily: F.uiBold, fontSize: 13, color: C.paperWarm },
+
+  reasons: {
+    paddingHorizontal: 18,
+    paddingTop: 13,
+    paddingBottom: 6,
+    borderTopWidth: 1,
+    borderTopColor: C.deskLine,
+    gap: 10,
+  },
+  reasonsTitle: { fontFamily: F.uiBold, fontSize: 12.5, color: C.paper },
+  reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  tag: {
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: C.deskRaise,
+    borderWidth: 1,
+    borderColor: C.deskLineStrong,
+  },
+  tagMuted: { backgroundColor: 'transparent', borderStyle: 'dashed' },
+  tagText: { fontFamily: F.ui, fontSize: 12, color: C.deskTxt },
+  back: { alignSelf: 'flex-start', paddingVertical: 4 },
+  backText: { fontFamily: F.ui, fontSize: 12.5, color: C.deskTxtDim },
 });

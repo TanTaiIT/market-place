@@ -1,4 +1,10 @@
-import { userClearRejections, userListForAdmin, userSetStatus, walletAdjust } from './generated';
+import {
+  userClearRejections,
+  userListForAdmin,
+  userRestoreTrust,
+  userSetStatus,
+  walletAdjust,
+} from './generated';
 import type { AdminUser as AdminUserDto } from './generated';
 import { PAGE_SIZE, initialsOf, relativeTime, unwrap, unwrapPage } from './client';
 import type { Page } from './client';
@@ -135,6 +141,19 @@ export const adminPeopleApi = {
       userClearRejections({ path: { id }, body: { reason: reason.trim() } }),
     );
     unwrap(res, 'Không gỡ được án phạt đăng tin');
+  },
+
+  /**
+   * Trả bậc uy tín về trần. Bậc chỉ leo lại bằng 5 tin liên tiếp do NGƯỜI duyệt thông qua, mà
+   * máy duyệt (không cộng điểm) xử gần hết tin của người bậc thấp — nên một lượt gỡ nhầm là mất
+   * bậc vĩnh viễn nếu không có nút này. KHÔNG gỡ án 7 ngày: đó là `clearRejections`.
+   */
+  async restoreTrust({ id, reason }: { id: string; reason: string }): Promise<AdminUser> {
+    if (reason.trim().length < 3) throw new Error('Nhập lý do phục hồi (ít nhất 3 ký tự)');
+    const res = await withAuthRetry(() =>
+      userRestoreTrust({ path: { id }, body: { reason: reason.trim() } }),
+    );
+    return toUser(unwrap(res, 'Không phục hồi được uy tín'));
   },
 
   /**

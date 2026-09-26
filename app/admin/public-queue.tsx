@@ -154,9 +154,9 @@ export default function PublicQueue() {
             act(l.status === 'hidden' ? 'Tin đã hiện lại trên bảng' : 'Đã ẩn tin khỏi bảng'),
           );
         }}
-        onRemove={(l) => {
+        onRemove={(l, reason) => {
           setSheet(null);
-          remove.mutate(l.id, act(`Đã gỡ "${l.title}" khỏi bảng`));
+          remove.mutate({ id: l.id, reason }, act(`Đã gỡ "${l.title}" khỏi bảng`));
         }}
       />
 

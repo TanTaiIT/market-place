@@ -9,7 +9,12 @@ import { Header } from '@/components/OrgProfileCard';
 import { useToast } from '@/components/Toast';
 import { useRequireAuth } from '@/components/GuestGate';
 import { useRequestJoin } from '@/queries/org';
-import { useOrgListingSearch, useOrgPeek, useOrgProfile } from '@/queries/org-discover';
+import {
+  useLeaveOrg,
+  useOrgListingSearch,
+  useOrgPeek,
+  useOrgProfile,
+} from '@/queries/org-discover';
 import { useMyGrants } from '@/queries/admin';
 import { canAdminOrg } from '@/api/admin';
 import { useProfile, useSavedIds, useToggleSaved } from '@/queries/listings';
@@ -39,6 +44,7 @@ export default function OrgProfileScreen() {
   const { data: org, error, isPending } = useOrgProfile(id ?? '', code);
   const { data: me } = useProfile();
   const join = useRequestJoin();
+  const leave = useLeaveOrg(id ?? '', code);
   /*
    * Đang tìm hay đang xem trước — MỘT biến quyết định cả nguồn dữ liệu lẫn câu nói khi rỗng.
    *
@@ -156,7 +162,16 @@ export default function OrgProfileScreen() {
                 : undefined
             }
             onOpenMembers={() => setMembersOrgId(org.id)}
-            busy={join.isPending}
+            onLeave={
+              org.joined
+                ? () =>
+                    leave.mutate(undefined, {
+                      onSuccess: () => toast(`✓ Đã rời ${org.name}`),
+                      onError: (e: Error) => toast(`⚠️ ${e.message}`),
+                    })
+                : undefined
+            }
+            busy={join.isPending || leave.isPending}
           />
             {/*
               Ô TÌM nằm trong `ListHeaderComponent`, dưới phần hồ sơ và ngay trên danh sách:

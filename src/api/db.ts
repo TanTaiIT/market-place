@@ -145,6 +145,12 @@ export type PostingQuota = {
   limit: number;
   pending: number;
   remaining: number;
+  /** Vì sao không đăng được, khi `allowed: false`. */
+  reason?: 'blocked_by_rejections' | 'quota_full' | 'live_full';
+  /** Tin đang hiện + chờ duyệt trên mọi trục, so với trần theo bậc uy tín. */
+  live: { count: number; limit: number };
+  /** Án quản chế của master — có án thì tin luôn chờ người duyệt. */
+  probation: { reason: string; until: string | null } | null;
   needsReconcile: StaleListing[];
 };
 

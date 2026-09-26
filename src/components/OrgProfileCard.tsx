@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { initialsOf } from '@/api/client';
 import { displayUrl } from '@/api/cloudinary';
 import { Avatar, PinButton } from './ui';
@@ -27,6 +27,7 @@ export function Header({
   onEdit,
   onPost,
   onOpenMembers,
+  onLeave,
   busy,
 }: {
   org: OrgProfile;
@@ -39,6 +40,8 @@ export function Header({
   onEdit?: () => void;
   /** Chỉ truyền khi nhóm này NHẬN được tin từ người đang xem — xem `index.tsx`. */
   onPost?: () => void;
+  /** Chỉ khi ĐÃ là thành viên. Hỏi lại trước khi gọi — tin trong nhóm của họ sẽ ẩn theo. */
+  onLeave?: () => void;
   busy: boolean;
 }) {
   const where = [org.district, org.provinceCode].filter(Boolean).join(', ');
@@ -117,6 +120,22 @@ export function Header({
               nhanh và là thứ duy nhất dùng được nếu nhóm chuyển sang riêng tư sau này. */}
           <ActionChip icon="🔗" label="Mời" onPress={onInvite} />
           {!!onEdit && <ActionChip icon="✎" label="Sửa nhóm" onPress={onEdit} />}
+          {!!onLeave && (
+            <ActionChip
+              icon="🚪"
+              label="Rời nhóm"
+              onPress={() =>
+                Alert.alert(
+                  'Rời nhóm này?',
+                  'Tin bạn đã đăng trong nhóm sẽ ẩn đi và bạn mất mọi quyền trong nhóm. Tin lên sàn giữ nguyên.',
+                  [
+                    { text: 'Ở lại', style: 'cancel' },
+                    { text: 'Rời nhóm', style: 'destructive', onPress: onLeave },
+                  ],
+                )
+              }
+            />
+          )}
         </ScrollView>
 
         {/* Mã vẫn phải ĐỌC được, không chỉ chia sẻ được: người ta hay đọc mã cho nhau nghe. Nhưng

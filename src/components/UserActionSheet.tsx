@@ -15,7 +15,14 @@ import { C, F } from '@/theme';
  * chữ người dùng gõ chứ không chỉ một nút xác nhận.
  */
 
-export type UserAction = 'lock' | 'unlock' | 'clear' | 'restore' | 'wallet';
+export type UserAction =
+  | 'lock'
+  | 'unlock'
+  | 'clear'
+  | 'restore'
+  | 'probation'
+  | 'unprobation'
+  | 'wallet';
 
 export type UserActionInput = {
   /** Lý do khoá / gỡ án phạt, hoặc ghi chú của lượt điều chỉnh ví. */
@@ -50,6 +57,18 @@ const COPY: Record<UserAction, { heading: string; label: string; submit: string;
     label: 'Lý do phục hồi',
     submit: 'Phục hồi',
     hint: 'Trả bậc về trần để tin lại tự lên bảng. KHÔNG gỡ án 7 ngày — người còn án thì bấm thêm "Gỡ án phạt".',
+  },
+  probation: {
+    heading: 'Đặt quản chế',
+    label: 'Lý do quản chế',
+    submit: 'Quản chế',
+    hint: 'Tin của người này sẽ phải qua người khác duyệt và không tự lên bảng; họ vẫn duyệt được tin người khác. Vô thời hạn — gỡ tay khi hết chuyện.',
+  },
+  unprobation: {
+    heading: 'Gỡ quản chế',
+    label: 'Ghi chú (không bắt buộc)',
+    submit: 'Gỡ quản chế',
+    hint: 'Tin của người này lại lên bảng theo bậc uy tín như trước.',
   },
   wallet: {
     heading: 'Điều chỉnh ví Xu',

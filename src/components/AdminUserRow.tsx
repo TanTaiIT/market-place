@@ -35,6 +35,7 @@ export function AdminUserRow({
   const status = STATUS[item.status];
   const locked = item.status === 'locked';
   const penalized = item.trustLevel < SELF_PUBLISH_LEVEL;
+  const watched = item.probation !== null;
 
   return (
     <View style={styles.row}>
@@ -69,12 +70,24 @@ export function AdminUserRow({
             <View style={[styles.badgeDot, { backgroundColor: status.fg }]} />
             <Text style={[styles.badgeText, { color: status.fg }]}>{status.label}</Text>
           </View>
+          {/* Án quản chế tách khỏi bậc: bậc không đổi khi bị quản chế, nên chỉ nhìn số là không thấy. */}
+          {watched && (
+            <View style={[styles.badge, { backgroundColor: C.warnTint }]}>
+              <View style={[styles.badgeDot, { backgroundColor: C.tape }]} />
+              <Text style={[styles.badgeText, { color: C.tape }]}>Quản chế</Text>
+            </View>
+          )}
 
           <View style={styles.acts}>
             <RowAction glyph="🪙" onPress={() => onAction('wallet')} />
             <RowAction glyph="⏳" onPress={() => onAction('clear')} />
             {/* Chỉ khi có bậc để trả — BE trả 409 cho người đang ở trần, ẩn nút thay vì để bấm rồi ăn lỗi. */}
             {penalized && <RowAction glyph="↺" onPress={() => onAction('restore')} />}
+            <RowAction
+              glyph="⚖️"
+              tone={watched ? undefined : 'danger'}
+              onPress={() => onAction(watched ? 'unprobation' : 'probation')}
+            />
             <RowAction
               glyph={locked ? '🔓' : '🔒'}
               tone={locked ? undefined : 'danger'}

@@ -101,8 +101,18 @@ export type AdminUser = {
     isActive: boolean;
     isEmailVerified: boolean;
     trustLevel: number;
+    probation: {
+        reason: string;
+        at: string;
+        until: string | null;
+    } | null;
     lastLoginAt: string | null;
     createdAt: string;
+};
+
+export type SetProbation = {
+    reason: string;
+    days?: number;
 };
 
 export type UserReport = {
@@ -160,6 +170,10 @@ export type PostingStanding = {
         rejections: number;
         until: string;
     } | null;
+    probation: {
+        reason: string;
+        until: string | null;
+    } | null;
 };
 
 export type StaleListing = {
@@ -178,7 +192,14 @@ export type QuotaStatus = {
     limit: number;
     pending: number;
     remaining: number;
-    reason?: 'blocked_by_rejections' | 'quota_full';
+    /**
+     * Tin đang hiện + chờ duyệt trên mọi trục, so với trần theo bậc uy tín
+     */
+    live: {
+        count: number;
+        limit: number;
+    };
+    reason?: 'blocked_by_rejections' | 'quota_full' | 'live_full';
     fee: PostingFee;
     standing: PostingStanding;
     /**
@@ -946,7 +967,6 @@ export type MySupportThread = {
         from: 'user' | 'master';
         body: string;
         at: string;
-        byUserId: string;
     }>;
     unread: boolean;
     updatedAt: string | null;
@@ -960,7 +980,6 @@ export type SupportThread = {
         from: 'user' | 'master';
         body: string;
         at: string;
-        byUserId: string;
     }>;
 };
 
@@ -1759,6 +1778,88 @@ export type UserRestoreTrustResponses = {
 };
 
 export type UserRestoreTrustResponse = UserRestoreTrustResponses[keyof UserRestoreTrustResponses];
+
+export type UserLiftProbationData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/users/{id}/probation';
+};
+
+export type UserLiftProbationErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy người dùng
+     */
+    404: ErrorResponse;
+    /**
+     * Tài khoản không trong diện quản chế
+     */
+    409: ErrorResponse;
+};
+
+export type UserLiftProbationError = UserLiftProbationErrors[keyof UserLiftProbationErrors];
+
+export type UserLiftProbationResponses = {
+    /**
+     * Đã gỡ quản chế
+     */
+    200: {
+        success: true;
+        message: string;
+        data: AdminUser;
+    };
+};
+
+export type UserLiftProbationResponse = UserLiftProbationResponses[keyof UserLiftProbationResponses];
+
+export type UserSetProbationData = {
+    body?: SetProbation;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/users/{id}/probation';
+};
+
+export type UserSetProbationErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Cần quyền master, hoặc mục tiêu là master
+     */
+    403: ErrorResponse;
+    /**
+     * Không tìm thấy người dùng
+     */
+    404: ErrorResponse;
+};
+
+export type UserSetProbationError = UserSetProbationErrors[keyof UserSetProbationErrors];
+
+export type UserSetProbationResponses = {
+    /**
+     * Đã đặt quản chế
+     */
+    200: {
+        success: true;
+        message: string;
+        data: AdminUser;
+    };
+};
+
+export type UserSetProbationResponse = UserSetProbationResponses[keyof UserSetProbationResponses];
 
 export type UserSetStatusData = {
     body?: SetUserStatus;
@@ -3261,6 +3362,43 @@ export type MembershipRemoveResponses = {
 };
 
 export type MembershipRemoveResponse = MembershipRemoveResponses[keyof MembershipRemoveResponses];
+
+export type MembershipLeaveData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/memberships/leave';
+};
+
+export type MembershipLeaveErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Không phải thành viên của tổ chức này
+     */
+    403: ErrorResponse;
+    /**
+     * Là quản trị duy nhất của tổ chức
+     */
+    409: ErrorResponse;
+};
+
+export type MembershipLeaveError = MembershipLeaveErrors[keyof MembershipLeaveErrors];
+
+export type MembershipLeaveResponses = {
+    /**
+     * Đã rời nhóm
+     */
+    200: {
+        success: true;
+        message: string;
+        data: unknown;
+    };
+};
+
+export type MembershipLeaveResponse = MembershipLeaveResponses[keyof MembershipLeaveResponses];
 
 export type InviteListData = {
     body?: never;

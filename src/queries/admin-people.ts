@@ -62,6 +62,15 @@ export function useRestoreTrust() {
   return usePeopleMutation(adminPeopleApi.restoreTrust);
 }
 
+/** Đặt/gỡ quản chế đổi `probation` trên hàng — cùng gốc quét với các thao tác khác. */
+export function useSetProbation() {
+  return usePeopleMutation(adminPeopleApi.setProbation);
+}
+
+export function useLiftProbation() {
+  return usePeopleMutation(adminPeopleApi.liftProbation);
+}
+
 /**
  * Điều chỉnh ví. KHÔNG quét cache nào: BE không có đường đọc ví người khác, nên không tồn tại
  * query nào để làm mới — bằng chứng duy nhất của lượt điều chỉnh là sổ cái phía BE.

@@ -5,6 +5,7 @@ import {
   createJoinRequest,
   listJoinRequests,
   membershipList,
+  membershipLeave,
   membershipRemove,
   myJoinRequests,
   myOrganizations,
@@ -125,6 +126,15 @@ export const orgApi = {
       membershipRemove({ path: { userId }, headers: { [ORG_HEADER]: orgId } }),
     );
     unwrap(res, 'Không gỡ được thành viên');
+  },
+
+  /**
+   * Rời nhóm — của CHÍNH MÌNH. BE thu hồi mọi quyền trong nhóm và ẩn tin mình đăng trong nhóm
+   * (tin lên sàn giữ nguyên). Quản trị duy nhất thì 409: phải trao quyền cho người khác trước.
+   */
+  async leave(orgId: string): Promise<void> {
+    const res = await withAuthRetry(() => membershipLeave({ headers: { [ORG_HEADER]: orgId } }));
+    unwrap(res, 'Không rời được nhóm');
   },
 
   async joinRequests(

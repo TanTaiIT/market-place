@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { orgApi, type OrgPatch } from '@/api/org';
+import { orgApi, type OrgPatch, type OrgProfile } from '@/api/org';
 import { api } from '@/api/client';
 import { qk } from './keys';
 
@@ -138,5 +138,32 @@ export function useOrgListingSearch(orgId: string, keyword: string, enabled: boo
     enabled: enabled && orgId.length > 0 && settled.length > 0,
     placeholderData: keepPreviousData,
     staleTime: 30_000,
+  });
+}
+
+/**
+ * Rời nhóm. Lạc quan trên chính hồ sơ đang mở (`joined: false`) để nút đổi ngay; hỏng thì trả
+ * lại. `onSettled` quét: hồ sơ nhóm (mọi biến thể `code`), "nhóm của tôi" (mất một nhóm), và bảng
+ * tin (tin trong nhóm của mình vừa ẩn, tin nội bộ nhóm không còn đọc được).
+ */
+export function useLeaveOrg(orgId: string, code?: string) {
+  const qc = useQueryClient();
+  const key = qk.orgProfile(orgId, code);
+  return useMutation({
+    mutationFn: () => orgApi.leave(orgId),
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: key });
+      const prev = qc.getQueryData<OrgProfile>(key);
+      if (prev) qc.setQueryData<OrgProfile>(key, { ...prev, joined: false });
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(key, ctx.prev);
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['orgs', 'profile'] });
+      void qc.invalidateQueries({ queryKey: qk.myOrgs() });
+      void qc.invalidateQueries({ queryKey: qk.listings() });
+    },
   });
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { KeyboardAvoidingView, Platform } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Surface } from '@/components/Surface';
@@ -15,6 +15,28 @@ import {
 } from '@/queries/listings';
 import { useListingPhotos } from '@/queries/upload';
 import { useOrgProfile } from '@/queries/org-discover';
+import type { PostingQuota } from '@/api/db';
+import { C, F } from '@/theme';
+
+/**
+ * Câu báo TRƯỚC khi soạn tin — người dùng phải biết tin sẽ chờ duyệt hay bị chặn ngay từ đầu,
+ * không phải sau khi gõ xong và ăn một toast 409. `null` = không có gì đáng nói.
+ */
+function quotaNotice(q: PostingQuota | undefined): string | null {
+  if (!q) return null;
+  if (q.probation) return `⚖️ Tài khoản đang bị quản chế — tin sẽ chờ người duyệt. Lý do: ${q.probation.reason}`;
+  if (q.reason === 'live_full') {
+    return `Bạn đang có ${q.live.count}/${q.live.limit} tin đang hiện hoặc chờ duyệt — đánh dấu đã bán hoặc xoá bớt trước khi đăng.`;
+  }
+  if (q.reason === 'blocked_by_rejections') {
+    return 'Quyền đăng đang tạm khoá vì có tin bị từ chối gần đây — liên hệ quản trị để mở lại.';
+  }
+  // 80% trần: nhắc sớm để họ dọn tin cũ, thay vì đụng trần rồi mới biết.
+  if (q.live.count >= q.live.limit * 0.8) {
+    return `Đang có ${q.live.count}/${q.live.limit} tin đang hiện hoặc chờ duyệt.`;
+  }
+  return null;
+}
 
 /**
  * Ghim tin mới.
@@ -76,6 +98,7 @@ export default function Post() {
   // `isPublic` đi kèm vì thang phủ sóng cần nó: nhóm kín không có bậc "Ai cũng xem được".
   const toGroup =
     orgId && org ? { id: orgId, name: org.name, isPublic: org.isPublic } : undefined;
+  const notice = quotaNotice(quota.data);
 
   if (quota.isPending || stale.length > 0) {
     return (
@@ -107,6 +130,7 @@ export default function Post() {
           style={{ flex: 1 }}
         >
           <ScreenHeader title={toGroup ? `Đăng vào ${toGroup.name}` : 'Ghim tin mới'} />
+          {!!notice && <Text style={styles.notice}>{notice}</Text>}
           <ListingForm
             photos={photos}
             toGroup={toGroup}
@@ -136,3 +160,18 @@ export default function Post() {
     </Surface>
   );
 }
+
+const styles = StyleSheet.create({
+  notice: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: C.warnTint,
+    fontFamily: F.ui,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: C.tape,
+  },
+});

@@ -10,7 +10,9 @@ import {
   useAdjustWallet,
   useAdminUsers,
   useClearRejections,
+  useLiftProbation,
   useRestoreTrust,
+  useSetProbation,
   useSetUserLock,
 } from '@/queries/admin-people';
 import type { AdminUser } from '@/api/admin-people';
@@ -47,6 +49,8 @@ export default function AdminUsers() {
   const lock = useSetUserLock();
   const clear = useClearRejections();
   const restore = useRestoreTrust();
+  const probation = useSetProbation();
+  const unprobation = useLiftProbation();
   const adjust = useAdjustWallet();
 
   /** Thao tác đang mở ngăn. Một state cho tất cả vì ngăn chỉ mở được một lần một. */
@@ -90,6 +94,20 @@ export default function AdminUsers() {
           onSuccess: (u) => done(`↺ Đã phục hồi uy tín bậc ${u.trustLevel} cho ${u.name}`),
           onError: fail,
         },
+      );
+    }
+
+    if (action === 'probation') {
+      return probation.mutate(
+        { id: user.id, reason: text },
+        { onSuccess: (u) => done(`⚖️ Đã đặt quản chế ${u.name}`), onError: fail },
+      );
+    }
+
+    if (action === 'unprobation') {
+      return unprobation.mutate(
+        { id: user.id },
+        { onSuccess: (u) => done(`✓ Đã gỡ quản chế ${u.name}`), onError: fail },
       );
     }
 
@@ -147,7 +165,14 @@ export default function AdminUsers() {
       <UserActionSheet
         action={acting?.action ?? null}
         user={acting?.user ?? null}
-        pending={lock.isPending || clear.isPending || restore.isPending || adjust.isPending}
+        pending={
+          lock.isPending ||
+          clear.isPending ||
+          restore.isPending ||
+          probation.isPending ||
+          unprobation.isPending ||
+          adjust.isPending
+        }
         onSubmit={submit}
         onClose={() => setActing(null)}
       />

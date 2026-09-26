@@ -965,6 +965,9 @@ export const api = {
       limit: dto.limit,
       pending: dto.pending,
       remaining: dto.remaining,
+      reason: dto.reason,
+      live: dto.live,
+      probation: dto.standing.probation ?? null,
       needsReconcile: dto.needsReconcile.map((l) => ({
         id: l._id,
         title: l.title,

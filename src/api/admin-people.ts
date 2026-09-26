@@ -1,7 +1,9 @@
 import {
   userClearRejections,
+  userLiftProbation,
   userListForAdmin,
   userRestoreTrust,
+  userSetProbation,
   userSetStatus,
   walletAdjust,
 } from './generated';
@@ -54,6 +56,12 @@ export type AdminUser = {
   status: UserStatus;
   /** Bậc uy tín: từ bậc 2 là tin tự lên bảng, chỉ hậu kiểm. Một số DUY NHẤT cho mọi trục. */
   trustLevel: number;
+  /**
+   * Án quản chế CÒN HIỆU LỰC của master, `null` khi không có. Đang quản chế thì tin của người
+   * này không tự lên, máy không duyệt, và họ không tự duyệt được tin của mình dù là admin nhóm —
+   * bậc uy tín giữ nguyên, nên hàng phải hiện án này TÁCH khỏi con số bậc.
+   */
+  probation: { reason: string; until: string | null } | null;
   joined: string;
   /** `null` = chưa đăng nhập lần nào kể từ khi BE bắt đầu ghi cột này. */
   lastSeen: string | null;
@@ -84,6 +92,9 @@ const toUser = (dto: AdminUserDto): AdminUser => ({
   avatarUrl: dto.avatar || undefined,
   status: statusOf(dto),
   trustLevel: dto.trustLevel,
+  probation: dto.probation
+    ? { reason: dto.probation.reason, until: dto.probation.until ?? null }
+    : null,
   joined: relativeTime(dto.createdAt),
   lastSeen: dto.lastLoginAt ? relativeTime(dto.lastLoginAt) : null,
 });
@@ -144,9 +155,10 @@ export const adminPeopleApi = {
   },
 
   /**
-   * Trả bậc uy tín về trần. Bậc chỉ leo lại bằng 5 tin liên tiếp do NGƯỜI duyệt thông qua, mà
-   * máy duyệt (không cộng điểm) xử gần hết tin của người bậc thấp — nên một lượt gỡ nhầm là mất
-   * bậc vĩnh viễn nếu không có nút này. KHÔNG gỡ án 7 ngày: đó là `clearRejections`.
+   * Trả bậc uy tín về trần. Bậc leo lại bằng 5 tin sạch liên tiếp (người duyệt, hoặc máy từ
+   * bậc 1) — nhưng bậc 0 thì máy không duyệt hộ, nên một lượt gỡ nhầm hai lần là chờ người
+   * duyệt rảnh mới leo lại được. Nút này trả thẳng về trần. KHÔNG gỡ án 7 ngày: đó là
+   * `clearRejections`.
    */
   async restoreTrust({ id, reason }: { id: string; reason: string }): Promise<AdminUser> {
     if (reason.trim().length < 3) throw new Error('Nhập lý do phục hồi (ít nhất 3 ký tự)');
@@ -154,6 +166,23 @@ export const adminPeopleApi = {
       userRestoreTrust({ path: { id }, body: { reason: reason.trim() } }),
     );
     return toUser(unwrap(res, 'Không phục hồi được uy tín'));
+  },
+
+  /**
+   * Đặt quản chế. Nhẹ hơn thu hồi quyền quản trị: người này vẫn duyệt tin của người khác, chỉ
+   * tin CỦA HỌ là phải qua người khác. Vô thời hạn — gỡ bằng `liftProbation`.
+   */
+  async setProbation({ id, reason }: { id: string; reason: string }): Promise<AdminUser> {
+    if (reason.trim().length < 3) throw new Error('Nhập lý do quản chế (ít nhất 3 ký tự)');
+    const res = await withAuthRetry(() =>
+      userSetProbation({ path: { id }, body: { reason: reason.trim() } }),
+    );
+    return toUser(unwrap(res, 'Không đặt được quản chế'));
+  },
+
+  async liftProbation({ id }: { id: string }): Promise<AdminUser> {
+    const res = await withAuthRetry(() => userLiftProbation({ path: { id } }));
+    return toUser(unwrap(res, 'Không gỡ được quản chế'));
   },
 
   /**

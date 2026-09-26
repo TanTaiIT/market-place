@@ -4,7 +4,7 @@ import {
   useQueryClient,
   keepPreviousData,
 } from '@tanstack/react-query';
-import { api } from '@/api/client';
+import { api, type ListingInput } from '@/api/client';
 import type { Listing, Profile, SearchFilter } from '@/api/db';
 import { useIsAuthenticated } from '@/stores/auth';
 import { qk } from './keys';
@@ -147,7 +147,9 @@ export function useQuota() {
 export function useCreateListing() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: api.createListing,
+    /** `idempotencyKey` sinh một lần cho mỗi lần soạn — xem `app/post.tsx`. */
+    mutationFn: ({ input, idempotencyKey }: { input: ListingInput; idempotencyKey?: string }) =>
+      api.createListing(input, idempotencyKey),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.listings() });
       qc.invalidateQueries({ queryKey: qk.profile() });

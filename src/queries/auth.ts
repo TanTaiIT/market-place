@@ -36,6 +36,18 @@ export function useSendEmailCode() {
   return useMutation({ mutationFn: () => api.sendEmailCode() });
 }
 
+/**
+ * Đổi mật khẩu. BE cắt phiên khác và trả PHIÊN MỚI cho máy này — ghi lại ngay bằng `signIn`,
+ * không thì refresh token đang giữ đã chết và lượt refresh kế tiếp đá người dùng ra.
+ */
+export function useChangePassword() {
+  const signIn = useAuthStore((s) => s.signIn);
+  return useMutation({
+    mutationFn: api.changePassword,
+    onSuccess: (session) => signIn(session),
+  });
+}
+
 export function useVerifyEmail() {
   const qc = useQueryClient();
   return useMutation({

@@ -48,6 +48,11 @@ export type AuthResponse = {
     };
 };
 
+export type ChangePassword = {
+    currentPassword: string;
+    newPassword: string;
+};
+
 export type UpdateProfile = {
     name?: string;
     phone?: string | '';
@@ -1111,6 +1116,7 @@ export type Wallet = {
 
 export type XuTransaction = {
     _id: string;
+    userId: string;
     amount: number;
     type: 'topup' | 'post_fee' | 'product_purchase' | 'refund' | 'promo_grant' | 'admin_adjust';
     balanceAfter: number;
@@ -1456,6 +1462,43 @@ export type AuthResetPasswordResponses = {
 };
 
 export type AuthResetPasswordResponse = AuthResetPasswordResponses[keyof AuthResetPasswordResponses];
+
+export type AuthChangePasswordData = {
+    body?: ChangePassword;
+    path?: never;
+    query?: never;
+    url: '/auth/password/change';
+};
+
+export type AuthChangePasswordErrors = {
+    /**
+     * Mật khẩu mới trùng mật khẩu cũ, hoặc tài khoản chưa có mật khẩu
+     */
+    400: ErrorResponse;
+    /**
+     * Mật khẩu hiện tại không đúng, hoặc thiếu token
+     */
+    401: ErrorResponse;
+    /**
+     * Quá nhiều request
+     */
+    429: ErrorResponse;
+};
+
+export type AuthChangePasswordError = AuthChangePasswordErrors[keyof AuthChangePasswordErrors];
+
+export type AuthChangePasswordResponses = {
+    /**
+     * Đã đổi mật khẩu
+     */
+    200: {
+        success: true;
+        message: string;
+        data: AuthResponse;
+    };
+};
+
+export type AuthChangePasswordResponse = AuthChangePasswordResponses[keyof AuthChangePasswordResponses];
 
 export type AuthVerifyResetCodeData = {
     body?: VerifyResetCode;
@@ -2127,6 +2170,9 @@ export type ListingListResponse = ListingListResponses[keyof ListingListResponse
 
 export type ListingCreateData = {
     body?: CreateListing;
+    headers?: {
+        'idempotency-key'?: string;
+    };
     path?: never;
     query?: never;
     url: '/listings';
@@ -3805,6 +3851,7 @@ export type CategoryGetTemplateData = {
     };
     query?: {
         version?: number;
+        fallback?: 'true' | 'false';
     };
     url: '/categories/{id}/template';
 };
@@ -4171,6 +4218,7 @@ export type DefaultTemplateGetData = {
     path?: never;
     query?: {
         version?: number;
+        fallback?: 'true' | 'false';
     };
     url: '/default-template';
 };

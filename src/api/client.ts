@@ -1,4 +1,5 @@
 import {
+  authChangePassword,
   authLogin,
   authLogout,
   authRefresh,
@@ -434,7 +435,7 @@ async function categoryNames(): Promise<Map<string, string>> {
  * Thứ người đăng gõ ra ở form tin — chung cho cả tạo mới lẫn sửa. `price` là chuỗi vì nó tới
  * thẳng từ `TextInput`; chuẩn hoá thành số là việc của `toEditableBody`, không phải của màn hình.
  */
-type ListingInput = {
+export type ListingInput = {
   title: string;
   price: string;
   desc: string;
@@ -560,6 +561,18 @@ export const api = {
   async login(email: string, password: string): Promise<AuthSession> {
     const res = await authLogin({ body: { email, password } });
     return toSession(unwrap(res, 'Đăng nhập không thành công, kiểm tra lại email và mật khẩu'));
+  },
+
+  /**
+   * Đổi mật khẩu khi đang đăng nhập. BE cắt mọi phiên KHÁC và trả cặp token mới cho máy này —
+   * caller phải ghi lại phiên (`signIn`), nếu không lượt refresh kế tiếp là bị đá ra.
+   */
+  async changePassword(input: {
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<AuthSession> {
+    const res = await withAuthRetry(() => authChangePassword({ body: input }));
+    return toSession(unwrap(res, 'Không đổi được mật khẩu'));
   },
 
   /**
@@ -926,9 +939,16 @@ export const api = {
    * Tin mới vào BE ở trạng thái `pending` chờ duyệt, nên nó KHÔNG hiện ngay ngoài feed —
    * `/listings` chỉ trả tin `active`. Người đăng thấy nó ở "Tin của tôi".
    */
-  async createListing(input: ListingInput): Promise<Listing> {
+  async createListing(input: ListingInput, idempotencyKey?: string): Promise<Listing> {
     const [res, names] = await Promise.all([
-      withAuthRetry(() => listingCreate({ body: toCreateBody(input) })),
+      withAuthRetry(() =>
+        listingCreate({
+          body: toCreateBody(input),
+          // Cùng khoá bấm lại → BE trả đúng tin đã tạo thay vì đăng đôi. Tuỳ chọn: không có khoá
+          // thì BE xử như trước.
+          headers: idempotencyKey ? { 'idempotency-key': idempotencyKey } : undefined,
+        }),
+      ),
       categoryNames(),
     ]);
     return toListing(unwrap(res, 'Không ghim được tin lên bảng'), names);

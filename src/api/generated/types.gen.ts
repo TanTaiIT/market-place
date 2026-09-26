@@ -222,6 +222,10 @@ export type PostingStats = {
     }>;
 };
 
+export type UpdateListingLocation = {
+    address?: string;
+};
+
 export type UpdateListing = {
     title?: string;
     description?: string;
@@ -231,14 +235,10 @@ export type UpdateListing = {
     condition?: 'new' | 'like_new' | 'used';
     categoryId?: string;
     images?: Array<string>;
-    location?: {
-        address?: string;
-        province?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
-        ward?: string;
-    };
     attributes?: {
         [key: string]: string | number | boolean | Array<string>;
     };
+    location?: UpdateListingLocation;
 };
 
 export type Listing = {

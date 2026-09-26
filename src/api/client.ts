@@ -42,8 +42,10 @@ import type {
   Listing as ListingDto,
   MeProfile,
   Message as MessageDto,
+  CreateListing,
   OwnerListing as OwnerListingDto,
   PublicProfile as PublicProfileDto,
+  UpdateListing,
 } from './generated';
 import type { Province, ProvinceName } from './location';
 import { CHAT_COLORS, NEW_PHOTOS, locationApplies } from './db';
@@ -474,45 +476,51 @@ type ListingInput = {
 };
 
 /**
- * Payload gửi lên BE, dùng chung cho `POST /listings` và `PATCH /listings/{id}`.
+ * Phần thân GIỐNG NHAU của lượt đăng và lượt sửa — mọi thứ trừ khu vực.
  *
- * Một chỗ duy nhất chuẩn hoá giá và gom `location`: hai đường đi tới cùng một schema, tách đôi
- * thì lần sau chỉ sửa một nhánh là tin sửa xong lại rơi mất `provinceCode` mà tin mới vẫn đúng.
- *
- * `location` chỉ gửi khi người đăng đã chọn khu vực, và KHÔNG có toạ độ — BE đã bỏ hẳn geo,
- * gửi kèm `coordinates` giờ là 400. "Tin gần đây" chạy theo xã/tỉnh chứ không theo bán kính.
+ * Khu vực tách ra vì hai đường nhận hai hình khác nhau: đăng gửi đủ tỉnh/phường/số nhà, sửa
+ * chỉ gửi được số nhà. Gộp lại như bản trước thì một trong hai luôn sai.
  *
  * `address` là số nhà / tên đường tự gõ, nằm dưới xã trong mô hình 2 cấp — không phải cấp
  * quận/huyện đã bỏ từ 01/07/2025.
  */
-function toEditableBody(input: ListingInput) {
-  // Ô giá là `number-pad` nhưng vẫn lọt dấu phân cách người dùng tự gõ; BE nhận `number`.
-  const price = Number(input.price.replace(/\D/g, ''));
-
-  // Gom từng mảnh có thật rồi mới quyết định gửi hay không: gắn `address` vào nhánh
-  // `if (province)` cũ sẽ nuốt mất địa chỉ của người chỉ gõ đường mà chưa chọn tỉnh.
-  const address = input.address?.trim();
-  const location = {
-    ...(address ? { address } : {}),
-    ...(input.province ? { province: input.province } : {}),
-    ...(input.ward ? { ward: input.ward } : {}),
-  };
-
+function commonBody(input: ListingInput) {
   return {
     title: input.title.trim(),
     description: input.desc.trim(),
-    price,
+    // Ô giá là `number-pad` nhưng vẫn lọt dấu phân cách người dùng tự gõ; BE nhận `number`.
+    price: Number(input.price.replace(/\D/g, '')),
     canDeliver: input.canDeliver ?? false,
     categoryId: input.categoryId,
     images: input.photoUrls ?? [],
-    // `location: {}` rỗng qua được `.strict()` của BE nhưng tạo ra bản ghi không lọc
-    // được theo gì — thà vắng hẳn field.
-    ...(Object.keys(location).length ? { location } : {}),
-    // Bỏ hẳn key khi rỗng, cùng lý do với `location`: `attributes: {}` qua được `.strict()`
-    // của BE nhưng ghi ra một tin không lọc được theo gì.
+    // Bỏ hẳn key khi rỗng: `attributes: {}` qua được `.strict()` của BE nhưng ghi ra một tin
+    // không lọc được theo gì.
     ...(input.attributes && Object.keys(input.attributes).length
       ? { attributes: input.attributes }
       : {}),
+  };
+}
+
+/**
+ * Thân của lượt SỬA — khu vực chỉ còn `address`.
+ *
+ * Tỉnh và phường là KHOÁ ĐỊNH TUYẾN: `provinceCode`/`wardCode` bên BE sinh từ chúng đúng một
+ * lần lúc tạo, và quyết định ô (danh mục × tỉnh × phường) nào duyệt tin. Cho sửa sau là mở
+ * đường cho một tin đã duyệt lặng lẽ đổi địa bàn — hiện ra ở tỉnh mới trong khi quyền duyệt
+ * vẫn nằm ở tỉnh cũ. `updateListingSchema` là `.strict()` nên gửi kèm là 400, không phải bị
+ * bỏ qua lặng lẽ.
+ *
+ * Kiểu trả về khai TƯỜNG MINH là chốt duy nhất bắt được việc này: giá trị đi vào `body:` là
+ * kết quả một hàm, không phải object literal tại chỗ gọi, nên phép kiểm dư-thừa-thuộc-tính
+ * không chạy ở đó. Nhờ dòng `: UpdateListing` mà thêm lại `province` vào đây sẽ đỏ ngay.
+ */
+function toEditableBody(input: ListingInput): UpdateListing {
+  const address = input.address?.trim();
+  return {
+    ...commonBody(input),
+    // `location: {}` qua được `.strict()` nhưng là một lượt ghi không nói gì — và với bản vá
+    // chỉ-có-address thì nó còn dễ bị đọc nhầm thành "xoá địa chỉ".
+    ...(address ? { location: { address } } : {}),
   };
 }
 
@@ -524,9 +532,20 @@ function toEditableBody(input: ListingInput) {
  * cho sửa sau là đường để một tin nội bộ đã được nhóm duyệt tự nhảy lên bảng tin chung.
  * Gộp chung một hàm như bản trước thì lượt sửa gửi thừa ba field và ăn 400 từ `.strict()`.
  */
-function toCreateBody(input: ListingInput) {
+function toCreateBody(input: ListingInput): CreateListing {
+  // Gom từng mảnh có thật rồi mới quyết định gửi hay không: gắn `address` vào nhánh
+  // `if (province)` sẽ nuốt mất địa chỉ của người chỉ gõ đường mà chưa chọn tỉnh.
+  const address = input.address?.trim();
+  const location = {
+    ...(address ? { address } : {}),
+    ...(input.province ? { province: input.province } : {}),
+    ...(input.ward ? { ward: input.ward } : {}),
+  };
+
   return {
-    ...toEditableBody(input),
+    ...commonBody(input),
+    // `location: {}` rỗng qua được `.strict()` nhưng tạo ra một tin không lọc được theo gì.
+    ...(Object.keys(location).length ? { location } : {}),
     ...(input.reach ? { reach: input.reach } : {}),
     ...(input.orgId ? { orgId: input.orgId } : {}),
     // CHỈ `marketplace` mới bắt buộc tỉnh: tỉnh là thứ chọn ra manager duyệt tin. `group_open`

@@ -147,6 +147,8 @@ export function ListingForm({
     attrFields: visibleAttrFields(attrFields, attributes),
     attributes,
     needsGroup: pick.reach !== 'marketplace' && !pick.orgId,
+    // `initial` = đang SỬA. Khu vực lúc đó đã khoá, nên nó không còn là chỗ người dùng "còn thiếu".
+    areaLocked: Boolean(initial),
   });
 
   const submit = () => {
@@ -270,7 +272,9 @@ export function ListingForm({
                   onChange={setPicked}
                 />
               )}
-              <LocationFields value={location} onChange={setLocation} />
+              {/* Cùng lý do với thang `reach` ngay trên: BE từ chối tỉnh/phường ở `PATCH`, nên
+                  bày ô chọn khi SỬA là nuốt lựa chọn của người dùng. Số nhà vẫn sửa được. */}
+              <LocationFields value={location} lockArea={Boolean(initial)} onChange={setLocation} />
               </View>
             </>
           )}

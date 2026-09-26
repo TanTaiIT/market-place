@@ -1,7 +1,8 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import type { ProvinceName } from '@/api/location';
 import { AddressField, ProvinceField, WardField } from './LocationPicker';
+import { C, F, S } from '@/theme';
 
 /**
  * Khối khu vực của form đăng tin: gom ba ô địa chỉ cùng luật hợp lệ của chúng vào một chỗ, để
@@ -47,23 +48,50 @@ export function locationGap(location: ListingLocation): { label: string; message
 
 export function LocationFields({
   value,
+  lockArea,
   onChange,
 }: {
   value: ListingLocation;
+  /**
+   * Khoá TỈNH và PHƯỜNG, chỉ còn số nhà sửa được — form SỬA truyền cờ này.
+   *
+   * Hai field đó là khoá định tuyến: BE dựng `provinceCode`/`wardCode` từ chúng đúng một lần
+   * lúc tạo, và chúng quyết định ô (danh mục × tỉnh × phường) nào duyệt tin. `PATCH /listings`
+   * vì thế không nhận chúng nữa — bày ô chọn ở đây là hứa một việc server sẽ từ chối.
+   *
+   * Hiện thành CHỮ chứ không ẩn đi: người sửa tin vẫn cần thấy tin của mình đang ở đâu, và
+   * một khối biến mất giữa form thì họ tưởng dữ liệu bị mất.
+   */
+  lockArea?: boolean;
   onChange: (next: ListingLocation) => void;
 }) {
   const patch = (fields: Partial<ListingLocation>) => onChange({ ...value, ...fields });
 
   return (
     <View style={styles.group}>
-      <ProvinceField value={value.province} onChange={(province) => patch({ province })} />
-      {/* Đổi tỉnh không cần xoá `ward` ở đây — `WardField` tự bỏ xã không thuộc tỉnh đang chọn. */}
-      <WardField
-        province={value.province}
-        value={value.ward}
-        onChange={(ward) => patch({ ward })}
-      />
-      {/* Sau xã: người dùng đã khoanh xong vùng rồi mới gõ chi tiết trong vùng đó. */}
+      {lockArea ? (
+        <View style={styles.locked}>
+          <Text style={styles.lockedLabel}>KHU VỰC</Text>
+          <Text style={styles.lockedValue}>
+            {[value.ward, value.province].filter(Boolean).join(', ') || 'Chưa có khu vực'}
+          </Text>
+          <Text style={styles.lockedHint}>
+            Khu vực cố định sau khi đăng — nó quyết định ai duyệt tin. Cần đổi thì đăng tin mới.
+          </Text>
+        </View>
+      ) : (
+        <>
+          <ProvinceField value={value.province} onChange={(province) => patch({ province })} />
+          {/* Đổi tỉnh không cần xoá `ward` ở đây — `WardField` tự bỏ xã không thuộc tỉnh đang chọn. */}
+          <WardField
+            province={value.province}
+            value={value.ward}
+            onChange={(ward) => patch({ ward })}
+          />
+        </>
+      )}
+      {/* Sau xã: người dùng đã khoanh xong vùng rồi mới gõ chi tiết trong vùng đó. Số nhà KHÔNG
+          tham gia định tuyến nên vẫn sửa được ở form sửa. */}
       <AddressField value={value.address} onChange={(address) => patch({ address })} />
     </View>
   );
@@ -71,4 +99,14 @@ export function LocationFields({
 
 const styles = StyleSheet.create({
   group: { marginTop: 18 },
+  locked: {
+    backgroundColor: C.paperWarm,
+    borderRadius: 10,
+    paddingHorizontal: S.md,
+    paddingVertical: S.md,
+    marginBottom: S.md,
+  },
+  lockedLabel: { fontFamily: F.mono, fontSize: 9.5, letterSpacing: 1.2, color: C.inkSoft },
+  lockedValue: { fontFamily: F.uiBold, fontSize: 14, color: C.ink, marginTop: 3 },
+  lockedHint: { fontFamily: F.ui, fontSize: 11.5, color: C.inkSoft, marginTop: 6, lineHeight: 17 },
 });

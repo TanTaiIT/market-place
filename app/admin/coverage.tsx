@@ -218,6 +218,9 @@ const styles = StyleSheet.create({
     gap: 9,
     marginHorizontal: 16,
     marginTop: 12,
+    // Thanh lọc bên dưới (`AdminFilter`) không có lề trên — thiếu dòng này là hai khối dính sát
+    // nhau. Cùng mức với ô tìm của màn Tin đăng.
+    marginBottom: 12,
     paddingHorizontal: 13,
     borderRadius: 10,
     backgroundColor: C.deskRaise,

@@ -362,6 +362,7 @@ export type OrganizationLookup = {
     coverUrl: string | null;
     memberCount: number;
     district: string | null;
+    ward: string | null;
     provinceCode: string | null;
     allowJoinRequests: boolean;
     allowOutsiderPosts: boolean;
@@ -376,6 +377,7 @@ export type OrganizationProfile = {
     description: string;
     provinceCode: string | null;
     district: string | null;
+    ward: string | null;
     memberCount: number;
     postsThisWeek: number;
     rules: Array<string>;
@@ -408,6 +410,7 @@ export type UpdateOrganization = {
     allowOutsiderPosts?: boolean;
     rules?: Array<string>;
     feedLayout?: 'feed' | 'grid';
+    ward?: string | null;
 };
 
 export type OrganizationCard = {
@@ -416,6 +419,7 @@ export type OrganizationCard = {
     description: string;
     provinceCode: string | null;
     district: string | null;
+    ward: string | null;
     memberCount: number;
     allowJoinRequests: boolean;
 };
@@ -425,6 +429,7 @@ export type CreateOrganization = {
     orgType?: 'school' | 'company' | 'community' | 'generic';
     provinceCode?: string;
     district?: string;
+    ward?: string;
 };
 
 export type SetOrganizationStatus = {
@@ -3120,6 +3125,8 @@ export type OrganizationLookupData = {
     path?: never;
     query?: {
         q?: string;
+        province?: 'Hà Nội' | 'Cao Bằng' | 'Tuyên Quang' | 'Lào Cai' | 'Điện Biên' | 'Lai Châu' | 'Sơn La' | 'Thái Nguyên' | 'Lạng Sơn' | 'Quảng Ninh' | 'Bắc Ninh' | 'Phú Thọ' | 'Hải Phòng' | 'Hưng Yên' | 'Ninh Bình' | 'Thanh Hóa' | 'Nghệ An' | 'Hà Tĩnh' | 'Quảng Trị' | 'Huế' | 'Đà Nẵng' | 'Quảng Ngãi' | 'Gia Lai' | 'Đắk Lắk' | 'Khánh Hòa' | 'Lâm Đồng' | 'Đồng Nai' | 'Tây Ninh' | 'Hồ Chí Minh' | 'Đồng Tháp' | 'Vĩnh Long' | 'An Giang' | 'Cần Thơ' | 'Cà Mau';
+        ward?: string;
     };
     url: '/organizations/lookup';
 };
@@ -4997,6 +5004,7 @@ export type ModerationListingsData = {
         status?: 'pending' | 'pending_unverified' | 'active' | 'rejected' | 'hidden';
         category?: string;
         q?: string;
+        seller?: string;
         page?: number;
         limit?: number;
     };
@@ -5165,6 +5173,7 @@ export type ModerationPublicQueueData = {
         status?: 'pending' | 'pending_unverified' | 'active' | 'rejected' | 'hidden';
         category?: string;
         q?: string;
+        seller?: string;
         page?: number;
         limit?: number;
     };

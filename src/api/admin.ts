@@ -233,7 +233,7 @@ export const adminApi = {
     status: ModStatus | undefined,
     categoryNames: Map<string, string>,
     page: number,
-    filter: { category?: string; q?: string } = {},
+    filter: { category?: string; q?: string; seller?: string } = {},
   ): Promise<Page<ModListing>> {
     const res = await withAuthRetry(() =>
       moderationListings({
@@ -241,6 +241,7 @@ export const adminApi = {
           status,
           category: filter.category,
           q: filter.q?.trim() || undefined,
+          seller: filter.seller,
           page,
           limit: PAGE_SIZE,
         },

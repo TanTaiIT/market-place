@@ -4,6 +4,7 @@ import { supportApi } from '@/api/support';
 import { onSocketEvent } from '@/api/socket';
 import { useIsAuthenticated } from '@/stores/auth';
 import { qk } from './keys';
+import { usePagedList } from './paged';
 
 /**
  * Lưới dự phòng cho socket, KHÔNG phải đường chính.
@@ -83,10 +84,7 @@ export function useMarkSupportRead() {
 /* ------------------------------- phía master ------------------------------- */
 
 export function useSupportQueue(waiting: boolean) {
-  return useQuery({
-    queryKey: qk.supportQueue(waiting),
-    queryFn: () => supportApi.queue(waiting),
-  });
+  return usePagedList(qk.supportQueue(waiting), (page) => supportApi.queue(waiting, page));
 }
 
 /**

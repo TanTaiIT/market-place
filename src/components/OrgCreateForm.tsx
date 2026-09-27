@@ -4,8 +4,8 @@ import { AdminChip, AdminPickerField, adminFormStyles } from './AdminPicker';
 import { Field, PinButton } from './ui';
 import { useToast } from './Toast';
 import type { PickerSearch } from './PickerSheet';
-import { useProvinces } from '@/queries/location';
-import { filterProvinces, mergedFromLabel, type ProvinceName } from '@/api/location';
+import { useProvinces, useWards } from '@/queries/location';
+import { filterProvinces, filterWards, mergedFromLabel, type ProvinceName } from '@/api/location';
 import { ORG_TYPES, type NewOrgInput, type OrgType } from '@/api/org-admin';
 
 /**
@@ -21,7 +21,7 @@ const EMPTY: NewOrgInput = {
   orgType: 'school',
   adminEmail: '',
   provinceCode: null,
-  district: '',
+  ward: null,
 };
 
 export function OrgCreateForm({
@@ -34,6 +34,7 @@ export function OrgCreateForm({
   const toast = useToast();
   const [form, setForm] = useState<NewOrgInput>(EMPTY);
   const { data: provinces, isPending } = useProvinces();
+  const { data: wards, isPending: wardsPending } = useWards(form.provinceCode);
 
   const patch = (fields: Partial<NewOrgInput>) => setForm((prev) => ({ ...prev, ...fields }));
 
@@ -45,6 +46,11 @@ export function OrgCreateForm({
         note: mergedFromLabel(p),
       })),
     [provinces],
+  );
+
+  const searchWard = useCallback<PickerSearch<string>>(
+    (keyword) => filterWards(wards ?? [], keyword).map((w) => ({ key: w, label: w })),
+    [wards],
   );
 
   const submit = () => {
@@ -105,16 +111,22 @@ export function OrgCreateForm({
           loading={isPending}
           value={form.provinceCode}
           emptyLabel="Không gắn tỉnh nào"
-          onChange={(provinceCode) => patch({ provinceCode })}
+          // Đổi tỉnh là bỏ phường cũ: phường của tỉnh trước không thuộc tỉnh mới.
+          onChange={(provinceCode) => patch({ provinceCode, ward: null })}
         />
 
-        <Field
-          onDark
-          label="Quận / huyện cũ (tuỳ chọn)"
-          value={form.district}
-          onChangeText={(district) => patch({ district })}
-          placeholder="Chỉ để phân biệt hai tổ chức trùng tên"
-        />
+        {form.provinceCode && (
+          <AdminPickerField
+            label="Phường / xã (tuỳ chọn)"
+            title={form.provinceCode}
+            placeholder="Chưa chọn"
+            search={searchWard}
+            loading={wardsPending}
+            value={form.ward}
+            emptyLabel="Không gắn phường nào"
+            onChange={(ward) => patch({ ward })}
+          />
+        )}
       </View>
 
       <PinButton label="Tạo tổ chức" loading={busy} onPress={submit} />

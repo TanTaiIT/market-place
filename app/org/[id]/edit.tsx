@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { initialsOf } from '@/api/client';
 import { uploadImage } from '@/api/cloudinary';
 import { AvatarPicker } from '@/components/AvatarPicker';
+import { WardField, type ProvinceName } from '@/components/LocationPicker';
 import { BoxField, FormSection } from '@/components/FormSection';
 import { EmptyState, Loading, PinButton, ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
@@ -72,11 +73,13 @@ export default function OrgEditScreen() {
     <Shell>
       <Form
         name={org.name}
+        province={org.provinceCode as ProvinceName | null}
         initial={{
           avatarUrl: org.avatarUrl,
           coverUrl: org.coverUrl,
           description: org.description,
           rules: org.rules,
+          ward: org.ward,
         }}
         busy={save.isPending}
         onSave={(patch) =>
@@ -98,18 +101,22 @@ type Draft = {
   coverUrl: string | null;
   description: string;
   rules: string[];
+  ward: string | null;
 };
 /** Một dòng nội quy trong form. `id` chỉ sống ở client — xem `rules` trong `<Form>`. */
 type Rule = { id: string; text: string };
 
 function Form({
   name,
+  province,
   initial,
   busy,
   onSave,
 }: {
   /** Tên nhóm — chỉ để dựng chữ viết tắt khi chưa có avatar. */
   name: string;
+  /** Tỉnh do master đặt — quản trị nhóm chỉ chọn phường TRONG tỉnh đó. `null` = chưa gắn tỉnh. */
+  province: ProvinceName | null;
   initial: Draft;
   busy: boolean;
   onSave: (patch: Draft) => void;
@@ -118,6 +125,7 @@ function Form({
   const [avatar, setAvatar] = useState(initial.avatarUrl);
   const [cover, setCover] = useState(initial.coverUrl);
   const [desc, setDesc] = useState(initial.description);
+  const [ward, setWard] = useState(initial.ward);
   /*
    * Mỗi dòng nội quy mang một `id` riêng, dù dữ liệu gửi đi chỉ là mảng chuỗi.
    *
@@ -170,6 +178,7 @@ function Form({
       coverUrl: cover,
       description: desc.trim(),
       rules: rules.map((r) => r.text.trim()).filter(Boolean),
+      ward,
     });
   };
 
@@ -224,6 +233,12 @@ function Form({
           </Pressable>
         )}
       </View>
+
+      <FormSection
+        title="Khu vực"
+        hint={province ? `Để người ở gần tìm thấy nhóm khi lọc theo phường trong ${province}` : 'Nhóm chưa gắn tỉnh — nhờ master gắn tỉnh trước'}
+      />
+      <WardField province={province} value={ward} onChange={setWard} allowAll />
 
       <FormSection title="Giới thiệu nhóm" hint="Người ngoài đọc đoạn này trước khi xin vào" />
       <BoxField

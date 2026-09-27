@@ -74,7 +74,8 @@ export type NewOrgInput = {
   adminEmail: string;
   /** Tên tỉnh, không phải mã — cùng nguồn `ProvinceName` với tin đăng, khỏi cast ở form. */
   provinceCode: ProvinceName | null;
-  district: string;
+  /** Phường/xã trong danh mục, thuộc `provinceCode` — BE chặn cặp lệch. */
+  ward: string | null;
 };
 
 export const ROLE_LABEL: Record<RoleGrant['role'], string> = {
@@ -218,7 +219,7 @@ export const orgAdminApi = {
           name: input.name.trim(),
           orgType: input.orgType,
           ...(input.provinceCode ? { provinceCode: input.provinceCode } : {}),
-          ...(input.district.trim() ? { district: input.district.trim() } : {}),
+          ...(input.provinceCode && input.ward ? { ward: input.ward } : {}),
         },
       }),
     );

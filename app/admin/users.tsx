@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { AdminFilter, AdminScreen } from '@/components/AdminScreen';
 import { AdminUserRow } from '@/components/AdminUserRow';
 import { UserActionSheet } from '@/components/UserActionSheet';
@@ -38,6 +39,7 @@ const TABS = [
 ];
 
 export default function AdminUsers() {
+  const router = useRouter();
   const toast = useToast();
   const [term, setTerm] = useState('');
   const [tab, setTab] = useState('all');
@@ -149,7 +151,16 @@ export default function AdminUsers() {
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => (
-          <AdminUserRow item={item} onAction={(action) => setActing({ action, user: item })} />
+          <AdminUserRow
+            item={item}
+            onAction={(action) => setActing({ action, user: item })}
+            onOpen={() =>
+              router.push({
+                pathname: '/admin/user/[id]',
+                params: { id: item.id, name: item.name, email: item.email },
+              })
+            }
+          />
         )}
         ListEmptyComponent={
           isPending ? (

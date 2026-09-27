@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { AdminUser, UserStatus } from '@/api/admin-people';
 import { RowAction } from './AdminListingRow';
 import type { UserAction } from './UserActionSheet';
@@ -28,9 +28,12 @@ const colorOf = (name: string) =>
 export function AdminUserRow({
   item,
   onAction,
+  onOpen,
 }: {
   item: AdminUser;
   onAction: (action: UserAction) => void;
+  /** Chạm vào phần tên → màn các tin người này đã đăng. Nút hành động vẫn bấm riêng. */
+  onOpen: () => void;
 }) {
   const status = STATUS[item.status];
   const locked = item.status === 'locked';
@@ -48,12 +51,14 @@ export function AdminUserRow({
       />
 
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text numberOfLines={1} style={styles.name}>
-          {item.name}
-        </Text>
-        <Text numberOfLines={1} style={styles.email}>
-          {item.email}
-        </Text>
+        <Pressable onPress={onOpen} style={({ pressed }) => pressed && { opacity: 0.6 }}>
+          <Text numberOfLines={1} style={styles.name}>
+            {item.name} <Text style={styles.open}>›</Text>
+          </Text>
+          <Text numberOfLines={1} style={styles.email}>
+            {item.email}
+          </Text>
+        </Pressable>
         <Text style={styles.stats}>
           {/* Tô sáng đúng ngưỡng tự đăng: nó là thứ khiến tin của người này lên bảng mà không ai
               nhìn qua. */}
@@ -111,6 +116,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   name: { fontFamily: F.uiBold, fontSize: 13.5, color: C.paper },
+  open: { color: C.deskTxtDim },
   email: { fontFamily: F.mono, fontSize: 10.5, color: C.deskTxtSoft, marginTop: 3 },
   stats: { fontFamily: F.ui, fontSize: 11, color: C.deskTxtDim, marginTop: 6 },
   foot: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },

@@ -4,6 +4,7 @@ import { initialsOf } from '@/api/client';
 import { displayUrl } from '@/api/cloudinary';
 import { Avatar, PinButton } from './ui';
 import { SectionHead } from './SectionHead';
+import { orgWhere } from '@/api/org';
 import type { Member, OrgProfile } from '@/api/org';
 import { C, F, R, S, T, shadow } from '@/theme';
 
@@ -44,7 +45,7 @@ export function Header({
   onLeave?: () => void;
   busy: boolean;
 }) {
-  const where = [org.district, org.provinceCode].filter(Boolean).join(', ');
+  const where = orgWhere(org);
 
   return (
     <View>

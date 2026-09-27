@@ -22,6 +22,7 @@ import type {
   MyOrganization,
   OrganizationProfile,
   UpdateOrganization,
+  OrganizationLookupData,
 } from './generated';
 
 /** Màn hình đi qua đây, không import thẳng `generated` — `app/**` chỉ biết tới `api/**`. */
@@ -31,6 +32,11 @@ export type { UpdateOrganization as OrgPatch };
 /** Một thẻ nhóm trong danh sách khám phá, và hồ sơ đầy đủ của một nhóm. */
 export type OrgRow = OrganizationLookup;
 export type OrgProfile = OrganizationProfile;
+/** Bộ lọc địa bàn của màn Tìm nhóm. Tỉnh lấy đúng tập tên mà BE nhận. */
+export type OrgWhereFilter = {
+  province?: NonNullable<NonNullable<OrganizationLookupData['query']>['province']>;
+  ward?: string;
+};
 import { PAGE_SIZE, relativeTime, unwrap, unwrapPage } from './client';
 import type { Page } from './client';
 import { ORG_HEADER, withAuthRetry } from './http';
@@ -65,8 +71,17 @@ export type MyJoinRequest = {
   expiresAt: string;
 };
 
-function whereOf(district: string | null, province: string | null): string {
-  return [district, province].filter(Boolean).join(', ');
+/**
+ * "Phường Bến Thành, Hồ Chí Minh". Phường (danh mục) đứng trước quận cũ (chữ tự do trước
+ * 01/07/2025): nhóm nào đã khai phường thì hiện đúng địa bàn đang lọc được. Bỏ phần vắng thay vì
+ * để lại dấu phẩy cụt.
+ */
+export function orgWhere(org: {
+  ward?: string | null;
+  district?: string | null;
+  provinceCode: string | null;
+}): string {
+  return [org.ward ?? org.district, org.provinceCode].filter(Boolean).join(', ');
 }
 
 /** Đối xứng với `relativeTime` nhưng nhìn về phía trước: "còn 3 ngày" chứ không "3 ngày trước". */
@@ -198,9 +213,16 @@ export const orgApi = {
    * Gọi trần, không `withAuthRetry`: route công khai, người chưa đăng nhập vẫn tìm được.
    * Nhóm riêng tư không bao giờ nằm trong kết quả — BE lọc, client không phải biết.
    */
-  async discover(keyword: string): Promise<OrgRow[]> {
+  async discover(keyword: string, where: OrgWhereFilter = {}): Promise<OrgRow[]> {
     const q = keyword.trim();
-    const res = await organizationLookup({ query: q ? { q } : {} });
+    const res = await organizationLookup({
+      query: {
+        ...(q ? { q } : {}),
+        ...(where.province ? { province: where.province } : {}),
+        // Phường chỉ có nghĩa khi đi kèm tỉnh — BE trả 400 nếu gửi lẻ.
+        ...(where.province && where.ward ? { ward: where.ward } : {}),
+      },
+    });
     return unwrap(res, 'Không tìm được nhóm nào');
   },
 
@@ -282,7 +304,7 @@ export const orgApi = {
     const org = unwrap(res, 'Không tìm thấy tổ chức nào với mã này');
     return {
       name: org.name,
-      where: whereOf(org.district, org.provinceCode),
+      where: orgWhere(org),
       memberCount: org.memberCount,
       allowJoinRequests: org.allowJoinRequests,
     };

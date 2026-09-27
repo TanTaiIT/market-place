@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AdminFilter, AdminPanel, AdminScreen } from '@/components/AdminScreen';
-import { EmptyState, Loading, PinButton } from '@/components/ui';
+import { EmptyState, Loading, PagedFooter, PinButton } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import {
   useReplySupport,
@@ -121,37 +121,43 @@ export default function AdminSupport() {
     <AdminScreen title="Hỗ trợ người dùng" note="hộp thư của đội ngũ nền tảng">
       <AdminFilter options={FILTERS} value={filter} onChange={setFilter} />
 
-      <ScrollView contentContainerStyle={styles.body}>
-        {queue.isPending ? (
-          <Loading onDark />
-        ) : queue.error ? (
-          <EmptyState icon="📡" onDark text={(queue.error as Error).message} />
-        ) : (queue.data ?? []).length === 0 ? (
-          <EmptyState
-            icon="📭"
-            onDark
-            text={
-              filter === 'waiting'
-                ? 'Không có ai đang chờ trả lời'
-                : 'Chưa có cuộc trao đổi nào'
-            }
-          />
-        ) : (
-          (queue.data ?? []).map((t) => (
-            <Pressable key={t.id} onPress={() => setOpenId(t.id)} style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.name}>{t.userName}</Text>
-                <Text style={styles.meta}>
-                  {t.lastUserAt ? `Nhắn ${relativeTime(t.lastUserAt)}` : 'Chưa nhắn gì'}
-                  {t.lastMasterAt ? ` · đã trả lời ${relativeTime(t.lastMasterAt)}` : ''}
-                </Text>
-              </View>
-              {t.waiting && <View style={styles.waitDot} />}
-              <Text style={styles.chev}>›</Text>
-            </Pressable>
-          ))
+      {/* FlatList + tải thêm khi cuộn: hàng đợi phân trang 10 luồng/trang (xem `supportApi.queue`). */}
+      <FlatList
+        data={queue.data ?? []}
+        keyExtractor={(t) => t.id}
+        onEndReached={queue.loadMore}
+        onEndReachedThreshold={0.5}
+        contentContainerStyle={styles.body}
+        ListFooterComponent={<PagedFooter loading={queue.isFetchingNextPage} onDark />}
+        ListEmptyComponent={
+          queue.isPending ? (
+            <Loading onDark />
+          ) : queue.error ? (
+            <EmptyState icon="📡" onDark text={(queue.error as Error).message} />
+          ) : (
+            <EmptyState
+              icon="📭"
+              onDark
+              text={
+                filter === 'waiting' ? 'Không có ai đang chờ trả lời' : 'Chưa có cuộc trao đổi nào'
+              }
+            />
+          )
+        }
+        renderItem={({ item: t }) => (
+          <Pressable onPress={() => setOpenId(t.id)} style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.name}>{t.userName}</Text>
+              <Text style={styles.meta}>
+                {t.lastUserAt ? `Nhắn ${relativeTime(t.lastUserAt)}` : 'Chưa nhắn gì'}
+                {t.lastMasterAt ? ` · đã trả lời ${relativeTime(t.lastMasterAt)}` : ''}
+              </Text>
+            </View>
+            {t.waiting && <View style={styles.waitDot} />}
+            <Text style={styles.chev}>›</Text>
+          </Pressable>
         )}
-      </ScrollView>
+      />
     </AdminScreen>
   );
 }

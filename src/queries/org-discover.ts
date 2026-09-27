@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { orgApi, type OrgPatch, type OrgProfile } from '@/api/org';
+import { orgApi, type OrgPatch, type OrgProfile, type OrgWhereFilter } from '@/api/org';
 import { api } from '@/api/client';
 import { qk } from './keys';
 
@@ -19,7 +19,7 @@ import { qk } from './keys';
  * Debounce 300ms, cùng lý do với ô tìm của bảng tổ chức (`useAllOrgs`): mỗi tiền tố là một `queryKey` mới
  * nên gõ thẳng sẽ bắn một request cho từng chữ cái vào một route có rate limit.
  */
-export function useOrgDiscover(keyword: string) {
+export function useOrgDiscover(keyword: string, where: OrgWhereFilter = {}) {
   const term = keyword.trim();
   const [settled, setSettled] = useState(term);
   useEffect(() => {
@@ -28,8 +28,9 @@ export function useOrgDiscover(keyword: string) {
   }, [term]);
 
   return useQuery({
-    queryKey: qk.orgDiscover(settled),
-    queryFn: () => orgApi.discover(settled),
+    // Bộ lọc KHÔNG hoãn như từ khoá: chọn tỉnh là một cú chạm, không phải chuỗi phím đang gõ dở.
+    queryKey: qk.orgDiscover(settled, where.province ?? null, where.ward ?? null),
+    queryFn: () => orgApi.discover(settled, where),
     placeholderData: keepPreviousData,
     staleTime: 60_000,
   });

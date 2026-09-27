@@ -7,7 +7,8 @@ import {
   supportThread,
 } from './generated';
 import type { MySupportThread, SupportQueueItem, SupportThread } from './generated';
-import { unwrap } from './client';
+import { PAGE_SIZE, unwrap, unwrapPage } from './client';
+import type { Page } from './client';
 import { withAuthRetry } from './http';
 
 export type SupportMessage = MySupportThread['messages'][number];
@@ -20,9 +21,6 @@ export type { MySupportThread, SupportQueueItem, SupportThread };
  * theo `(listingId, buyerId)`), còn đây là một luồng duy nhất cho mỗi người, sống mãi, không
  * thuộc tổ chức nào. Hai thứ khác domain nên khác endpoint.
  */
-
-/** Trần `limit` mà `/support/threads` khai trong spec — xem lý do ở `supportApi.queue`. */
-const QUEUE_LIMIT = 100;
 
 export const supportApi = {
   /** Luồng của chính mình. Chưa nhắn bao giờ vẫn trả về hình dạng đầy đủ với `id: null`. */
@@ -46,25 +44,26 @@ export const supportApi = {
 
   /* ------------------------------ phía master ------------------------------ */
 
-  async queue(waiting: boolean): Promise<SupportQueueItem[]> {
+  /**
+   * Một TRANG hàng đợi, 10 luồng — trần chung của mọi danh sách (`PAGINATION.MAX_LIMIT` bên BE).
+   *
+   * Bản trước xin `limit: 100` một lượt với ý "thấy trọn hàng đợi". Ý đó chưa bao giờ thành: BE
+   * vẫn kẹp về 10, nên master chỉ thấy 10 luồng đầu mà không có dấu hiệu nào; và từ khi schema
+   * chặn cứng ở 10 thì nó thành lỗi 400. Phân trang thật (cuộn tới đâu tải tới đó) là đường duy
+   * nhất vừa đúng luật chung vừa không cắt mất việc của master.
+   */
+  async queue(waiting: boolean, page: number): Promise<Page<SupportQueueItem>> {
     const res = await withAuthRetry(() =>
       supportQueue({
         query: {
           // Chuỗi chứ không boolean: BE nhận `'true' | 'false'` vì `Boolean('false')` là `true`.
           waiting: waiting ? 'true' : 'false',
-          /*
-           * Xin thẳng trần của endpoint này.
-           *
-           * `/support/threads` là ngoại lệ duy nhất trong spec: nó cho `limit` tới 100, còn mọi
-           * endpoint danh sách khác chặn ở 10. Không gửi gì thì BE rơi về mặc định 10 và master
-           * chỉ thấy 10 luồng đầu mà không có dấu hiệu nào — im lặng cắt mất việc phải làm.
-           * Phản hồi có `meta` phân trang; khi hàng đợi vượt 100 thì chỗ này cần phân trang thật.
-           */
-          limit: QUEUE_LIMIT,
+          page,
+          limit: PAGE_SIZE,
         },
       }),
     );
-    return unwrap(res, 'Không tải được hàng đợi hỗ trợ');
+    return unwrapPage(res, 'Không tải được hàng đợi hỗ trợ', (t) => t);
   },
 
   /** Mở một luồng. Lệnh này ĐÁNH DẤU master đã xem, nên luồng rời hàng đợi. */

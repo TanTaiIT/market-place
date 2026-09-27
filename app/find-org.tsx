@@ -4,11 +4,12 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
 import { OrgGrid, type OrgGridSection } from '@/components/OrgGrid';
+import { ProvinceField, WardField, type ProvinceName } from '@/components/LocationPicker';
 import { useToast } from '@/components/Toast';
 import { useMyOrgs, useRequestJoin } from '@/queries/org';
 import { useOrgDiscover } from '@/queries/org-discover';
 import { useProfile } from '@/queries/listings';
-import type { OrgRow } from '@/api/org';
+import { orgWhere, type OrgRow } from '@/api/org';
 import { C, F } from '@/theme';
 
 /**
@@ -24,17 +25,19 @@ import { C, F } from '@/theme';
  * một nhóm kín cũng không lộ ra nó có tồn tại.
  */
 
-/** "Quận 1, Hồ Chí Minh" — bỏ phần vắng thay vì để lại dấu phẩy cụt. */
-const whereOf = (org: OrgRow) => [org.district, org.provinceCode].filter(Boolean).join(', ');
-
 export default function FindOrg() {
   const router = useRouter();
   const toast = useToast();
   const [term, setTerm] = useState('');
+  const [province, setProvince] = useState<ProvinceName | null>(null);
+  const [ward, setWard] = useState<string | null>(null);
 
   const { data: profile } = useProfile();
   const { data: mine } = useMyOrgs();
-  const { data, error, isPending } = useOrgDiscover(term);
+  const { data, error, isPending } = useOrgDiscover(term, {
+    province: province ?? undefined,
+    ward: ward ?? undefined,
+  });
   const join = useRequestJoin();
 
   const myIds = new Set((mine ?? []).map((o) => o.id));
@@ -90,7 +93,7 @@ export default function FindOrg() {
         avatarUrl: o.avatarUrl,
         coverUrl: o.coverUrl,
         memberCount: o.memberCount,
-        where: whereOf(o),
+        where: orgWhere(o),
         joinCode: o.joinCode,
         action: o.allowJoinRequests ? 'join' : 'closed',
         // Nhóm không nhận đơn chỉ lọt vào đây qua đường gõ đúng mã, nên ổ khoá đi cùng ca đó.
@@ -119,6 +122,16 @@ export default function FindOrg() {
         />
       </View>
 
+      {/* Bỏ trống = toàn quốc / toàn tỉnh. Phường tự xoá khi đổi tỉnh (xem `WardField`). */}
+      <View style={styles.filters}>
+        <View style={{ flex: 1 }}>
+          <ProvinceField value={province} onChange={setProvince} allowAll />
+        </View>
+        <View style={{ flex: 1 }}>
+          <WardField province={province} value={ward} onChange={setWard} allowAll />
+        </View>
+      </View>
+
       <Text style={styles.hint}>
         Gõ tên để xem gợi ý, hoặc nhập mã như <Text style={styles.code}>HV-CHO</Text> để vào
         thẳng nhóm.
@@ -137,7 +150,9 @@ export default function FindOrg() {
               text={
                 term
                   ? `Không có nhóm công khai nào khớp "${term}". Nhóm riêng tư chỉ vào được bằng mã.`
-                  : 'Chưa có nhóm công khai nào để gợi ý'
+                  : province
+                    ? `Chưa có nhóm công khai nào ở ${ward ?? province}`
+                    : 'Chưa có nhóm công khai nào để gợi ý'
               }
             />
           )
@@ -165,6 +180,7 @@ const styles = StyleSheet.create({
     borderColor: C.lineInput,
   },
   searchGlyph: { fontSize: 14 },
+  filters: { flexDirection: 'row', gap: 10, marginHorizontal: 16, marginTop: 10 },
   searchInput: { flex: 1, paddingVertical: 12, fontFamily: F.ui, fontSize: 14, color: C.ink },
   /*
    * `inkSoft`, không phải `sand`: `sand` là `#F5F6F7` còn nền màn là `cork` `#F1F2F4` — hai sắc

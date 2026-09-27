@@ -121,7 +121,8 @@ export const qk = {
   allOrgsRoot: () => ['orgs', 'all'] as const,
   orgByCode: (code: string) => ['orgs', 'by-code', code] as const,
   /** Tìm nhóm công khai. Từ khoá nằm trong key: mỗi từ khoá là một tập kết quả khác. */
-  orgDiscover: (q: string) => ['orgs', 'discover', q] as const,
+  orgDiscover: (q: string, province: string | null, ward: string | null) =>
+    ['orgs', 'discover', q, province, ward] as const,
   /** `code` tham gia khoá: có mã và không mã là hai câu trả lời khác nhau cho cùng một id. */
   orgProfile: (orgId: string, code?: string) =>
     ['orgs', 'profile', orgId, code ?? ''] as const,
@@ -157,6 +158,12 @@ export const qk = {
   /** `category`/`q` là bộ lọc SERVER của màn Tin đăng — một tổ hợp lọc là một danh sách trang riêng. */
   adminListings: (orgId: string, status: string, category = 'all', q = '') =>
     ['admin', 'listings', orgId, status, category, q] as const,
+  /**
+   * Mọi tin của một người (Người dùng › chi tiết). Nằm DƯỚI `adminRoot()`: mutation duyệt/ẩn/gỡ
+   * của bàn quản trị quét cả cụm, nên màn này tự cập nhật sau mỗi thao tác trên sheet.
+   */
+  adminUserListings: (sellerId: string, status: string) =>
+    ['admin', 'user-listings', sellerId, status] as const,
   adminPublicQueue: (status: string) => ['admin', 'public-queue', status] as const,
   adminCoverage: () => ['admin', 'coverage'] as const,
   /**

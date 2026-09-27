@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminPeopleApi } from '@/api/admin-people';
 import type { UserFilter } from '@/api/admin-people';
+import { adminApi } from '@/api/admin';
+import type { ModStatus } from '@/api/admin';
+import { useCategories } from './listings';
 import { qk } from './keys';
 import { usePagedList } from './paged';
 
@@ -77,4 +80,21 @@ export function useLiftProbation() {
  */
 export function useAdjustWallet() {
   return useMutation({ mutationFn: adminPeopleApi.adjustWallet });
+}
+
+/**
+ * Mọi tin một người đã đăng, mọi trạng thái bàn duyệt thấy (`GET /moderation/listings?seller=`).
+ *
+ * KHÔNG gửi `X-Org-Id` dù master đang chọn một nhóm ở bàn quản trị: câu hỏi ở màn này là "người
+ * này đã đăng những gì", không phải "trong nhóm đang chọn". Không có header thì scope của master
+ * là mọi nhóm + trục công khai.
+ */
+export function useUserListings(sellerId: string, status?: ModStatus) {
+  const { data: categories } = useCategories();
+  const names = new Map((categories ?? []).map((c) => [c.id, c.name]));
+  return usePagedList(
+    qk.adminUserListings(sellerId, status ?? 'all'),
+    (page) => adminApi.getListings(undefined, status, names, page, { seller: sellerId }),
+    { enabled: !!sellerId, keepPrevious: true },
+  );
 }

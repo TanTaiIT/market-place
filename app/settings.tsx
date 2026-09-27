@@ -3,11 +3,13 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AvatarPicker } from '@/components/AvatarPicker';
 import { ChangePasswordCard } from '@/components/ChangePasswordCard';
+import { PushPrefsCard } from '@/components/PushPrefsCard';
 import { AddressField, ProvinceField, WardField } from '@/components/LocationPicker';
 import { EmptyState, Field, Loading, PinButton, ScreenHeader } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { useProfile, useUpdateProfile } from '@/queries/listings';
 import { useChangePassword } from '@/queries/auth';
+import { useEnablePush, usePushPermission, usePushPrefs, useSendTestPush, useUpdatePushPrefs } from '@/queries/push';
 import { GENDER_LABEL } from '@/api/db';
 import type { Gender, Profile } from '@/api/db';
 import { C, F } from '@/theme';
@@ -25,6 +27,12 @@ export default function Settings() {
   const { data: profile, error } = useProfile();
   const update = useUpdateProfile();
   const changePw = useChangePassword();
+  const permission = usePushPermission();
+  const pushPrefs = usePushPrefs();
+  const updatePush = useUpdatePushPrefs();
+  const enablePush = useEnablePush();
+  const testPush = useSendTestPush();
+  const showError = (e: Error) => toast(`⚠️ ${e.message}`);
 
   const [form, setForm] = useState<Form | null>(null);
 
@@ -127,6 +135,27 @@ export default function Settings() {
               update.mutate(form, {
                 onSuccess: () => toast('✓ Đã lưu thay đổi!'),
                 onError: (e: Error) => toast(`⚠️ ${e.message}`),
+              })
+            }
+          />
+
+          <PushPrefsCard
+            permission={permission.data}
+            prefs={pushPrefs.data}
+            enabling={enablePush.isPending}
+            testing={testPush.isPending}
+            onEnable={() =>
+              enablePush.mutate(undefined, {
+                onSuccess: (on) => toast(on ? '🔔 Đã bật thông báo' : 'Chưa được cấp quyền thông báo'),
+                onError: showError,
+              })
+            }
+            onChange={(change) => updatePush.mutate(change, { onError: showError })}
+            onTest={() =>
+              testPush.mutate(undefined, {
+                onSuccess: (devices) =>
+                  toast(devices > 0 ? '🔔 Đã gửi — xem thanh thông báo' : 'Máy này chưa đăng ký nhận thông báo'),
+                onError: showError,
               })
             }
           />

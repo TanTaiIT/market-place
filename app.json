@@ -4,6 +4,7 @@
     "slug": "ghim",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "scheme": "ghim",
     "userInterfaceStyle": "light",
     "ios": {
@@ -13,7 +14,9 @@
     "android": {
       "package": "com.ghim.app",
       "adaptiveIcon": {
-        "backgroundColor": "#B98851"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "monochromeImage": "./assets/adaptive-icon-mono.png",
+        "backgroundColor": "#FFFFFF"
       }
     },
     "plugins": [
@@ -31,15 +34,32 @@
       [
         "expo-splash-screen",
         {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#11170F"
         }
       ],
       "expo-status-bar",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#78C8D4",
+          "defaultChannel": "listing_status"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "59335439-f02f-445f-bca7-54d5f09e16a7"
+      }
+    },
+    "owner": "tantaiit1908"
   }
 }

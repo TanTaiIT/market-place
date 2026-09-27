@@ -23,6 +23,7 @@ import {
   useSendMessage,
 } from '@/queries/chat';
 import { useListing } from '@/queries/listings';
+import { usePushPrompt, useSuppressChatPush } from '@/queries/push';
 import { C, F, shadow } from '@/theme';
 
 export default function Chat() {
@@ -37,6 +38,8 @@ export default function Chat() {
   const { data: messages, loadMore, isFetchingNextPage } = useMessages(conversationId);
   // Vào phòng để nhận tin của người kia ngay, không chờ lượt refetch nào.
   useConversationRoom(conversationId);
+  useSuppressChatPush(conversationId);
+  const askPush = usePushPrompt();
   // Chuỗi rỗng = chưa có hội thoại -> `useListing` tự tắt qua `enabled`.
   const { data: listing } = useListing(conversation?.listingId ?? '');
   const send = useSendMessage(conversationId);
@@ -74,6 +77,7 @@ export default function Chat() {
     setText('');
     send.mutate(t);
     scrollToEnd();
+    void askPush('Bật thông báo để biết ngay khi người kia trả lời.');
   };
 
   if (isLoading) return <Loading />;

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Stack, type ErrorBoundaryProps } from 'expo-router';
+import { Stack, useRouter, type ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -26,6 +26,7 @@ import { ToastProvider } from '@/components/Toast';
 import { useSyncAccessToken, useValidateSession } from '@/queries/auth';
 import { useChatSocket, useInboxSignal } from '@/queries/chat';
 import { useNotifSignal } from '@/queries/notifications';
+import { usePushRegistration, usePushTaps } from '@/queries/push';
 import { useAuthHydrated, useIsAuthenticated } from '@/stores/auth';
 import { C } from '@/theme';
 
@@ -96,6 +97,11 @@ export default function RootLayout() {
   // Đối xứng cho hộp thư thông báo. Hiệu ứng lắc chuông KHÔNG ở đây mà ở `TabBar` — nó thuộc
   // về cái chuông, còn hook này phải sống cả khi thanh tab không hiển thị.
   useNotifSignal(queryClient);
+  // Push: đăng ký máy khi đã có quyền (không tự xin quyền lúc mở app — xem `usePushPrompt`).
+  usePushRegistration();
+
+  const router = useRouter();
+  const openFromPush = useCallback((path: string) => router.push(path), [router]);
 
   const [splashDone, setSplashDone] = useState(false);
   const finishSplash = useCallback(() => setSplashDone(true), []);
@@ -106,6 +112,7 @@ export default function RootLayout() {
   // Phiên đăng nhập phải đọc xong mới dựng Stack — guard chạy sớm sẽ nháy qua màn login rồi
   // mới nhảy vào feed. Đọc đĩa chạy song song với animation splash, không cộng dồn thời gian.
   const ready = fontsReady && authHydrated;
+  usePushTaps(queryClient, ready, openFromPush);
 
   useEffect(() => {
     if (fontsReady) SplashScreen.hideAsync().catch(() => {});

@@ -997,6 +997,59 @@ export type SupportQueueItem = {
     waiting: boolean;
 };
 
+export type RegisterPushDevice = {
+    token: string;
+    platform: 'ios' | 'android';
+    appVersion?: string;
+    deviceName?: string;
+};
+
+export type UnregisterPushDevice = {
+    token: string;
+};
+
+export type UpdatePushPreferences = {
+    enabled?: boolean;
+    categories?: {
+        chat?: boolean;
+        listing_status?: boolean;
+        membership?: boolean;
+        report?: boolean;
+        wallet?: boolean;
+        group_notice?: boolean;
+        group_activity?: boolean;
+        support?: boolean;
+    };
+};
+
+export type PushPreferences = {
+    enabled: boolean;
+    categories: {
+        chat: boolean;
+        listing_status: boolean;
+        membership: boolean;
+        report: boolean;
+        account: boolean;
+        wallet: boolean;
+        group_notice: boolean;
+        group_activity: boolean;
+        support: boolean;
+    };
+    locked: Array<'account'>;
+};
+
+export type PushDevice = {
+    id: string;
+    platform: 'ios' | 'android';
+    appVersion: string;
+    deviceName: string;
+    lastSeenAt: string;
+};
+
+export type PushTestResult = {
+    devices: number;
+};
+
 export type SendVerificationCode = {
     expiresInSeconds: number;
     resendAfterSeconds: number;
@@ -1465,6 +1518,9 @@ export type AuthResetPasswordResponse = AuthResetPasswordResponses[keyof AuthRes
 
 export type AuthChangePasswordData = {
     body?: ChangePassword;
+    headers?: {
+        'x-push-token'?: string;
+    };
     path?: never;
     query?: never;
     url: '/auth/password/change';
@@ -6378,3 +6434,172 @@ export type SocialFeedbackReviewResponses = {
 };
 
 export type SocialFeedbackReviewResponse = SocialFeedbackReviewResponses[keyof SocialFeedbackReviewResponses];
+
+export type PushRegisterDeviceData = {
+    body?: RegisterPushDevice;
+    path?: never;
+    query?: never;
+    url: '/push/devices';
+};
+
+export type PushRegisterDeviceErrors = {
+    /**
+     * Token hoặc dữ liệu không hợp lệ
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Quá nhiều request
+     */
+    429: ErrorResponse;
+};
+
+export type PushRegisterDeviceError = PushRegisterDeviceErrors[keyof PushRegisterDeviceErrors];
+
+export type PushRegisterDeviceResponses = {
+    /**
+     * Đã đăng ký
+     */
+    200: {
+        success: true;
+        message: string;
+        data: PushDevice;
+    };
+};
+
+export type PushRegisterDeviceResponse = PushRegisterDeviceResponses[keyof PushRegisterDeviceResponses];
+
+export type PushUnregisterDeviceData = {
+    body?: UnregisterPushDevice;
+    path?: never;
+    query?: never;
+    url: '/push/devices/unregister';
+};
+
+export type PushUnregisterDeviceErrors = {
+    /**
+     * Token không hợp lệ
+     */
+    400: ErrorResponse;
+    /**
+     * Quá nhiều request
+     */
+    429: ErrorResponse;
+};
+
+export type PushUnregisterDeviceError = PushUnregisterDeviceErrors[keyof PushUnregisterDeviceErrors];
+
+export type PushUnregisterDeviceResponses = {
+    /**
+     * Đã gỡ
+     */
+    200: {
+        success: true;
+        message: string;
+        data: unknown;
+    };
+};
+
+export type PushUnregisterDeviceResponse = PushUnregisterDeviceResponses[keyof PushUnregisterDeviceResponses];
+
+export type PushGetPreferencesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/push/preferences';
+};
+
+export type PushGetPreferencesErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+};
+
+export type PushGetPreferencesError = PushGetPreferencesErrors[keyof PushGetPreferencesErrors];
+
+export type PushGetPreferencesResponses = {
+    /**
+     * Công tắc
+     */
+    200: {
+        success: true;
+        message: string;
+        data: PushPreferences;
+    };
+};
+
+export type PushGetPreferencesResponse = PushGetPreferencesResponses[keyof PushGetPreferencesResponses];
+
+export type PushUpdatePreferencesData = {
+    body?: UpdatePushPreferences;
+    path?: never;
+    query?: never;
+    url: '/push/preferences';
+};
+
+export type PushUpdatePreferencesErrors = {
+    /**
+     * Dữ liệu không hợp lệ
+     */
+    400: ErrorResponse;
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+};
+
+export type PushUpdatePreferencesError = PushUpdatePreferencesErrors[keyof PushUpdatePreferencesErrors];
+
+export type PushUpdatePreferencesResponses = {
+    /**
+     * Đã lưu
+     */
+    200: {
+        success: true;
+        message: string;
+        data: PushPreferences;
+    };
+};
+
+export type PushUpdatePreferencesResponse = PushUpdatePreferencesResponses[keyof PushUpdatePreferencesResponses];
+
+export type PushSendTestData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/push/test';
+};
+
+export type PushSendTestErrors = {
+    /**
+     * Thiếu hoặc sai access token
+     */
+    401: ErrorResponse;
+    /**
+     * Quá nhiều request
+     */
+    429: ErrorResponse;
+    /**
+     * Push chưa bật trên server
+     */
+    503: ErrorResponse;
+};
+
+export type PushSendTestError = PushSendTestErrors[keyof PushSendTestErrors];
+
+export type PushSendTestResponses = {
+    /**
+     * Đã xếp hàng
+     */
+    200: {
+        success: true;
+        message: string;
+        data: PushTestResult;
+    };
+};
+
+export type PushSendTestResponse = PushSendTestResponses[keyof PushSendTestResponses];

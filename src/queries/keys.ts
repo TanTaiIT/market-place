@@ -89,6 +89,9 @@ export const qk = {
   conversation: (id: string) => ['conversation', id] as const,
   messages: (conversationId: string) => ['conversation', conversationId, 'messages'] as const,
   notifications: () => ['notifications'] as const,
+  /** Công tắc push lưu ở server; quyền thông báo là trạng thái của MÁY, đọc lại mỗi lần app quay lại. */
+  pushPrefs: () => ['push', 'prefs'] as const,
+  pushPermission: () => ['push', 'permission'] as const,
   profile: () => ['profile'] as const,
 
   /*

@@ -1,4 +1,4 @@
-# Ghim — React Native (Expo SDK 54)
+# Ghim — React Native (Expo SDK 57)
 
 Bản port đầy đủ của prototype HTML `ghim-mobile-ui.html` sang React Native, dùng
 **expo-router**, **TanStack React Query v5** và **Reanimated 4**.
@@ -16,8 +16,22 @@ npm install
 npx expo start -c
 ```
 
-Mở Expo Go trên iPhone → quét mã QR. Dự án nhắm đúng **SDK 54** nên Expo Go
-client 1017756 của bạn chạy được ngay, không cần dev build.
+**Không chạy bằng Expo Go nữa** (từ khi có push notification, 2026-09-27): Expo Go trên Android
+không nhận push từ SDK 53, nên app chạy bằng **development build** — một APK riêng của Ghim có
+sẵn `expo-dev-client`, vẫn nạp JS từ `expo start` như Expo Go.
+
+```bash
+npm i -g eas-cli && eas login
+eas build --profile development --platform android   # lần đầu, hoặc khi đổi native module
+# cài APK vừa build lên máy thật, rồi:
+npx expo start -c --dev-client
+```
+
+Chỉ phải build lại khi thêm/đổi native module hoặc `app.json`; sửa JS thì chỉ cần `expo start`.
+
+**Push notification** cần thêm credential (làm một lần, cần tài khoản Expo + Firebase) — các bước ở
+`docs/market/docs/architecture/push-notification.plan.md` §11. Thiếu `google-services.json` thì
+app vẫn build và chạy, chỉ không nhận được push. Máy ảo không nhận push — test trên máy thật.
 
 Nếu về sau muốn Expo tự chỉnh version cho khớp SDK:
 

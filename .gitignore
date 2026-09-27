@@ -13,3 +13,8 @@ npm-debug.*
 *.orig.*
 web-build/
 .DS_Store
+
+# Firebase (FCM) cho push Android — tải từ Firebase Console, không commit. EAS build lấy qua
+# file secret GOOGLE_SERVICES_JSON (xem app.config.ts).
+google-services.json
+GoogleService-Info.plist

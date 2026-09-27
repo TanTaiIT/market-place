@@ -64,7 +64,7 @@ import type {
   PublicProfile,
   SearchFilter,
 } from './db';
-import { getCurrentUserId, withAuthRetry } from './http';
+import { getHttpPushToken, getCurrentUserId, withAuthRetry } from './http';
 import { REVIEW_MODE } from '@/compliance';
 
 /**
@@ -571,7 +571,14 @@ export const api = {
     currentPassword: string;
     newPassword: string;
   }): Promise<AuthSession> {
-    const res = await withAuthRetry(() => authChangePassword({ body: input }));
+    // Máy đang đổi gửi push token của nó: BE gỡ mọi máy KHÁC, máy này vẫn nhận thông báo.
+    const pushToken = getHttpPushToken();
+    const res = await withAuthRetry(() =>
+      authChangePassword({
+        body: input,
+        headers: pushToken ? { 'x-push-token': pushToken } : undefined,
+      }),
+    );
     return toSession(unwrap(res, 'Không đổi được mật khẩu'));
   },
 

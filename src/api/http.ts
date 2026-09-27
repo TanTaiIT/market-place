@@ -49,6 +49,21 @@ export function getCurrentUserId(): string | null {
   return session?.userId ?? null;
 }
 
+/**
+ * Push token đã đăng ký của MÁY NÀY. Ở đây chứ không ở `push.ts` vì `client.ts` cũng cần nó
+ * (đổi mật khẩu gửi kèm để máy này không bị gỡ cùng các máy khác) — để ở `push.ts` là hai file
+ * import vòng lẫn nhau.
+ */
+let pushToken: string | null = null;
+
+export function setHttpPushToken(next: string | null): void {
+  pushToken = next;
+}
+
+export function getHttpPushToken(): string | null {
+  return pushToken;
+}
+
 // ── LÀM MỚI PHIÊN ───────────────────────────────────────────────────
 
 /**

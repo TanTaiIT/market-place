@@ -16,6 +16,7 @@ import {
 import { useListingPhotos } from '@/queries/upload';
 import { useOrgProfile } from '@/queries/org-discover';
 import { QuotaNotice } from '@/components/QuotaNotice';
+import { usePushPrompt } from '@/queries/push';
 
 /**
  * Ghim tin mới.
@@ -28,6 +29,7 @@ export default function Post() {
   const toast = useToast();
   const create = useCreateListing();
   const photos = useListingPhotos();
+  const askPush = usePushPrompt();
 
   /*
    * Khoá chống đăng đôi, sinh MỘT lần cho mỗi lần mở màn: mạng chậm, bấm "Ghim" hai lần thì BE trả
@@ -139,6 +141,7 @@ export default function Post() {
                     // cả tin chờ duyệt.
                     toast('📌 Đã ghim tin — chờ duyệt rồi sẽ lên bảng');
                     router.replace('/mylistings');
+                    void askPush('Bật thông báo để biết ngay khi tin được duyệt hoặc bị từ chối.');
                   },
                   onError: (e: Error) => toast(`⚠️ ${e.message}`),
                 },

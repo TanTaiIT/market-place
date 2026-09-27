@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
+import { pushApi } from '@/api/push';
 import {
   setHttpSession,
   setSessionRefresher,
@@ -77,6 +78,8 @@ export function useSignOut() {
      * người bấm "đăng xuất" không có gì để làm với thông báo lỗi ở đây.
      */
     void api.signOut().catch(() => undefined);
+    // Máy này thôi nhận push của tài khoản vừa rời. Không cần phiên còn sống — xem `pushApi`.
+    void pushApi.unregister();
 
     useAuthStore.getState().signOut();
     qc.clear();
@@ -104,6 +107,7 @@ function refreshSession(qc: QueryClient): Promise<string | null> {
     .catch(() => {
       // Refresh token cũng hết hạn / bị thu hồi -> hết đường tự cứu. Dọn phiên như
       // `useSignOut` (kể cả cache) để `Stack.Protected` đưa về màn login thay vì treo ở màn lỗi.
+      void pushApi.unregister();
       useAuthStore.getState().signOut();
       setHttpSession(null);
       qc.clear();

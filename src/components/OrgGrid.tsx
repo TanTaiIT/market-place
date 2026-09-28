@@ -48,9 +48,16 @@ function toRows(sections: OrgGridSection[]): Row[] {
 
 export function OrgGrid({
   sections,
+  header,
   empty,
 }: {
   sections: OrgGridSection[];
+  /**
+   * Khối cuộn CÙNG lưới, phía trên mục đầu (ô tìm, bộ lọc). Nằm trong lề ngang của `list`, nên
+   * caller không tự canh lề. Truyền element chứ không component: mỗi lần dữ liệu đổi `FlatList`
+   * render lại header, mà một component khai inline sẽ bị remount và ô gõ trong đó mất focus.
+   */
+  header?: React.ReactElement;
   /** Hiện khi KHÔNG mục nào có thẻ — mục rỗng tự biến mất, không để lại tiêu đề trơ. */
   empty: React.ReactElement;
 }) {
@@ -61,6 +68,7 @@ export function OrgGrid({
       data={rows}
       keyExtractor={(r) => r.key}
       contentContainerStyle={styles.list}
+      ListHeaderComponent={header}
       keyboardShouldPersistTaps="handled"
       renderItem={({ item, index }) =>
         item.kind === 'head' ? (

@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { groupDigits } from '@/api/client';
-import { shortDong } from '@/api/db';
+import { FREE_PRICE, shortDong } from '@/api/db';
 import { C, F } from '@/theme';
 
 /**
@@ -56,9 +56,18 @@ interface Preset {
   max: number | null;
 }
 
+/**
+ * Đứng đầu hàng chip, NGOÀI thang: "Dưới 500k" vẫn chứa tin 0đ, nhưng người đi tìm đồ cho tặng
+ * không muốn lội qua hàng trăm tin có giá để tới chúng. Không phải bậc của thang nên không sinh
+ * từ `LADDERS`; giá trị lấy từ `FREE_PRICE` để chip này và chip tiêu chí ở trang kết quả cùng
+ * chỉ một khoảng.
+ */
+const FREE_PRESET: Preset = { label: '🎁 Miễn phí', ...FREE_PRICE };
+
 function presetsOf(categorySlug: string | null): Preset[] {
   const [a, b, c, d] = (categorySlug && LADDERS[categorySlug]) || DEFAULT_LADDER;
   return [
+    FREE_PRESET,
     { label: `Dưới ${shortDong(a)}`, min: null, max: a },
     { label: `${shortDong(a)} – ${shortDong(b)}`, min: a, max: b },
     { label: `${shortDong(b)} – ${shortDong(c)}`, min: b, max: c },

@@ -16,21 +16,15 @@ import { qk } from './keys';
  * Tìm nhóm công khai. Từ khoá rỗng = khối "Gợi ý cho bạn", nên KHÔNG có `enabled` chặn:
  * màn khám phá phải có nội dung ngay lúc mở, trước khi người dùng gõ chữ nào.
  *
- * Debounce 300ms, cùng lý do với ô tìm của bảng tổ chức (`useAllOrgs`): mỗi tiền tố là một `queryKey` mới
- * nên gõ thẳng sẽ bắn một request cho từng chữ cái vào một route có rate limit.
+ * KHÔNG hoãn 300ms như `useAllOrgs`: màn Tìm nhóm chỉ đổi từ khoá khi người dùng bấm tìm
+ * (`find-org.tsx` giữ bản nháp riêng), nên mỗi khoá mới là một lượt tìm có chủ ý chứ không phải
+ * một chữ cái đang gõ dở — hoãn ở đây chỉ là bắt người ta chờ thêm sau cú bấm.
  */
 export function useOrgDiscover(keyword: string, where: OrgWhereFilter = {}) {
   const term = keyword.trim();
-  const [settled, setSettled] = useState(term);
-  useEffect(() => {
-    const t = setTimeout(() => setSettled(term), 300);
-    return () => clearTimeout(t);
-  }, [term]);
-
   return useQuery({
-    // Bộ lọc KHÔNG hoãn như từ khoá: chọn tỉnh là một cú chạm, không phải chuỗi phím đang gõ dở.
-    queryKey: qk.orgDiscover(settled, where.province ?? null, where.ward ?? null),
-    queryFn: () => orgApi.discover(settled, where),
+    queryKey: qk.orgDiscover(term, where.province ?? null, where.ward ?? null),
+    queryFn: () => orgApi.discover(term, where),
     placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
@@ -121,7 +115,7 @@ export function useOrgPeek(orgId: string, joined: boolean) {
  * khối xem trước lấy đúng 3 tin và đi kèm danh bạ, còn lượt tìm lấy rộng hơn nhiều và không
  * cần danh bạ. Nhét chung một query là mỗi lần gõ một chữ lại kéo theo một lượt gọi danh bạ.
  *
- * Hoãn 300ms như `useOrgDiscover`: mỗi tiền tố là một khoá mới, gõ thẳng là một request cho
+ * Hoãn 300ms như `useAllOrgs`: mỗi tiền tố là một khoá mới, gõ thẳng là một request cho
  * từng chữ cái.
  */
 export function useOrgListingSearch(orgId: string, keyword: string, enabled: boolean) {

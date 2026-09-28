@@ -7,6 +7,7 @@ import { useMyOrgs } from '@/queries/org';
 import {
   activeFilterCount,
   EMPTY_SEARCH,
+  isFreePrice,
   locationApplies,
   priceRangeLabel,
   type ListingAttrFilter,
@@ -100,7 +101,8 @@ export function SearchCrumbBar({
   if (price) {
     crumbs.push({
       key: 'price',
-      icon: '💰',
+      // Đồ cho tặng không có "tiền" để mà 💰 — cùng biểu tượng với chip trong `PriceField`.
+      icon: isFreePrice(filter.minPrice, filter.maxPrice) ? '🎁' : '💰',
       text: price,
       without: { ...filter, minPrice: null, maxPrice: null },
     });

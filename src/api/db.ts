@@ -453,12 +453,24 @@ export function shortDong(dong: number): string {
 }
 
 /**
+ * "Tin miễn phí" = khoảng giá `[0, 0]`, không phải một cờ riêng. Tin cho tặng lưu `price: 0` ở
+ * BE (schema bắt buộc, `min: 0`), và bộ lọc giá đã là `$gte`/`$lte` — nên hai đầu cùng bằng 0
+ * lọc ra đúng tập đó mà không thêm param, không đổi URL, không đụng BE. Chip trong `PriceField`
+ * và nhãn ở `priceRangeLabel` cùng đọc một chỗ để "miễn phí" không lệch nghĩa giữa hai nơi.
+ */
+export const FREE_PRICE = { min: 0, max: 0 } as const;
+export const isFreePrice = (min: number | null, max: number | null): boolean =>
+  min === FREE_PRICE.min && max === FREE_PRICE.max;
+
+/**
  * Nhãn khoảng giá, `null` khi không ràng buộc giá.
  *
  * Một đầu để trống thì viết "từ …"/"đến …" chứ không bơm số thay vào: "0 — 2tr" nói rằng có chặn
  * dưới ở 0, còn "đến 2tr" mới đúng là không có chặn dưới.
  */
 export function priceRangeLabel(min: number | null, max: number | null): string | null {
+  // "0đ — 0đ" đúng về số nhưng không ai đọc ra là "cho tặng".
+  if (isFreePrice(min, max)) return 'Miễn phí';
   if (min !== null && max !== null) return `${shortDong(min)} — ${shortDong(max)}`;
   if (min !== null) return `từ ${shortDong(min)}`;
   if (max !== null) return `đến ${shortDong(max)}`;

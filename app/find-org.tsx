@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState, Loading, ScreenHeader } from '@/components/ui';
@@ -10,7 +10,7 @@ import { useMyOrgs, useRequestJoin } from '@/queries/org';
 import { useOrgDiscover } from '@/queries/org-discover';
 import { useProfile } from '@/queries/listings';
 import { orgWhere, type OrgRow } from '@/api/org';
-import { C, F } from '@/theme';
+import { C, F, R } from '@/theme';
 
 /**
  * Tìm nhóm MỚI — gợi ý công khai, tìm theo tên, và gõ mã để vào thẳng một nhóm.
@@ -25,25 +25,39 @@ import { C, F } from '@/theme';
  * một nhóm kín cũng không lộ ra nó có tồn tại.
  */
 
+/** Từ khoá + địa bàn của lượt tìm gần nhất — xem chú thích tại `applied` trong `FindOrg`. */
+type Applied = { term: string; province: ProvinceName | null; ward: string | null };
+
+/** Cao bằng ô chọn của `LocationPicker` (padding 13×2 + một dòng chữ 14 + viền) để đứng cùng hàng. */
+const GO_SIZE = 46;
+
 export default function FindOrg() {
   const router = useRouter();
   const toast = useToast();
   const [term, setTerm] = useState('');
   const [province, setProvince] = useState<ProvinceName | null>(null);
   const [ward, setWard] = useState<string | null>(null);
+  /*
+   * Tiêu chí ĐÃ BẤM TÌM — query chỉ nhìn bản này. Ba ô trên là bản nháp: chọn tỉnh rồi chọn
+   * xã mà mỗi cú chạm đã bắn một lượt tìm thì danh sách nhảy hai lần cho một ý định, và kết
+   * quả "tỉnh-chưa-xã" chen vào giữa. Bấm 🔍 (hoặc phím tìm trên bàn phím) mới chốt cả từ khoá
+   * lẫn địa bàn một lần — cùng cách với thẻ tìm ở trang chủ (`FeedSearchCard`).
+   */
+  const [applied, setApplied] = useState<Applied>({ term: '', province: null, ward: null });
+  const search = () => setApplied({ term: term.trim(), province, ward });
 
   const { data: profile } = useProfile();
   const { data: mine } = useMyOrgs();
-  const { data, error, isPending } = useOrgDiscover(term, {
-    province: province ?? undefined,
-    ward: ward ?? undefined,
+  const { data, error, isPending } = useOrgDiscover(applied.term, {
+    province: applied.province ?? undefined,
+    ward: applied.ward ?? undefined,
   });
   const join = useRequestJoin();
 
   const myIds = new Set((mine ?? []).map((o) => o.id));
   const suggested = (data ?? []).filter((o) => !myIds.has(o.id));
   /* Gõ trúng mã thì BE trả đúng một dòng — dấu hiệu đủ chắc để gọi tên nó ra ở tiêu đề mục. */
-  const exactCode = term.trim().length >= 4 && suggested.length === 1;
+  const exactCode = applied.term.length >= 4 && suggested.length === 1;
 
   /*
    * Mang MÃ theo khi mở hồ sơ: nhóm riêng tư 404 với người ngoài, và mã là chìa khoá duy nhất
@@ -104,11 +118,14 @@ export default function FindOrg() {
     },
   ];
 
-  return (
-    // `SafeAreaView` chứ không `View`: `ScreenHeader` không tự chừa lề trên — xem docblock của nó.
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.cork }} edges={['top']}>
-      <ScreenHeader title="Tìm nhóm" />
-
+  /*
+   * Ô tìm + địa bàn CUỘN CÙNG lưới, không ghim dưới thanh tiêu đề: từ khi hai ô địa bàn xếp dọc,
+   * khối này ăn phần lớn nửa trên màn điện thoại, ghim lại thì lưới kết quả chỉ còn vài hàng thấy
+   * được. Cuộn được là an toàn vì lượt tìm chỉ chạy khi bấm 🔍 — lý do `search/index.tsx` từng
+   * phải tách ngăn lọc ra khỏi danh sách (kết quả tự đổi dưới tay lúc đang chỉnh) không còn ở đây.
+   */
+  const header = (
+    <>
       <View style={styles.search}>
         <Text style={styles.searchGlyph}>🔍</Text>
         <TextInput
@@ -119,26 +136,43 @@ export default function FindOrg() {
           style={styles.searchInput}
           autoCorrect={false}
           returnKeyType="search"
+          onSubmitEditing={search}
         />
       </View>
 
       {/* Bỏ trống = toàn quốc / toàn tỉnh. Phường tự xoá khi đổi tỉnh (xem `WardField`). */}
       <View style={styles.filters}>
-        <View style={{ flex: 1 }}>
-          <ProvinceField value={province} onChange={setProvince} allowAll />
-        </View>
-        <View style={{ flex: 1 }}>
-          <WardField province={province} value={ward} onChange={setWard} allowAll />
+        <ProvinceField value={province} onChange={setProvince} allowAll />
+        <View style={styles.wardRow}>
+          <View style={{ flex: 1 }}>
+            <WardField province={province} value={ward} onChange={setWard} allowAll />
+          </View>
+          <Pressable
+            onPress={search}
+            accessibilityRole="button"
+            accessibilityLabel="Tìm nhóm"
+            style={({ pressed }) => [styles.go, pressed && styles.goPressed]}
+          >
+            <Text style={styles.goGlyph}>🔍</Text>
+          </Pressable>
         </View>
       </View>
 
       <Text style={styles.hint}>
-        Gõ tên để xem gợi ý, hoặc nhập mã như <Text style={styles.code}>HV-CHO</Text> để vào
-        thẳng nhóm.
+        Gõ tên nhóm, hoặc mã như <Text style={styles.code}>HV-CHO</Text> để vào thẳng nhóm; chọn
+        địa bàn nếu cần rồi bấm 🔍.
       </Text>
+    </>
+  );
+
+  return (
+    // `SafeAreaView` chứ không `View`: `ScreenHeader` không tự chừa lề trên — xem docblock của nó.
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.cork }} edges={['top']}>
+      <ScreenHeader title="Tìm nhóm" />
 
       <OrgGrid
         sections={sections}
+        header={header}
         empty={
           isPending ? (
             <Loading />
@@ -148,10 +182,10 @@ export default function FindOrg() {
             <EmptyState
               icon="🔍"
               text={
-                term
-                  ? `Không có nhóm công khai nào khớp "${term}". Nhóm riêng tư chỉ vào được bằng mã.`
-                  : province
-                    ? `Chưa có nhóm công khai nào ở ${ward ?? province}`
+                applied.term
+                  ? `Không có nhóm công khai nào khớp "${applied.term}". Nhóm riêng tư chỉ vào được bằng mã.`
+                  : applied.province
+                    ? `Chưa có nhóm công khai nào ở ${applied.ward ?? applied.province}`
                     : 'Chưa có nhóm công khai nào để gợi ý'
               }
             />
@@ -167,12 +201,11 @@ const styles = StyleSheet.create({
    * Viền `lineInput`, không phải `pin`: `pin` là `#FF4D4D`, trùng byte với `C.danger`. Một ô
    * tìm kiếm viền đỏ đọc ra là "ô này đang lỗi" trước khi người ta gõ chữ nào.
    */
+  // Không có lề ngang: cả khối nằm trong `header` của `OrgGrid`, lề do lưới cấp.
   search: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
-    marginHorizontal: 16,
-    marginTop: 4,
     paddingHorizontal: 13,
     borderRadius: 10,
     backgroundColor: C.paperWarm,
@@ -180,7 +213,25 @@ const styles = StyleSheet.create({
     borderColor: C.lineInput,
   },
   searchGlyph: { fontSize: 14 },
-  filters: { flexDirection: 'row', gap: 10, marginHorizontal: 16, marginTop: 10 },
+  // Xếp dọc để mỗi ô ăn trọn bề ngang: tên xã dài nằm trong nửa màn là bị cắt "…".
+  filters: { marginTop: 10 },
+  /*
+   * `flex-end` chứ không `center`: `WardField` gồm nhãn + ô chọn, nút tìm phải ngang hàng với Ô
+   * CHỌN chứ không lơ lửng giữa nhãn và ô. `marginBottom` của nút = `field.marginBottom` bên
+   * `LocationPicker`, để hai đáy chạm cùng một đường.
+   */
+  wardRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10 },
+  go: {
+    width: GO_SIZE,
+    height: GO_SIZE,
+    marginBottom: 16,
+    borderRadius: R.sm,
+    backgroundColor: C.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  goPressed: { opacity: 0.75 },
+  goGlyph: { fontSize: 18 },
   searchInput: { flex: 1, paddingVertical: 12, fontFamily: F.ui, fontSize: 14, color: C.ink },
   /*
    * `inkSoft`, không phải `sand`: `sand` là `#F5F6F7` còn nền màn là `cork` `#F1F2F4` — hai sắc
@@ -192,7 +243,6 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     lineHeight: 17,
     color: C.inkSoft,
-    marginHorizontal: 16,
     marginTop: 8,
   },
   code: { fontFamily: F.monoBold, color: C.brandTx },
